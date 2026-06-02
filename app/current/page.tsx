@@ -44,24 +44,37 @@ export default function CurrentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-sm mx-auto pt-8">
-        <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-400 text-sm mb-6">
-          ← Буцах
-        </button>
+    <div className="min-h-screen bg-gray-50">
+      <div className="relative">
+        {location ? (
+          <iframe
+            width="100%"
+            height="220"
+            style={{border: 0}}
+            src={`https://www.openstreetmap.org/export/embed.html?bbox=${location.lng-0.005},${location.lat-0.005},${location.lng+0.005},${location.lat+0.005}&layer=mapnik&marker=${location.lat},${location.lng}`}
+          />
+        ) : (
+          <div className="w-full h-56 bg-gray-200 flex items-center justify-center">
+            <p className="text-gray-400 text-sm">Газрын зураг ачааллаж байна...</p>
+          </div>
+        )}
+        <div className="absolute top-3 left-3">
+          <button onClick={() => router.back()} className="bg-white rounded-full px-3 py-1.5 text-sm text-gray-600 shadow-sm">
+            ← Буцах
+          </button>
+        </div>
+      </div>
 
+      <div className="p-4 max-w-sm mx-auto">
         <h2 className="text-lg font-medium mb-1">Хүрэх газраа тодорхойлно уу</h2>
-        <p className="text-gray-400 text-xs mb-6">Таны одоогийн байршил тогтоогдлоо 📍</p>
+        <p className="text-gray-400 text-xs mb-4">Таны одоогийн байршил тогтоогдлоо 📍</p>
 
-        <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-4">
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-3">
           <div className="flex items-center gap-2 mb-1">
             <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
             <span className="text-xs text-gray-400">Таны байршил</span>
           </div>
           <p className="text-sm font-medium pl-5 text-gray-700">{address}</p>
-          {location && (
-            <p className="text-xs text-gray-300 pl-5 mt-1">{location.lat.toFixed(5)}, {location.lng.toFixed(5)}</p>
-          )}
         </div>
 
         <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-6">
