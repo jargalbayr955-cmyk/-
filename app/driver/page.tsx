@@ -21,11 +21,10 @@ export default function DriverPage() {
       .select()
       .eq('phone', phone)
       .eq('pin', pin)
-      .single()
-    if (!data) {
+    if (!data || data.length === 0) {
       setError('Дугаар эсвэл PIN буруу байна')
     } else {
-      setDriver(data)
+      setDriver(data[0])
     }
     setLoading(false)
   }
@@ -181,7 +180,7 @@ export default function DriverPage() {
                     <div className="w-2.5 h-2.5 rounded-full bg-red-500 mt-1 flex-shrink-0"></div>
                     <div>
                       <p className="text-xs text-gray-400">Хүргэх газар</p>
-                      <p className="text-sm font-medium text-gray-700">{o.to_address || o.dest || '-'}</p>
+                      <p className="text-sm font-medium text-gray-700">{o.to_address || '-'}</p>
                     </div>
                   </div>
                   {o.car_type && (
