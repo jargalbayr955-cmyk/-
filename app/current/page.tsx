@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 
 export default function CurrentPage() {
   const [dest, setDest] = useState('')
@@ -31,15 +32,21 @@ export default function CurrentPage() {
     }
   }, [])
 
-  const handleSearch = () => {
-    if (!dest) return
-    if (location) {
-      localStorage.setItem('fromLat', location.lat.toString())
-      localStorage.setItem('fromLng', location.lng.toString())
-    }
+  const handleSearch = async () => {
+    if (!dest || !location) return
+    localStorage.setItem('fromLat', location.lat.toString())
+    localStorage.setItem('fromLng', location.lng.toString())
     localStorage.setItem('fromAddress', address)
     localStorage.setItem('dest', dest)
-    localStorage.setItem('fromType', 'current')
+
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    await supabase.from('orders').insert({
+      from_address: address,
+      to_address: dest,
+      status: 'pending',
+      user_phone: user.phone || ''
+    })
+
     router.push('/drivers')
   }
 

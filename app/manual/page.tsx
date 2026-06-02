@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 
 export default function ManualPage() {
   const [from, setFrom] = useState('')
@@ -8,12 +9,22 @@ export default function ManualPage() {
   const [carType, setCarType] = useState('')
   const router = useRouter()
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!from || !to || !carType) return
     localStorage.setItem('from', from)
     localStorage.setItem('dest', to)
     localStorage.setItem('carType', carType)
     localStorage.setItem('fromType', 'manual')
+
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    await supabase.from('orders').insert({
+      from_address: from,
+      to_address: to,
+      car_type: carType,
+      status: 'pending',
+      user_phone: user.phone || ''
+    })
+
     router.push('/drivers')
   }
 
