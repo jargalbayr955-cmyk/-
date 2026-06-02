@@ -40,7 +40,7 @@ export default function DriversPage() {
         <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-400 text-sm mb-6">
           ← Буцах
         </button>
-        <h2 className="text-lg font-medium mb-1">Ойр байгаа машинууд</h2>
+        <h2 className="text-lg font-medium mb-1">Ойр байгаа машинууд.</h2>
         <p className="text-gray-400 text-sm mb-6">Таалагдсан үнэ рүү шууд залгаарай</p>
         {loading ? (
           <p className="text-center text-gray-400 text-sm py-12">Хайж байна...</p>
