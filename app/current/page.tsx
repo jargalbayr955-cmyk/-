@@ -40,12 +40,18 @@ export default function CurrentPage() {
     localStorage.setItem('dest', dest)
 
     const user = JSON.parse(localStorage.getItem('user') || '{}')
-    await supabase.from('orders').insert({
-      from_address: address,
-      to_address: dest,
-      status: 'pending',
-      user_phone: user.phone || ''
-    })
+    const { data: orderData } = await supabase
+      .from('orders')
+      .insert({
+        from_address: address,
+        to_address: dest,
+        status: 'pending',
+        user_phone: user.phone || ''
+      })
+      .select()
+      .single()
+
+    if (orderData) localStorage.setItem('current_order_id', orderData.id)
 
     router.push('/drivers')
   }
