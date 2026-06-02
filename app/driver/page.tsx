@@ -11,6 +11,8 @@ export default function DriverPage() {
   const [locating, setLocating] = useState(false)
   const [error, setError] = useState('')
   const [locMsg, setLocMsg] = useState('')
+  const [offerPrices, setOfferPrices] = useState<{[key: string]: string}>({})
+  const [sentOffers, setSentOffers] = useState<{[key: string]: boolean}>({})
 
   const handleLogin = async () => {
     if (!phone || !pin) return setError('Дугаар болон PIN оруулна уу')
@@ -63,6 +65,21 @@ export default function DriverPage() {
     const newVal = !driver.available
     await supabase.from('drivers').update({ available: newVal }).eq('id', driver.id)
     setDriver({ ...driver, available: newVal })
+  }
+
+  const sendOffer = async (order: any) => {
+    const price = offerPrices[order.id]
+    if (!price) return alert('Үнэ оруулна уу')
+    await supabase.from('offers').insert({
+      order_id: order.id,
+      driver_id: driver.id,
+      driver_name: driver.name,
+      driver_phone: driver.phone,
+      car_type: driver.car_type,
+      price: parseInt(price),
+      status: 'pending'
+    })
+    setSentOffers({ ...sentOffers, [order.id]: true })
   }
 
   const callUser = (userPhone: string) => {
@@ -123,7 +140,7 @@ export default function DriverPage() {
         <div className="flex items-center justify-between">
           <div>
             <p className="font-medium text-sm">{driver.name}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{driver.car_type} · ₮{driver.price?.toLocaleString()}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{driver.car_type}</p>
           </div>
           <button
             onClick={toggleAvailable}
@@ -156,7 +173,7 @@ export default function DriverPage() {
         {orders.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
             <p className="text-gray-400 text-sm">Одоогоор захиалга байхгүй</p>
-            <p className="text-gray-300 text-xs mt-1">15 секунд тутамд автоматаар шинэчлэгдэнэ</p>
+            <p className="text-gray-300 text-xs mt-1">15 секунд тутамд шинэчлэгдэнэ</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -186,15 +203,39 @@ export default function DriverPage() {
                   {o.car_type && (
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-400">Машины төрөл:</span>
-                      <span className="text-xs font-medium text-gray-700">{o.car_type}</span>
+                      <span className="text-xs font-medium">{o.car_type}</span>
                     </div>
                   )}
                 </div>
+
+                {sentOffers[o.id] ? (
+                  <div className="bg-green-50 rounded-xl py-2.5 text-center">
+                    <p className="text-green-600 text-sm font-medium">Үнийн санал илгээгдлээ!</p>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      placeholder="Үнэ (₮)"
+                      value={offerPrices[o.id] || ''}
+                      onChange={e => setOfferPrices({...offerPrices, [o.id]: e.target.value})}
+                      className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none"
+                    />
+                    <button
+                      onClick={() => sendOffer(o)}
+                      className="rounded-xl px-4 py-2 text-sm font-medium text-white"
+                      style={{background:'#e8433a'}}
+                    >
+                      Илгээх
+                    </button>
+                  </div>
+                )}
+
                 {o.user_phone && (
                   <button
                     onClick={() => callUser(o.user_phone)}
-                    className="w-full rounded-xl py-2.5 text-sm font-medium text-white"
-                    style={{background:'#e8433a'}}
+                    className="w-full rounded-xl py-2.5 text-sm font-medium text-white mt-2"
+                    style={{background:'#1a73e8'}}
                   >
                     Хэрэглэгч рүү залгах
                   </button>
