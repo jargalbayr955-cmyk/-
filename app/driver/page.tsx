@@ -26,7 +26,6 @@ export default function DriverPage() {
       setError('Дугаар эсвэл PIN буруу байна')
     } else {
       setDriver(data)
-      fetchOrders()
     }
     setLoading(false)
   }
@@ -51,11 +50,11 @@ export default function DriverPage() {
           .from('drivers')
           .update({ lat: pos.coords.latitude, lng: pos.coords.longitude, available: true })
           .eq('id', driver.id)
-        setLocMsg('✅ Байршил шинэчлэгдлээ!')
+        setLocMsg('Байршил шинэчлэгдлээ!')
         setLocating(false)
       },
       () => {
-        setLocMsg('❌ Байршил тогтоох боломжгүй')
+        setLocMsg('Байршил тогтоох боломжгүй')
         setLocating(false)
       }
     )
@@ -65,6 +64,10 @@ export default function DriverPage() {
     const newVal = !driver.available
     await supabase.from('drivers').update({ available: newVal }).eq('id', driver.id)
     setDriver({ ...driver, available: newVal })
+  }
+
+  const callUser = (userPhone: string) => {
+    window.location.href = 'tel:' + userPhone
   }
 
   useEffect(() => {
@@ -127,14 +130,14 @@ export default function DriverPage() {
             onClick={toggleAvailable}
             className={"text-xs rounded-xl px-4 py-2 font-medium " + (driver.available ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500')}
           >
-            {driver.available ? '🟢 Ажиллаж байна' : '⚫ Амарч байна'}
+            {driver.available ? 'Ажиллаж байна' : 'Амарч байна'}
           </button>
         </div>
       </div>
 
       <div className="px-4 pt-4">
         <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-4">
-          <p className="font-medium text-sm mb-3">📍 Байршил шинэчлэх</p>
+          <p className="font-medium text-sm mb-3">Байршил шинэчлэх</p>
           <button
             onClick={updateLocation}
             disabled={locating}
@@ -153,7 +156,7 @@ export default function DriverPage() {
 
         {orders.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
-            <p className="text-gray-400 text-sm">Одоогоор захиалга байхгүй байна</p>
+            <p className="text-gray-400 text-sm">Одоогоор захиалга байхгүй</p>
             <p className="text-gray-300 text-xs mt-1">15 секунд тутамд автоматаар шинэчлэгдэнэ</p>
           </div>
         ) : (
@@ -162,9 +165,11 @@ export default function DriverPage() {
               <div key={o.id} className="bg-white border border-gray-200 rounded-2xl p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-xs bg-red-50 text-red-500 rounded-lg px-2 py-1 font-medium">Шинэ захиалга</span>
-                  <span className="text-xs text-gray-400">{new Date(o.created_at).toLocaleTimeString('mn-MN', {hour:'2-digit', minute:'2-digit'})}</span>
+                  <span className="text-xs text-gray-400">
+                    {new Date(o.created_at).toLocaleTimeString('mn-MN', {hour:'2-digit', minute:'2-digit'})}
+                  </span>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 mb-3">
                   <div className="flex items-start gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-blue-500 mt-1 flex-shrink-0"></div>
                     <div>
@@ -181,20 +186,20 @@ export default function DriverPage() {
                   </div>
                   {o.car_type && (
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-400">🚛 Машины төрөл:</span>
+                      <span className="text-xs text-gray-400">Машины төрөл:</span>
                       <span className="text-xs font-medium text-gray-700">{o.car_type}</span>
                     </div>
                   )}
-                  {o.user_phone && (
-                    
-                      href={"tel:" + o.user_phone}
-                      className="flex items-center justify-center gap-2 w-full rounded-xl py-2.5 text-sm font-medium text-white mt-2"
-                      style={{background:'#e8433a'}}
-                    >
-                      📞 Хэрэглэгч рүү залгах
-                    </a>
-                  )}
                 </div>
+                {o.user_phone && (
+                  <button
+                    onClick={() => callUser(o.user_phone)}
+                    className="w-full rounded-xl py-2.5 text-sm font-medium text-white"
+                    style={{background:'#e8433a'}}
+                  >
+                    Хэрэглэгч рүү залгах
+                  </button>
+                )}
               </div>
             ))}
           </div>
