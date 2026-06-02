@@ -1,13 +1,43 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function CurrentPage() {
   const [dest, setDest] = useState('')
+  const [location, setLocation] = useState<{lat: number, lng: number} | null>(null)
+  const [address, setAddress] = useState('Байршил тогтоож байна...')
   const router = useRouter()
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const lat = pos.coords.latitude
+          const lng = pos.coords.longitude
+          setLocation({ lat, lng })
+          try {
+            const res = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+            )
+            const data = await res.json()
+            const addr = data.display_name?.split(',').slice(0, 3).join(',') || 'Байршил тогтоогдлоо'
+            setAddress(addr)
+          } catch {
+            setAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`)
+          }
+        },
+        () => setAddress('Байршил тогтоох боломжгүй')
+      )
+    }
+  }, [])
 
   const handleSearch = () => {
     if (!dest) return
+    if (location) {
+      localStorage.setItem('fromLat', location.lat.toString())
+      localStorage.setItem('fromLng', location.lng.toString())
+    }
+    localStorage.setItem('fromAddress', address)
     localStorage.setItem('dest', dest)
     localStorage.setItem('fromType', 'current')
     router.push('/drivers')
@@ -28,7 +58,10 @@ export default function CurrentPage() {
             <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
             <span className="text-xs text-gray-400">Таны байршил</span>
           </div>
-          <p className="text-sm font-medium pl-5">Одоогийн байршил (GPS)</p>
+          <p className="text-sm font-medium pl-5 text-gray-700">{address}</p>
+          {location && (
+            <p className="text-xs text-gray-300 pl-5 mt-1">{location.lat.toFixed(5)}, {location.lng.toFixed(5)}</p>
+          )}
         </div>
 
         <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-6">
@@ -47,10 +80,10 @@ export default function CurrentPage() {
 
         <button
           onClick={handleSearch}
-          disabled={!dest}
+          disabled={!dest || !location}
           className="w-full bg-red-500 text-white rounded-xl py-3 font-medium text-sm disabled:opacity-40"
         >
-          Машин хайх
+          {!location ? 'Байршил тогтоож байна...' : 'Машин хайх'}
         </button>
       </div>
     </div>
