@@ -20,6 +20,8 @@ export default function AdminPage() {
   const [showForm, setShowForm] = useState(false)
   const [password, setPassword] = useState('')
   const [authed, setAuthed] = useState(false)
+  const [heroUrl, setHeroUrl] = useState('')
+  const [heroSaved, setHeroSaved] = useState(false)
 
   const ADMIN_PASSWORD = 'achilt2024'
 
@@ -30,8 +32,18 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    if (authed) fetchDrivers()
+    if (authed) {
+      fetchDrivers()
+      const saved = localStorage.getItem('hero_url')
+      if (saved) setHeroUrl(saved)
+    }
   }, [authed])
+
+  const saveHeroUrl = () => {
+    localStorage.setItem('hero_url', heroUrl)
+    setHeroSaved(true)
+    setTimeout(() => setHeroSaved(false), 2000)
+  }
 
   const handleAdd = async () => {
     if (!form.name || !form.phone || !form.car_type || !form.price) return
@@ -99,6 +111,26 @@ export default function AdminPage() {
             className="bg-red-500 text-white rounded-xl px-4 py-2 text-sm font-medium"
           >
             + Жолооч нэмэх
+          </button>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-4">
+          <h3 className="font-medium text-sm mb-3">🖼️ Нүүр хуудасны зураг</h3>
+          <input
+            type="text"
+            placeholder="Зургийн URL оруулна уу..."
+            value={heroUrl}
+            onChange={e => setHeroUrl(e.target.value)}
+            className="w-full border border-gray-100 rounded-xl px-3 py-2 text-sm mb-2 outline-none"
+          />
+          {heroUrl && (
+            <img src={heroUrl} alt="preview" className="w-full h-32 object-cover rounded-xl mb-2" />
+          )}
+          <button
+            onClick={saveHeroUrl}
+            className="w-full bg-red-500 text-white rounded-xl py-2 text-sm font-medium"
+          >
+            {heroSaved ? '✅ Хадгалагдлаа!' : 'Хадгалах'}
           </button>
         </div>
 
