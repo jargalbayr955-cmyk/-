@@ -1,45 +1,111 @@
- 'use client'
-import { useState } from 'react'
+'use client'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 
-export default function HomePage() {
-  const [choice, setChoice] = useState<null | 1 | 2>(null)
+type Driver = {
+  id: string
+  name: string
+  phone: string
+  car_type: string
+  price: number
+  rating: number
+  lat: number
+  lng: number
+  is_online: boolean
+  distance?: number
+}
+
+function getDistance(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng/2) * Math.sin(dLng/2)
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+}
+
+export default function DriversPage() {
+  const [drivers, setDrivers] = useState<Driver[]>([])
+  const [loading, setLoading] = useState(true)
+  const [userLat, setUserLat] = useState(47.9184)
+  const [userLng, setUserLng] = useState(106.9177)
   const router = useRouter()
+
+  useEffect(() => {
+    const lat = parseFloat(localStorage.getItem('fromLat') || '47.9184')
+    const lng = parseFloat(localStorage.getItem('fromLng') || '106.9177')
+    setUserLat(lat)
+    setUserLng(lng)
+
+    const fetchDrivers = async () => {
+      const { data } = await supabase
+        .from('drivers')
+        .select()
+        .eq('available', true)
+        .limit(8)
+      if (data) {
+        const withDistance = data.map(d => ({
+          ...d,
+          distance: d.lat && d.lng ? getDistance(lat, lng, d.lat, d.lng) : 99
+        }))
+        withDistance.sort((a, b) => (a.distance || 99) - (b.distance || 99))
+        setDrivers(withDistance)
+      }
+      setLoading(false)
+    }
+    fetchDrivers()
+  }, [])
+
+  const callDriver = (phone: string) => {
+    window.location.href = 'tel:' + phone
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-sm mx-auto pt-8">
-        <div className="flex items-center gap-2 mb-8">
-          <span className="text-2xl">🚛</span>
-          <h1 className="text-xl font-medium">АчТүрэн</h1>
-        </div>
-
-        <h2 className="text-lg font-medium mb-2">Байршил сонгох</h2>
-        <p className="text-gray-500 text-sm mb-6">Машинаа хаанаас ачуулах вэ?</p>
-
-        <div
-          onClick={() => router.push('/current')}
-          className="bg-white border border-gray-200 rounded-2xl p-4 mb-3 flex items-center gap-4 cursor-pointer hover:border-red-400 transition-colors"
-        >
-          <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center text-white font-medium">1</div>
-          <div className="flex-1">
-            <p className="font-medium text-sm">Энэ байгаа байршлаас</p>
-            <p className="text-gray-400 text-xs mt-0.5">GPS байршлыг ашиглана</p>
+        <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-400 text-sm mb-6">
+          ← Буцах
+        </button>
+        <h2 className="text-lg font-medium mb-1">Ойр байгаа машинууд</h2>
+        <p className="text-gray-400 text-sm mb-6">Таалагдсан үнэ рүү шууд залгаарай</p>
+        {loading ? (
+          <p className="text-center text-gray-400 text-sm py-12">Хайж байна...</p>
+        ) : drivers.length === 0 ? (
+          <p className="text-center text-gray-400 text-sm py-12">Одоогоор машин олдсонгүй</p>
+        ) : (
+          <div className="space-y-3">
+            {drivers.map((d) => (
+              <div key={d.id} className="bg-white border border-gray-200 rounded-2xl p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                  {d.name.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{d.name}</p>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-xs text-gray-400">⭐ {d.rating}</span>
+                    <span className="text-xs text-gray-400">🚛 {d.car_type}</span>
+                    {d.distance !== undefined && d.distance < 90 && (
+                      <span className="text-xs text-blue-500 font-medium">
+                        📍 {d.distance < 1 ? (d.distance * 1000).toFixed(0) + 'м' : d.distance.toFixed(1) + 'км'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <p className="text-red-500 font-medium text-sm">₮{d.price.toLocaleString()}</p>
+                  <button
+                    onClick={() => callDriver(d.phone)}
+                    className="bg-red-500 text-white text-xs rounded-lg px-3 py-1.5"
+                  >
+                    📞 Залгах
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-          <span className="text-red-400">📍</span>
-        </div>
-
-        <div
-          onClick={() => router.push('/manual')}
-          className="bg-white border border-gray-200 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:border-red-400 transition-colors"
-        >
-          <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center text-white font-medium">2</div>
-          <div className="flex-1">
-            <p className="font-medium text-sm">Өөр газрын байршил</p>
-            <p className="text-gray-400 text-xs mt-0.5">Гараар хаяг оруулна</p>
-          </div>
-          <span className="text-red-400">✏️</span>
-        </div>
+        )}
       </div>
     </div>
   )
