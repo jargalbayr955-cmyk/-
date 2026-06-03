@@ -14,10 +14,11 @@ export default function RootLayout({
   return (
     <html lang="mn">
       <head>
-        <meta charSet="utf-8" />
+        <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta httpEquiv="Content-Type" content="text/html; charset=utf-8" />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body style={{fontFamily: "Arial, sans-serif"}} className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }
