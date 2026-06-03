@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
   const [phone, setPhone] = useState('')
-  const [pin, setPin] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [heroUrl, setHeroUrl] = useState('')
@@ -22,24 +21,19 @@ export default function LoginPage() {
   }, [])
 
   useEffect(() => {
-    // Supabase-аас hero_url унших
     supabase.from('settings').select('value').eq('key', 'hero_url').single().then(({ data }) => {
       if (data?.value) setHeroUrl(data.value)
     })
   }, [])
 
   const handleLogin = async () => {
-    if (!phone || !pin) return setError('Дугаар болон PIN оруулна уу')
+    if (!phone || phone.length < 8) return setError('Зөв утасны дугаар оруулна уу')
     setLoading(true)
     setError('')
-    const { data, error } = await supabase
-      .from('users')
-      .select()
-      .eq('phone', phone)
-      .eq('pin', pin)
-      .single()
+    const fullPhone = '+976' + phone
+    const { data, error } = await supabase.from('users').select().eq('phone', fullPhone).single()
     if (error || !data) {
-      setError('Дугаар эсвэл PIN буруу байна')
+      setError('Дугаар бүртгэлгүй байна. Бүртгүүлнэ үү.')
     } else {
       localStorage.setItem('user', JSON.stringify(data))
       router.push('/home')
@@ -72,23 +66,17 @@ export default function LoginPage() {
       <div className="flex-1 px-6 pt-6 pb-10">
         <p className="text-sm mb-6" style={{color:'rgba(255,255,255,0.4)'}}>Утасны дугаараар нэвтрэх</p>
 
-        <input
-          type="tel"
-          placeholder="Утасны дугаар"
-          value={phone}
-          onChange={e => setPhone(e.target.value)}
-          className="w-full rounded-2xl px-4 py-3.5 mb-3 text-sm outline-none"
-          style={{background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff'}}
-        />
-        <input
-          type="password"
-          placeholder="4 оронтой PIN"
-          maxLength={4}
-          value={pin}
-          onChange={e => setPin(e.target.value)}
-          className="w-full rounded-2xl px-4 py-3.5 mb-4 text-sm outline-none"
-          style={{background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff'}}
-        />
+        <div className="flex gap-2 mb-4">
+          <div className="rounded-2xl px-3 py-3.5 text-sm flex items-center" style={{background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.6)'}}>🇲🇳 +976</div>
+          <input
+            type="tel"
+            placeholder="8 оронтой дугаар"
+            value={phone}
+            onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 8))}
+            className="flex-1 rounded-2xl px-4 py-3.5 text-sm outline-none"
+            style={{background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff'}}
+          />
+        </div>
 
         {error && <p className="text-red-400 text-xs mb-3">{error}</p>}
 
