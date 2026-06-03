@@ -107,10 +107,10 @@ export default function DriversPage() {
     }
 
     return (
-        <div style={{minHeight:'100vh', background:'linear-gradient(160deg, #0a0a0f 0%, #1a0505 50%, #0a0a0f 100%)', display:'flex', flexDirection:'column'}}>
+        <div style={{minHeight:'100vh', background:'#060608', display:'flex', flexDirection:'column'}}>
 
             {/* Header */}
-            <div style={{padding:'16px 20px', display:'flex', alignItems:'center', gap:'12px', borderBottom:'1px solid rgba(232,67,58,0.1)', background:'rgba(10,0,0,0.5)'}}>
+            <div style={{padding:'16px 20px', display:'flex', alignItems:'center', gap:'12px', borderBottom:'1px solid rgba(232,67,58,0.1)', background:'rgba(0,0,0,0.6)'}}>
                 <button onClick={() => router.back()} style={{background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'20px', padding:'7px 14px', color:'rgba(255,255,255,0.6)', fontSize:'13px', cursor:'pointer', fontWeight:'600'}}>← Буцах</button>
                 <div style={{flex:1}}>
                     <p style={{color:'white', fontWeight:'700', fontSize:'15px', margin:0}}>Жолооч хайж байна</p>
@@ -124,7 +124,7 @@ export default function DriversPage() {
             </div>
 
             {/* Захиалгын мэдээлэл */}
-            <div style={{margin:'16px 16px 0', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:'16px', padding:'14px 16px'}}>
+            <div style={{margin:'16px 16px 0', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:'16px', padding:'14px 16px'}}>
                 <div style={{display:'flex', alignItems:'flex-start', gap:'10px', marginBottom:'10px'}}>
                     <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#3b82f6', marginTop:'4px', flexShrink:0}}/>
                     <div>
@@ -161,15 +161,15 @@ export default function DriversPage() {
                             const dist = getDistance(userLat!, userLng!, o.driver_lat, o.driver_lng)
                             return (
                                 <div key={o.id} style={{
-                                    background:'rgba(232,67,58,0.06)',
-                                    border:'1px solid rgba(232,67,58,0.2)',
+                                    background:'rgba(15,15,18,0.95)',
+                                    border:'1px solid rgba(255,255,255,0.07)',
                                     borderRadius:'18px', padding:'16px',
                                     animation:'slideUp 0.3s ease forwards',
                                     animationDelay:`${idx*0.05}s`, opacity:0
                                 }}>
 
                                     <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'12px'}}>
-                                        <div style={{width:'46px', height:'46px', borderRadius:'50%', background:'#e8433a', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'18px', fontWeight:'800', flexShrink:0}}>
+                                        <div style={{width:'46px', height:'46px', borderRadius:'50%', background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.3)', display:'flex', alignItems:'center', justifyContent:'center', color:'#ff6b5b', fontSize:'18px', fontWeight:'800', flexShrink:0}}>
                                             {o.driver_name.charAt(0)}
                                         </div>
                                         <div style={{flex:1}}>
@@ -177,7 +177,7 @@ export default function DriversPage() {
                                             <p style={{color:'rgba(255,255,255,0.4)', fontSize:'12px', margin:'3px 0 0'}}>🚛 {o.car_type}</p>
                                         </div>
                                         <div style={{textAlign:'right'}}>
-                                            <p style={{color:'#ff6b5b', fontWeight:'800', fontSize:'18px', margin:0}}>₮{o.price.toLocaleString()}</p>
+                                            <p style={{color:'white', fontWeight:'800', fontSize:'18px', margin:0}}>₮{o.price.toLocaleString()}</p>
                                             {dist && <p style={{color:'rgba(59,130,246,0.8)', fontSize:'12px', margin:'3px 0 0'}}>📍 {dist} км</p>}
                                         </div>
                                     </div>
@@ -186,7 +186,7 @@ export default function DriversPage() {
                                         disabled={accepting === o.id}
                                         style={{
                                             width:'100%', borderRadius:'14px', padding:'14px',
-                                            background: accepting === o.id ? 'rgba(232,67,58,0.4)' : '#e8433a',
+                                            background: accepting === o.id ? 'rgba(232,67,58,0.3)' : 'rgba(232,67,58,0.9)',
                                             border:'none', color:'white', fontSize:'15px', fontWeight:'800',
                                             cursor: accepting === o.id ? 'not-allowed' : 'pointer',
                                             boxShadow: accepting === o.id ? 'none' : '0 4px 20px rgba(232,67,58,0.35)',
