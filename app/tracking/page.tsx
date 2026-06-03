@@ -87,8 +87,8 @@ export default function TrackingPage() {
       })
 
       const map = Leaflet.map(mapRef.current!).setView([userLat, userLng], 14)
-      Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
+      Leaflet.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© CartoDB'
       }).addTo(map)
 
       const userIcon = Leaflet.divIcon({

@@ -127,8 +127,8 @@ export default function DriverPage() {
         const drvLng = driver?.lng || userLng
 
         const map = Leaflet.map(mapRef.current!).setView([userLat || 47.9, userLng || 106.9], 13)
-        Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap'
+        Leaflet.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          attribution: '© CartoDB'
         }).addTo(map)
 
         // Хэрэглэгчийн байршил
