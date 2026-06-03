@@ -183,7 +183,7 @@ export default function TrackingPage() {
             <a href={'tel:' + order.driver_phone} style={{
               display:'flex', alignItems:'center', justifyContent:'center', gap:'12px',
               borderRadius:'16px', padding:'16px',
-              background:'#ff6b5b', color:'white', textDecoration:'none',
+              background:'white', color:'black', textDecoration:'none',
               animation:'btnPulse 2s ease-in-out infinite'
             }}>
               <span style={{fontSize:'22px'}}>📞</span>
