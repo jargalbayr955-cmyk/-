@@ -7,6 +7,8 @@ export default function HomePage() {
   const [visible, setVisible] = useState(false)
 
   const pressTimer = useRef<any>(null)
+  const [tapCount, setTapCount] = useState(0)
+  const tapTimer = useRef<any>(null)
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 100)
@@ -20,6 +22,19 @@ export default function HomePage() {
 
   const handleLogoRelease = () => {
     if (pressTimer.current) clearTimeout(pressTimer.current)
+  }
+
+  const handleBadgeTap = () => {
+    setTapCount(c => {
+      const next = c + 1
+      if (next >= 4) {
+        router.push('/admin')
+        return 0
+      }
+      if (tapTimer.current) clearTimeout(tapTimer.current)
+      tapTimer.current = setTimeout(() => setTapCount(0), 1500)
+      return next
+    })
   }
 
   return (
@@ -59,11 +74,13 @@ export default function HomePage() {
               }}>А</div>
             <span style={{color:'white', fontWeight:'800', fontSize:'17px', letterSpacing:'-0.5px'}}>Ачилт</span>
           </div>
-          <div style={{
-            display:'flex', alignItems:'center', gap:'6px',
-            background:'rgba(232,67,58,0.2)', border:'1px solid rgba(232,67,58,0.35)',
-            borderRadius:'20px', padding:'5px 12px'
-          }}>
+          <div
+            onClick={handleBadgeTap}
+            style={{
+              display:'flex', alignItems:'center', gap:'6px',
+              background:'rgba(232,67,58,0.2)', border:'1px solid rgba(232,67,58,0.35)',
+              borderRadius:'20px', padding:'5px 12px', cursor:'pointer', userSelect:'none'
+            }}>
             <div style={{width:'6px', height:'6px', borderRadius:'50%', background:'#e8433a', animation:'pulse 1.5s infinite'}}/>
             <span style={{color:'#ff6b5b', fontSize:'11px', fontWeight:'700', letterSpacing:'1px'}}>24/7</span>
           </div>
