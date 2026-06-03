@@ -248,7 +248,7 @@ export default function DriverPage() {
 
   if (!driver) {
     return (
-      <div className="min-h-screen flex flex-col" style={{background:'#0f0f1a'}}>
+      <div className="min-h-screen flex flex-col" style={{background:'#060608'}}>
         <div className="flex-1 px-6 pt-16 pb-10">
           <div className="text-center mb-10">
             <div className="text-5xl mb-3">🚛</div>
@@ -272,7 +272,7 @@ export default function DriverPage() {
       <div className="min-h-screen flex flex-col">
         <div className="bg-white px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
-            <p className="font-medium text-sm">{driver.name}</p>
+            <p style={{color:"white", fontWeight:"700", fontSize:"15px"}}>{driver.name}</p>
             <p className="text-xs text-green-500">Захиалга хүлээн авсан</p>
           </div>
           <div className="flex items-center gap-2">
@@ -288,14 +288,14 @@ export default function DriverPage() {
             <div className="flex items-start gap-2 mb-2">
               <div className="w-2.5 h-2.5 rounded-full bg-blue-500 mt-1 flex-shrink-0"></div>
               <div>
-                <p className="text-xs text-gray-400">Авах газар</p>
+                <p style={{color:"rgba(255,255,255,0.35)", fontSize:"12px"}}>Авах газар</p>
                 <p className="text-sm font-medium">{acceptedOrder.from_address}</p>
               </div>
             </div>
             <div className="flex items-start gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-red-500 mt-1 flex-shrink-0"></div>
               <div>
-                <p className="text-xs text-gray-400">Хүргэх газар</p>
+                <p style={{color:"rgba(255,255,255,0.35)", fontSize:"12px"}}>Хүргэх газар</p>
                 <p className="text-sm font-medium">{acceptedOrder.to_address}</p>
               </div>
             </div>
@@ -312,20 +312,21 @@ export default function DriverPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-6">
+    <div className="min-h-screen pb-6" style={{background:"#060608"}}>
       {newOrderAlert && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-red-500 text-white px-6 py-3 rounded-2xl shadow-lg text-sm font-medium animate-bounce">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl text-sm font-medium animate-bounce" style={{background:"#e8433a", color:"white", boxShadow:"0 4px 20px rgba(232,67,58,0.5)"}}>
           🚛 Шинэ захиалга ирлээ!
         </div>
       )}
-      <div className="bg-white px-5 py-4 border-b border-gray-100">
+      <div className="px-5 py-4" style={{background:"#0d0d0f", borderBottom:"1px solid rgba(255,255,255,0.07)"}}>
         <div className="flex items-center justify-between">
           <div>
-            <p className="font-medium text-sm">{driver.name}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{driver.car_type}</p>
+            <p style={{color:"white", fontWeight:"700", fontSize:"15px"}}>{driver.name}</p>
+            <p style={{color:"rgba(255,255,255,0.4)", fontSize:"12px", marginTop:"2px"}}>{driver.car_type}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={toggleAvailable} className={"text-xs rounded-xl px-4 py-2 font-medium " + (driver.available ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500')}>
+            <button onClick={toggleAvailable} className={"text-xs rounded-xl px-4 py-2 font-medium " + (driver.available ? "" : "")}
+              style={{background: driver.available ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.06)", color: driver.available ? "#22c55e" : "rgba(255,255,255,0.4)", border: driver.available ? "1px solid rgba(34,197,94,0.3)" : "1px solid rgba(255,255,255,0.08)"}}}>
               {driver.available ? '🟢 Ажиллаж байна' : '⚫ Амарч байна'}
             </button>
             <button onClick={() => router.push('/driver/profile')} className="text-xs rounded-xl px-3 py-2 bg-gray-100 text-gray-500">
@@ -335,29 +336,29 @@ export default function DriverPage() {
         </div>
       </div>
       <div className="px-4 pt-4">
-        <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-4">
-          <p className="font-medium text-sm mb-3">📍 Байршил шинэчлэх</p>
+        <div className="rounded-2xl p-4 mb-4" style={{background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)"}}>
+          <p style={{color:"white", fontWeight:"700", fontSize:"14px", marginBottom:"12px"}}>📍 Байршил шинэчлэх</p>
           <button onClick={updateLocation} disabled={locating} className="w-full rounded-xl py-2.5 text-sm font-medium text-white disabled:opacity-50" style={{background:'#e8433a'}}>
             {locating ? 'Байршил тогтоож байна...' : 'Одоогийн байршил илгээх'}
           </button>
-          {locMsg && <p className="text-xs text-center mt-2 text-green-600">{locMsg}</p>}
-          {driver.lat && <p className="text-xs text-center mt-1 text-gray-400">📍 {driver.lat?.toFixed(4)}, {driver.lng?.toFixed(4)}</p>}
+          {locMsg && <p style={{color:"#22c55e", fontSize:"12px", textAlign:"center", marginTop:"8px"}}>{locMsg}</p>}
+          {driver.lat && <p style={{color:"rgba(255,255,255,0.3)", fontSize:"12px", textAlign:"center", marginTop:"4px"}}>📍 {driver.lat?.toFixed(4)}, {driver.lng?.toFixed(4)}</p>}
         </div>
         <div className="flex items-center justify-between mb-3">
-          <p className="font-medium text-sm">Захиалгууд <span className="text-red-500 ml-1">({orders.length})</span></p>
+          <p style={{color:"white", fontWeight:"700", fontSize:"14px"}}>Захиалгууд <span className="text-red-500 ml-1">({orders.length})</span></p>
           <button onClick={fetchOrders} className="text-xs text-red-500">↺ Шинэчлэх</button>
         </div>
         {orders.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center">
+          <div className="rounded-2xl p-10 text-center" style={{background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)"}}>
             <div className="text-4xl mb-3">⏳</div>
-            <p className="text-gray-400 text-sm">Одоогоор захиалга байхгүй</p>
+            <p style={{color:"rgba(255,255,255,0.3)", fontSize:"14px"}}>Одоогоор захиалга байхгүй</p>
           </div>
         ) : (
           <div className="space-y-3">
             {orders.map((o) => {
               const dist = getDistance(driver.lat, driver.lng, o.from_lat, o.from_lng)
               return (
-                <div key={o.id} className="bg-white border border-gray-200 rounded-2xl p-4">
+                <div key={o.id} className="rounded-2xl p-4" style={{background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)"}}>
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs bg-red-50 text-red-500 rounded-lg px-2 py-1 font-medium">🆕 Шинэ</span>
                     <div className="flex items-center gap-2">
@@ -367,30 +368,30 @@ export default function DriverPage() {
                       </span>
                     </div>
                   </div>
-                  <div className="bg-gray-50 rounded-xl p-3 mb-3 space-y-2">
+                  <div className="rounded-xl p-3 mb-3 space-y-2" style={{background:"rgba(255,255,255,0.03)"}}>
                     <div className="flex items-start gap-2">
                       <div className="w-2.5 h-2.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0"></div>
                       <div>
-                        <p className="text-xs text-gray-400">Авах газар</p>
-                        <p className="text-sm font-medium text-gray-700">{o.from_address || 'GPS байршил'}</p>
+                        <p style={{color:"rgba(255,255,255,0.35)", fontSize:"12px"}}>Авах газар</p>
+                        <p style={{color:"white", fontSize:"14px", fontWeight:"600"}}>{o.from_address || 'GPS байршил'}</p>
                       </div>
                     </div>
                     <div className="w-px h-3 bg-gray-300 ml-1"></div>
                     <div className="flex items-start gap-2">
                       <div className="w-2.5 h-2.5 rounded-full bg-red-500 mt-1.5 flex-shrink-0"></div>
                       <div>
-                        <p className="text-xs text-gray-400">Хүргэх газар</p>
-                        <p className="text-sm font-medium text-gray-700">{o.to_address || '-'}</p>
+                        <p style={{color:"rgba(255,255,255,0.35)", fontSize:"12px"}}>Хүргэх газар</p>
+                        <p style={{color:"white", fontSize:"14px", fontWeight:"600"}}>{o.to_address || '-'}</p>
                       </div>
                     </div>
                   </div>
                   {sentOffers[o.id] ? (
-                    <div className="bg-green-50 rounded-xl py-3 text-center">
+                    <div className="rounded-xl py-3 text-center" style={{background:"rgba(34,197,94,0.1)", border:"1px solid rgba(34,197,94,0.2)"}}>
                       <p className="text-green-600 text-sm font-medium">✅ Санал илгээгдлээ!</p>
                     </div>
                   ) : (
                     <div className="flex gap-2">
-                      <input type="number" placeholder="Үнэ оруулна уу (₮)" value={offerPrices[o.id] || ''} onChange={e => setOfferPrices({...offerPrices, [o.id]: e.target.value})} className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none" />
+                      <input type="number" placeholder="Үнэ оруулна уу (₮)" value={offerPrices[o.id] || ''} onChange={e => setOfferPrices({...offerPrices, [o.id]: e.target.value})} className="flex-1 rounded-xl px-3 py-2.5 text-sm outline-none" style={{background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", color:"white"}} />
                       <button onClick={() => sendOffer(o)} disabled={sendingOffer === o.id} className="rounded-xl px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50" style={{background:'#e8433a'}}>
                         {sendingOffer === o.id ? '...' : 'Илгээх'}
                       </button>
