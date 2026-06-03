@@ -13,6 +13,7 @@ export default function DriverPage() {
   const [locMsg, setLocMsg] = useState('')
   const [offerPrices, setOfferPrices] = useState<{[key: string]: string}>({})
   const [sentOffers, setSentOffers] = useState<{[key: string]: boolean}>({})
+  const [sendingOffer, setSendingOffer] = useState<string | null>(null)
   const [newOrderAlert, setNewOrderAlert] = useState(false)
   const prevOrderIds = useRef<string[]>([])
 
@@ -59,6 +60,7 @@ export default function DriverPage() {
           lng: pos.coords.longitude,
           available: true
         }).eq('id', driver.id)
+        setDriver({ ...driver, lat: pos.coords.latitude, lng: pos.coords.longitude })
         setLocMsg('Байршил шинэчлэгдлээ!')
         setLocating(false)
       },
@@ -72,9 +74,25 @@ export default function DriverPage() {
     setDriver({ ...driver, available: newVal })
   }
 
+  // Санал явуулахад GPS-ийг автоматаар авна
   const sendOffer = async (order: any) => {
     const price = offerPrices[order.id]
     if (!price) return alert('Үнэ оруулна уу')
+    setSendingOffer(order.id)
+
+    // GPS авах
+    const getPos = (): Promise<{lat: number, lng: number} | null> =>
+      new Promise((resolve) => {
+        if (!navigator.geolocation) return resolve(null)
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => resolve(null),
+          { timeout: 5000 }
+        )
+      })
+
+    const pos = await getPos()
+
     await supabase.from('offers').insert({
       order_id: order.id,
       driver_id: driver.id,
@@ -83,10 +101,18 @@ export default function DriverPage() {
       car_type: driver.car_type,
       price: parseInt(price),
       status: 'pending',
-      driver_lat: driver.lat || null,
-      driver_lng: driver.lng || null
+      driver_lat: pos?.lat || driver.lat || null,
+      driver_lng: pos?.lng || driver.lng || null
     })
+
+    // Жолоочийн байршлыг шинэчлэх
+    if (pos) {
+      await supabase.from('drivers').update({ lat: pos.lat, lng: pos.lng }).eq('id', driver.id)
+      setDriver({ ...driver, lat: pos.lat, lng: pos.lng })
+    }
+
     setSentOffers({ ...sentOffers, [order.id]: true })
+    setSendingOffer(null)
   }
 
   const getDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
@@ -162,6 +188,7 @@ export default function DriverPage() {
             {locating ? 'Байршил тогтоож байна...' : 'Одоогийн байршил илгээх'}
           </button>
           {locMsg && <p className="text-xs text-center mt-2 text-green-600">{locMsg}</p>}
+          {driver.lat && <p className="text-xs text-center mt-1 text-gray-400">📍 {driver.lat?.toFixed(4)}, {driver.lng?.toFixed(4)}</p>}
         </div>
         <div className="flex items-center justify-between mb-3">
           <p className="font-medium text-sm">Захиалгууд <span className="text-red-500 ml-1">({orders.length})</span></p>
@@ -212,8 +239,8 @@ export default function DriverPage() {
                   ) : (
                     <div className="flex gap-2">
                       <input type="number" placeholder="Үнэ оруулна уу (₮)" value={offerPrices[o.id] || ''} onChange={e => setOfferPrices({...offerPrices, [o.id]: e.target.value})} className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none" />
-                      <button onClick={() => sendOffer(o)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-white" style={{background:'#e8433a'}}>
-                        Илгээх
+                      <button onClick={() => sendOffer(o)} disabled={sendingOffer === o.id} className="rounded-xl px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50" style={{background:'#e8433a'}}>
+                        {sendingOffer === o.id ? '...' : 'Илгээх'}
                       </button>
                     </div>
                   )}
