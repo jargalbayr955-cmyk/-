@@ -191,16 +191,27 @@ export default function TrackingPage() {
         </div>
 
         {order?.driver_phone ? (
-          <a
-            href={'tel:' + order.driver_phone}
-            className="w-full flex items-center justify-center gap-2 rounded-2xl py-3.5 font-medium text-sm text-white"
-            style={{background:'#e8433a'}}
-          >
-            📞 {order.driver_name} руу залгах ({order.driver_phone})
-          </a>
+          <div>
+            <p style={{color:'rgba(255,255,255,0.4)', fontSize:'12px', textAlign:'center', marginBottom:'10px', fontWeight:'500'}}>
+              Захиалгаа баталгаажуулахын тулд жолоочтойгоо холбогдоно уу
+            </p>
+            <a
+              href={'tel:' + order.driver_phone}
+              style={{
+                width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px',
+                borderRadius:'16px', padding:'16px',
+                background:'#e8433a', color:'white', textDecoration:'none',
+                fontSize:'16px', fontWeight:'800', letterSpacing:'0.3px',
+                boxShadow:'0 6px 25px rgba(232,67,58,0.45)',
+                animation:'btnPulse 2s ease-in-out infinite'
+              }}
+            >
+              📞 {order.driver_name} руу залгаж баталгаажуулна уу
+            </a>
+          </div>
         ) : (
-          <div className="w-full flex items-center justify-center gap-2 rounded-2xl py-3.5 text-sm text-gray-400 bg-gray-100">
-            Жолоочийн мэдээлэл хүлээж байна...
+          <div style={{background:'rgba(255,255,255,0.05)', borderRadius:'14px', padding:'14px', textAlign:'center'}}>
+            <p style={{color:'rgba(255,255,255,0.3)', fontSize:'13px', margin:0}}>Жолоочийн мэдээлэл хүлээж байна...</p>
           </div>
         )}
       </div>
