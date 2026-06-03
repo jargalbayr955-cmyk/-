@@ -149,7 +149,7 @@ export default function CurrentPage() {
           <div style={{borderTop:'1px solid rgba(255,255,255,0.06)', paddingTop:'8px'}}>
             <input
               type="text"
-              placeholder="Нэмэлт байршил (заавал биш) — орц, давхар, тэмдэглэл..."
+              placeholder="Нэмэлт байршил гараар бичиж болно"
               value={extraAddress}
               onChange={e => setExtraAddress(e.target.value)}
               style={{width:'100%', background:'transparent', border:'none', color:'rgba(255,255,255,0.6)', fontSize:'13px', outline:'none'}}
