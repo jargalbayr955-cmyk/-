@@ -4,10 +4,21 @@ import { useRouter } from 'next/navigation'
 
 export default function IndexPage() {
   const router = useRouter()
+
   useEffect(() => {
-    const user = localStorage.getItem('user')
-    if (user) { router.replace('/home') }
-    else { router.replace('/register') }
+    try {
+      const user = localStorage.getItem('user')
+      if (user && user !== 'null' && user !== 'undefined') {
+        router.replace('/home')
+      } else {
+        router.replace('/register')
+      }
+    } catch {
+      router.replace('/register')
+    }
   }, [])
-  return null
+
+  return (
+    <div style={{minHeight:'100vh', background:'#0a0a0f'}}/>
+  )
 }
