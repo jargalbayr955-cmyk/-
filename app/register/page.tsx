@@ -65,6 +65,7 @@ export default function RegisterPage() {
           <h1 className="text-white text-2xl font-medium">Бүртгүүлэх</h1>
         </div>
       </div>
+
       <div className="flex-1 px-6 pt-6 pb-10">
         {step === 'phone' && (
           <>
@@ -77,6 +78,7 @@ export default function RegisterPage() {
             <button onClick={handleSendOtp} disabled={loading} className="w-full rounded-2xl py-4 font-medium text-sm text-white disabled:opacity-50" style={{ background: '#e8433a' }}>{loading ? 'Явуулж байна...' : 'SMS код явуулах'}</button>
           </>
         )}
+
         {step === 'otp' && (
           <>
             <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.4)' }}>+976{phone} дугаарт код явуулсан</p>
@@ -86,6 +88,7 @@ export default function RegisterPage() {
             <button onClick={() => { setStep('phone'); setError('') }} className="w-full text-center text-xs mt-4" style={{ color: 'rgba(255,255,255,0.35)' }}>← Дугаар өөрчлөх</button>
           </>
         )}
+
         {step === 'pin' && (
           <>
             <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.4)' }}>4 оронтой PIN тохируулна уу</p>
@@ -95,7 +98,10 @@ export default function RegisterPage() {
             <button onClick={handleSetPin} disabled={loading} className="w-full rounded-2xl py-4 font-medium text-sm text-white disabled:opacity-50" style={{ background: '#e8433a' }}>{loading ? 'Хадгалж байна...' : 'Бүртгэл үүсгэх'}</button>
           </>
         )}
-        <p className="text-center text-xs mt-6" style={{ color: 'rgba(255,255,255,0.4)' }}>Бүртгэлтэй юу? <span style={{ color: '#e8433a' }} className="cursor-pointer" onClick={() => router.push('/')}>Нэвтрэх</span></p>
+
+        <p className="text-center text-xs mt-6" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          Бүртгэлтэй юу? <span style={{ color: '#e8433a' }} className="cursor-pointer" onClick={() => router.push('/')}>Нэвтрэх</span>
+        </p>
       </div>
     </div>
   )
