@@ -324,9 +324,14 @@ export default function DriverPage() {
             <p className="font-medium text-sm">{driver.name}</p>
             <p className="text-xs text-gray-400 mt-0.5">{driver.car_type}</p>
           </div>
-          <button onClick={toggleAvailable} className={"text-xs rounded-xl px-4 py-2 font-medium " + (driver.available ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500')}>
-            {driver.available ? '🟢 Ажиллаж байна' : '⚫ Амарч байна'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={toggleAvailable} className={"text-xs rounded-xl px-4 py-2 font-medium " + (driver.available ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500')}>
+              {driver.available ? '🟢 Ажиллаж байна' : '⚫ Амарч байна'}
+            </button>
+            <button onClick={() => router.push('/driver/profile')} className="text-xs rounded-xl px-3 py-2 bg-gray-100 text-gray-500">
+              👤
+            </button>
+          </div>
         </div>
       </div>
       <div className="px-4 pt-4">
