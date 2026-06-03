@@ -55,8 +55,6 @@ export default function TrackingPage() {
           .eq('id', orderId)
           .single()
         if (ord) setOrder(ord)
-
-        // driver_id байхгүй бол order-оос авах
         const trackId = driverId || ord?.driver_id
         if (trackId) {
           const { data: drv } = await supabase.from('drivers').select('lat, lng').eq('id', trackId).single()
@@ -73,10 +71,8 @@ export default function TrackingPage() {
     return () => clearInterval(interval)
   }, [])
 
-  // Init map
   useEffect(() => {
     if (!mapReady || !userLat || !userLng || mapInstanceRef.current) return
-
     import('leaflet').then((L) => {
       const Leaflet = L.default
       delete (Leaflet.Icon.Default.prototype as any)._getIconUrl
@@ -85,60 +81,37 @@ export default function TrackingPage() {
         iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
         shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
       })
-
       const map = Leaflet.map(mapRef.current!).setView([userLat, userLng], 14)
-      Leaflet.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '© CartoDB'
-      }).addTo(map)
-
+      Leaflet.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB' }).addTo(map)
       const userIcon = Leaflet.divIcon({
-        html: '<div style="background:#3b82f6;width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>',
-        iconSize: [18, 18],
-        iconAnchor: [9, 9],
-        className: ''
+        html: '<div style="background:#3b82f6;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5)"></div>',
+        iconSize: [16, 16], iconAnchor: [8, 8], className: ''
       })
-
-      userMarkerRef.current = Leaflet.marker([userLat, userLng], { icon: userIcon })
-        .addTo(map)
-        .bindPopup('Таны байршил')
-
+      userMarkerRef.current = Leaflet.marker([userLat, userLng], { icon: userIcon }).addTo(map).bindPopup('Таны байршил')
       mapInstanceRef.current = map
     })
   }, [mapReady, userLat, userLng])
 
-  // Update driver marker + line
   useEffect(() => {
     if (!mapInstanceRef.current || !driverLat || !driverLng || !userLat || !userLng) return
-
     import('leaflet').then((L) => {
       const Leaflet = L.default
-
       const truckIcon = Leaflet.divIcon({
-        html: '<div style="font-size:30px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">🚛</div>',
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
-        className: ''
+        html: '<div style="font-size:28px;line-height:1">🚛</div>',
+        iconSize: [32, 32], iconAnchor: [16, 16], className: ''
       })
-
       if (driverMarkerRef.current) {
         driverMarkerRef.current.setLatLng([driverLat, driverLng])
       } else {
-        driverMarkerRef.current = Leaflet.marker([driverLat, driverLng], { icon: truckIcon })
-          .addTo(mapInstanceRef.current)
-          .bindPopup('Жолооч')
+        driverMarkerRef.current = Leaflet.marker([driverLat, driverLng], { icon: truckIcon }).addTo(mapInstanceRef.current).bindPopup('Жолооч')
       }
-
       if (lineRef.current) {
         lineRef.current.setLatLngs([[userLat, userLng], [driverLat, driverLng]])
       } else {
         lineRef.current = Leaflet.polyline([[userLat, userLng], [driverLat, driverLng]], {
-          color: '#e8433a',
-          weight: 3,
-          dashArray: '10, 8',
-          opacity: 0.9
+          color: '#e8433a', weight: 3, dashArray: '10, 8', opacity: 0.9
         }).addTo(mapInstanceRef.current)
       }
-
       const bounds = Leaflet.latLngBounds([[userLat, userLng], [driverLat, driverLng]])
       mapInstanceRef.current.fitBounds(bounds, { padding: [60, 60] })
       setDistance(calcDistance(userLat, userLng, driverLat, driverLng))
@@ -146,75 +119,100 @@ export default function TrackingPage() {
   }, [driverLat, driverLng, userLat, userLng])
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className="bg-white px-5 py-4 border-b border-gray-100 flex items-center justify-between" style={{zIndex: 1000, position: 'relative'}}>
-        <button onClick={() => router.back()} className="text-gray-400 text-sm">← Буцах</button>
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-          <span className="font-medium text-sm">Live Tracking</span>
+    <div style={{minHeight:'100vh', background:'#060608', display:'flex', flexDirection:'column'}}>
+
+      {/* Header */}
+      <div style={{padding:'14px 20px', background:'rgba(0,0,0,0.8)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', justifyContent:'space-between', zIndex:1000, position:'relative'}}>
+        <button onClick={() => router.back()} style={{background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'20px', padding:'7px 14px', color:'rgba(255,255,255,0.6)', fontSize:'13px', cursor:'pointer', fontWeight:'600'}}>← Буцах</button>
+        <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+          <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#e8433a', animation:'pulse 1.5s infinite'}}/>
+          <span style={{color:'white', fontWeight:'700', fontSize:'14px'}}>Live Tracking</span>
         </div>
-        <div className="w-16"></div>
+        <div style={{width:'60px'}}/>
       </div>
 
-      <div ref={mapRef} style={{height: '45vh', minHeight: '280px'}}></div>
+      {/* Map */}
+      <div ref={mapRef} style={{height:'45vh', minHeight:'280px'}}/>
 
-      <div className="bg-white border-t border-gray-100 p-4" style={{zIndex: 1000, position: 'relative'}}>
-        {distance && driverLat ? (
-          <div className="bg-red-50 rounded-2xl p-3 mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🚛</span>
-              <div>
-                <p className="text-sm font-medium">{order?.driver_name || 'Жолооч'}</p>
-                <p className="text-xs text-gray-400">Таны байршил руу явж байна</p>
+      {/* Bottom */}
+      <div style={{background:'#060608', borderTop:'1px solid rgba(255,255,255,0.06)', padding:'16px', zIndex:1000, position:'relative', flex:1}}>
+
+        {/* Жолоочийн мэдээлэл */}
+        {order?.driver_name ? (
+          <div style={{background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'14px 16px', marginBottom:'14px'}}>
+            <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+              <div style={{width:'46px', height:'46px', borderRadius:'50%', background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.3)', display:'flex', alignItems:'center', justifyContent:'center', color:'#ff6b5b', fontSize:'18px', fontWeight:'800', flexShrink:0}}>
+                {order.driver_name.charAt(0)}
               </div>
-            </div>
-            <div className="text-right">
-              <p className="text-red-500 font-bold text-xl">{distance} км</p>
-              <p className="text-xs text-gray-400">зайтай</p>
+              <div style={{flex:1}}>
+                <p style={{color:'white', fontWeight:'800', fontSize:'17px', margin:0, letterSpacing:'-0.3px'}}>{order.driver_name}</p>
+                <p style={{color:'rgba(255,255,255,0.4)', fontSize:'13px', margin:'3px 0 0'}}>
+                  {distance ? `📍 ${distance} км зайтай · ` : ''}Таны байршил руу явж байна
+                </p>
+              </div>
+              {distance && (
+                <div style={{textAlign:'right'}}>
+                  <p style={{color:'#e8433a', fontWeight:'800', fontSize:'20px', margin:0}}>{distance}</p>
+                  <p style={{color:'rgba(255,255,255,0.3)', fontSize:'11px', margin:'2px 0 0'}}>км</p>
+                </div>
+              )}
             </div>
           </div>
         ) : (
-          <div className="bg-gray-50 rounded-2xl p-3 mb-3 text-center">
-            <p className="text-gray-400 text-sm">Жолоочийн байршил хүлээж байна...</p>
+          <div style={{background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:'16px', padding:'14px', marginBottom:'14px', textAlign:'center'}}>
+            <p style={{color:'rgba(255,255,255,0.3)', fontSize:'13px', margin:0}}>Жолоочийн байршил хүлээж байна...</p>
           </div>
         )}
 
-        <div className="flex items-center justify-center gap-6 mb-3">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-            <span className="text-xs text-gray-500">Таны байршил</span>
+        {/* Legend */}
+        <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'20px', marginBottom:'14px'}}>
+          <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+            <div style={{width:'10px', height:'10px', borderRadius:'50%', background:'#3b82f6'}}/>
+            <span style={{color:'rgba(255,255,255,0.4)', fontSize:'12px'}}>Таны байршил</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm">🚛</span>
-            <span className="text-xs text-gray-500">Жолооч</span>
+          <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+            <span style={{fontSize:'14px'}}>🚛</span>
+            <span style={{color:'rgba(255,255,255,0.4)', fontSize:'12px'}}>Жолооч</span>
           </div>
         </div>
 
+        {/* Дуудлага товч */}
         {order?.driver_phone ? (
           <div>
-            <p style={{color:'rgba(255,255,255,0.4)', fontSize:'12px', textAlign:'center', marginBottom:'10px', fontWeight:'500'}}>
-              Захиалгаа баталгаажуулахын тулд жолоочтойгоо холбогдоно уу
-            </p>
-            <a
-              href={'tel:' + order.driver_phone}
-              style={{
-                width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px',
-                borderRadius:'16px', padding:'16px',
-                background:'#e8433a', color:'white', textDecoration:'none',
-                fontSize:'16px', fontWeight:'800', letterSpacing:'0.3px',
-                boxShadow:'0 6px 25px rgba(232,67,58,0.45)',
-                animation:'btnPulse 2s ease-in-out infinite'
-              }}
-            >
-              📞 {order.driver_name} руу залгаж баталгаажуулна уу
+            <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', marginBottom:'10px'}}>
+              <div style={{flex:1, height:'1px', background:'rgba(255,255,255,0.06)'}}/>
+              <p style={{color:'rgba(255,255,255,0.35)', fontSize:'12px', margin:0, whiteSpace:'nowrap'}}>
+                Та залгаж баталгаажуулна уу
+              </p>
+              <div style={{flex:1, height:'1px', background:'rgba(255,255,255,0.06)'}}/>
+            </div>
+            <a href={'tel:' + order.driver_phone} style={{
+              display:'flex', alignItems:'center', justifyContent:'center', gap:'12px',
+              borderRadius:'16px', padding:'16px',
+              background:'#e8433a', color:'white', textDecoration:'none',
+              animation:'btnPulse 2s ease-in-out infinite'
+            }}>
+              <span style={{fontSize:'22px'}}>📞</span>
+              <div style={{textAlign:'left'}}>
+                <p style={{color:'white', fontWeight:'800', fontSize:'16px', margin:0, letterSpacing:'-0.3px'}}>{order.driver_name}</p>
+                <p style={{color:'rgba(255,255,255,0.75)', fontSize:'14px', margin:'2px 0 0', fontWeight:'600', letterSpacing:'1px'}}>{order.driver_phone}</p>
+              </div>
             </a>
           </div>
         ) : (
-          <div style={{background:'rgba(255,255,255,0.05)', borderRadius:'14px', padding:'14px', textAlign:'center'}}>
-            <p style={{color:'rgba(255,255,255,0.3)', fontSize:'13px', margin:0}}>Жолоочийн мэдээлэл хүлээж байна...</p>
+          <div style={{background:'rgba(255,255,255,0.03)', borderRadius:'14px', padding:'14px', textAlign:'center'}}>
+            <p style={{color:'rgba(255,255,255,0.25)', fontSize:'13px', margin:0}}>Жолоочийн мэдээлэл хүлээж байна...</p>
           </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+        @keyframes btnPulse {
+          0%,100%{box-shadow:0 6px 25px rgba(232,67,58,0.4)}
+          50%{box-shadow:0 6px 40px rgba(232,67,58,0.75)}
+        }
+      `}</style>
     </div>
   )
 }
