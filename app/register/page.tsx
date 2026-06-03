@@ -166,7 +166,7 @@ export default function RegisterPage() {
         </div>
         {error && <div style={{background:'rgba(232,67,58,0.1)', border:'1px solid rgba(232,67,58,0.25)', borderRadius:'12px', padding:'10px 14px', marginBottom:'14px'}}><p style={{color:'#ff6b6b', fontSize:'13px', margin:0}}>⚠️ {error}</p></div>}
         <button onClick={handleRegister} disabled={loading} style={{width:'100%', borderRadius:'16px', padding:'17px', background: loading ? 'rgba(232,67,58,0.4)' : '#e8433a', border:'none', color:'white', fontSize:'17px', fontWeight:'800', cursor: loading ? 'not-allowed' : 'pointer', letterSpacing:'0.5px', transition:'all 0.2s', boxShadow: loading ? 'none' : '0 6px 30px rgba(232,67,58,0.4)'}}>
-          {loading ? 'Бүртгэж байна...' : 'Бүртгүүлэх →'}
+          {loading ? 'Нэвтэрч байна...' : 'Нэвтрэх →'}
         </button>
         <p style={{textAlign:'center', fontSize:'13px', marginTop:'1.5rem', color:'rgba(255,255,255,0.3)'}}>
           Бүртгэлтэй юу? <span onClick={() => router.push('/login')} style={{color:'#e8433a', cursor:'pointer', fontWeight:'700'}}>Нэвтрэх</span>
