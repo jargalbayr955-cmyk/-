@@ -28,7 +28,6 @@ export default function TrackingPage() {
     return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1)
   }
 
-  // Load leaflet CSS
   useEffect(() => {
     const link = document.createElement('link')
     link.rel = 'stylesheet'
@@ -50,14 +49,21 @@ export default function TrackingPage() {
 
     const fetchTracking = async () => {
       if (orderId) {
-        const { data: ord } = await supabase.from('orders').select().eq('id', orderId).single()
+        const { data: ord } = await supabase
+          .from('orders')
+          .select('id, driver_name, driver_phone, driver_id, from_address, to_address, status')
+          .eq('id', orderId)
+          .single()
         if (ord) setOrder(ord)
-      }
-      if (driverId) {
-        const { data: drv } = await supabase.from('drivers').select('lat, lng').eq('id', driverId).single()
-        if (drv?.lat) {
-          setDriverLat(drv.lat)
-          setDriverLng(drv.lng)
+
+        // driver_id байхгүй бол order-оос авах
+        const trackId = driverId || ord?.driver_id
+        if (trackId) {
+          const { data: drv } = await supabase.from('drivers').select('lat, lng').eq('id', trackId).single()
+          if (drv?.lat) {
+            setDriverLat(drv.lat)
+            setDriverLng(drv.lng)
+          }
         }
       }
     }
@@ -73,7 +79,6 @@ export default function TrackingPage() {
 
     import('leaflet').then((L) => {
       const Leaflet = L.default
-
       delete (Leaflet.Icon.Default.prototype as any)._getIconUrl
       Leaflet.Icon.Default.mergeOptions({
         iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -136,7 +141,6 @@ export default function TrackingPage() {
 
       const bounds = Leaflet.latLngBounds([[userLat, userLng], [driverLat, driverLng]])
       mapInstanceRef.current.fitBounds(bounds, { padding: [60, 60] })
-
       setDistance(calcDistance(userLat, userLng, driverLat, driverLng))
     })
   }, [driverLat, driverLng, userLat, userLng])
@@ -186,14 +190,18 @@ export default function TrackingPage() {
           </div>
         </div>
 
-        {order?.driver_phone && (
+        {order?.driver_phone ? (
           <a
             href={'tel:' + order.driver_phone}
             className="w-full flex items-center justify-center gap-2 rounded-2xl py-3.5 font-medium text-sm text-white"
             style={{background:'#e8433a'}}
           >
-            📞 Жолоочтой холбогдох
+            📞 {order.driver_name} руу залгах ({order.driver_phone})
           </a>
+        ) : (
+          <div className="w-full flex items-center justify-center gap-2 rounded-2xl py-3.5 text-sm text-gray-400 bg-gray-100">
+            Жолоочийн мэдээлэл хүлээж байна...
+          </div>
         )}
       </div>
     </div>

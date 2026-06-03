@@ -18,6 +18,11 @@ export default function DriverPage() {
   const [newOrderAlert, setNewOrderAlert] = useState(false)
   const [acceptedOrder, setAcceptedOrder] = useState<any>(null)
   const prevOrderIds = useRef<string[]>([])
+  const mapRef = useRef<any>(null)
+  const mapInstanceRef = useRef<any>(null)
+  const driverMarkerRef = useRef<any>(null)
+  const userMarkerRef = useRef<any>(null)
+  const lineRef = useRef<any>(null)
   const router = useRouter()
 
   const handleLogin = async () => {
@@ -82,10 +87,89 @@ export default function DriverPage() {
           lng: pos.coords.longitude
         }).eq('id', driver.id)
         setDriver((d: any) => ({ ...d, lat: pos.coords.latitude, lng: pos.coords.longitude }))
+        // Update driver marker on map
+        if (driverMarkerRef.current) {
+          driverMarkerRef.current.setLatLng([pos.coords.latitude, pos.coords.longitude])
+        }
+        if (lineRef.current && acceptedOrder?.from_lat) {
+          lineRef.current.setLatLngs([
+            [pos.coords.latitude, pos.coords.longitude],
+            [acceptedOrder.from_lat, acceptedOrder.from_lng]
+          ])
+        }
       })
     }, 10000)
     return () => clearInterval(interval)
   }, [driver, acceptedOrder])
+
+  // Init Leaflet map for accepted order
+  useEffect(() => {
+    if (!acceptedOrder || !mapRef.current || mapInstanceRef.current) return
+
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+    document.head.appendChild(link)
+
+    setTimeout(() => {
+      import('leaflet').then((L) => {
+        const Leaflet = L.default
+        delete (Leaflet.Icon.Default.prototype as any)._getIconUrl
+        Leaflet.Icon.Default.mergeOptions({
+          iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        })
+
+        const userLat = acceptedOrder.from_lat
+        const userLng = acceptedOrder.from_lng
+        const drvLat = driver?.lat || userLat
+        const drvLng = driver?.lng || userLng
+
+        const map = Leaflet.map(mapRef.current!).setView([userLat || 47.9, userLng || 106.9], 13)
+        Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap'
+        }).addTo(map)
+
+        // Хэрэглэгчийн байршил
+        const userIcon = Leaflet.divIcon({
+          html: '<div style="background:#3b82f6;width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>',
+          iconSize: [18, 18], iconAnchor: [9, 9], className: ''
+        })
+        userMarkerRef.current = Leaflet.marker([userLat, userLng], { icon: userIcon })
+          .addTo(map).bindPopup('Хэрэглэгчийн байршил')
+
+        // Жолоочийн байршил
+        const truckIcon = Leaflet.divIcon({
+          html: '<div style="font-size:28px;line-height:1">🚛</div>',
+          iconSize: [32, 32], iconAnchor: [16, 16], className: ''
+        })
+        driverMarkerRef.current = Leaflet.marker([drvLat, drvLng], { icon: truckIcon })
+          .addTo(map).bindPopup('Таны байршил')
+
+        // Зураас
+        lineRef.current = Leaflet.polyline([[drvLat, drvLng], [userLat, userLng]], {
+          color: '#e8433a', weight: 3, dashArray: '10, 8', opacity: 0.9
+        }).addTo(map)
+
+        const bounds = Leaflet.latLngBounds([[drvLat, drvLng], [userLat, userLng]])
+        map.fitBounds(bounds, { padding: [60, 60] })
+
+        mapInstanceRef.current = map
+      })
+    }, 300)
+  }, [acceptedOrder])
+
+  // Cleanup map
+  useEffect(() => {
+    if (!acceptedOrder && mapInstanceRef.current) {
+      mapInstanceRef.current.remove()
+      mapInstanceRef.current = null
+      driverMarkerRef.current = null
+      userMarkerRef.current = null
+      lineRef.current = null
+    }
+  }, [acceptedOrder])
 
   const toggleAvailable = async () => {
     const newVal = !driver.available
@@ -145,8 +229,6 @@ export default function DriverPage() {
   useEffect(() => {
     if (!driver) return
     fetchOrders()
-
-    // Listen for confirmed orders
     const channel = supabase
       .channel('orders-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
@@ -184,14 +266,8 @@ export default function DriverPage() {
     )
   }
 
-  // Accepted order - show navigation map
+  // Accepted order - Leaflet map with line
   if (acceptedOrder) {
-    const userLat = acceptedOrder.from_lat
-    const userLng = acceptedOrder.from_lng
-    const mapUrl = userLat && userLng
-      ? `https://www.openstreetmap.org/export/embed.html?bbox=${userLng - 0.02},${userLat - 0.02},${userLng + 0.02},${userLat + 0.02}&layer=mapnik&marker=${userLat},${userLng}`
-      : null
-
     return (
       <div className="min-h-screen flex flex-col">
         <div className="bg-white px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -199,28 +275,13 @@ export default function DriverPage() {
             <p className="font-medium text-sm">{driver.name}</p>
             <p className="text-xs text-green-500">Захиалга хүлээн авсан</p>
           </div>
-          <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-        </div>
-
-        <div className="relative flex-1" style={{minHeight: '400px'}}>
-          {mapUrl ? (
-            <iframe
-              key={`${driver.lat}-${driver.lng}`}
-              width="100%"
-              height="100%"
-              style={{border: 0, minHeight: '400px'}}
-              src={mapUrl}
-            />
-          ) : (
-            <div className="w-full flex items-center justify-center bg-gray-200" style={{minHeight: '400px'}}>
-              <p className="text-gray-400 text-sm">Газрын зураг ачааллаж байна...</p>
-            </div>
-          )}
-          <div className="absolute top-3 right-3 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
-            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-            LIVE
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+            <span className="text-xs text-red-500 font-medium">LIVE</span>
           </div>
         </div>
+
+        <div ref={mapRef} style={{flex: 1, minHeight: '400px'}}></div>
 
         <div className="bg-white p-4 border-t border-gray-100">
           <div className="bg-gray-50 rounded-2xl p-3 mb-3">
@@ -285,7 +346,6 @@ export default function DriverPage() {
           <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center">
             <div className="text-4xl mb-3">⏳</div>
             <p className="text-gray-400 text-sm">Одоогоор захиалга байхгүй</p>
-            <p className="text-gray-300 text-xs mt-1">Шинэ захиалга ирэхэд автоматаар харагдана</p>
           </div>
         ) : (
           <div className="space-y-3">
