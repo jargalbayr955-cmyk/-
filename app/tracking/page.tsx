@@ -193,7 +193,10 @@ export default function TrackingPage() {
               animation:'btnPulse 2s ease-in-out infinite'
             }}>
               <span style={{fontSize:'22px'}}>📞</span>
-              <p style={{color:'white', fontWeight:'800', fontSize:'18px', margin:0, letterSpacing:'2px'}}>{order.driver_phone}</p>
+              <div style={{textAlign:'left'}}>
+                <p style={{color:'rgba(255,255,255,0.75)', fontSize:'12px', margin:'0 0 3px', fontWeight:'500'}}>Та залгаж баталгаажуулна уу</p>
+                <p style={{color:'white', fontWeight:'800', fontSize:'18px', margin:0, letterSpacing:'2px'}}>{order.driver_phone}</p>
+              </div>
             </a>
           </div>
         ) : (
