@@ -9,6 +9,7 @@ export default function CurrentPage() {
   const [address, setAddress] = useState('Байршил тогтоож байна...')
   const [carType, setCarType] = useState('')
   const [carMark, setCarMark] = useState('')
+  const [extraAddress, setExtraAddress] = useState('')
   const [errors, setErrors] = useState<{dest?:boolean, carType?:boolean, carMark?:boolean}>({})
   const [mapReady, setMapReady] = useState(false)
   const mapRef = useRef<any>(null)
@@ -102,7 +103,7 @@ export default function CurrentPage() {
 
     const user = JSON.parse(localStorage.getItem('user') || 'null')
     const { data: orderData } = await supabase.from('orders').insert({
-      from_address: address,
+      from_address: extraAddress ? `${address} (${extraAddress})` : address,
       to_address: dest,
       from_lat: location!.lat,
       from_lng: location!.lng,
@@ -144,7 +145,16 @@ export default function CurrentPage() {
             <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#3b82f6', flexShrink:0}}/>
             <span style={{color:'rgba(255,255,255,0.35)', fontSize:'11px', fontWeight:'700', letterSpacing:'1px'}}>ТАНЫ БАЙРШИЛ</span>
           </div>
-          <p style={{color:'rgba(255,255,255,0.7)', fontSize:'13px', margin:0}}>{address}</p>
+          <p style={{color:'rgba(255,255,255,0.7)', fontSize:'13px', margin:'0 0 8px'}}>{address}</p>
+          <div style={{borderTop:'1px solid rgba(255,255,255,0.06)', paddingTop:'8px'}}>
+            <input
+              type="text"
+              placeholder="Нэмэлт байршил (заавал биш) — орц, давхар, тэмдэглэл..."
+              value={extraAddress}
+              onChange={e => setExtraAddress(e.target.value)}
+              style={{width:'100%', background:'transparent', border:'none', color:'rgba(255,255,255,0.6)', fontSize:'13px', outline:'none'}}
+            />
+          </div>
         </div>
 
         {/* Хүрэх газар */}
