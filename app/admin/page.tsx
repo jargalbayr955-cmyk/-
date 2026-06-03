@@ -33,13 +33,15 @@ export default function AdminPage() {
   useEffect(() => {
     if (authed) {
       fetchDrivers()
-      const saved = localStorage.getItem('hero_url')
-      if (saved) setHeroUrl(saved)
+      // Supabase-аас hero_url унших
+      supabase.from('settings').select('value').eq('key', 'hero_url').single().then(({ data }) => {
+        if (data?.value) setHeroUrl(data.value)
+      })
     }
   }, [authed])
 
-  const saveHeroUrl = () => {
-    localStorage.setItem('hero_url', heroUrl)
+  const saveHeroUrl = async () => {
+    await supabase.from('settings').upsert({ key: 'hero_url', value: heroUrl })
     setHeroSaved(true)
     setTimeout(() => setHeroSaved(false), 2000)
   }

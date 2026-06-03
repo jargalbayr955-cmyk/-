@@ -17,8 +17,10 @@ export default function LoginPage() {
   }, [])
 
   useEffect(() => {
-    const saved = localStorage.getItem('hero_url')
-    if (saved) setHeroUrl(saved)
+    // Supabase-аас hero_url унших
+    supabase.from('settings').select('value').eq('key', 'hero_url').single().then(({ data }) => {
+      if (data?.value) setHeroUrl(data.value)
+    })
   }, [])
 
   const handleLogin = async () => {
