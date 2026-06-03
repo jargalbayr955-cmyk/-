@@ -48,57 +48,94 @@ export default function LoginPage() {
     <div style={{minHeight:'100vh', background:'#0a0a0f', display:'flex', flexDirection:'column', overflow:'hidden'}}>
 
       {/* Hero */}
-      <div style={{position:'relative', height:'55vh', overflow:'hidden'}}>
+      <div style={{position:'relative', height:'58vh', overflow:'hidden'}}>
+
+        {/* Зураг — машин хурдтай ирж байгаа мэт */}
         <div style={{
-          position:'absolute', inset:'-20px',
+          position:'absolute', inset:'-30px',
           backgroundImage:`url(${bgImage})`,
-          backgroundSize:'cover',
-          backgroundPosition:'center',
-          animation:'zoomIn 8s ease-out forwards',
-          filter:'brightness(0.5)'
+          backgroundSize:'130%',
+          backgroundPosition:'20% center',
+          animation:'truckDrive 1.2s cubic-bezier(0.25,0.46,0.45,0.94) forwards',
+          filter:'brightness(0.5) saturate(1.2)'
+        }}/>
+
+        {/* Хөдөлгөөний blur шугамууд */}
+        <div style={{
+          position:'absolute', inset:0,
+          background:'linear-gradient(to right, rgba(0,0,0,0.6) 0%, transparent 40%, transparent 70%, rgba(0,0,0,0.3) 100%)',
+          animation:'fadeIn 0.8s ease forwards'
         }}/>
         <div style={{
           position:'absolute', inset:0,
-          background:'linear-gradient(to bottom, rgba(10,10,15,0.1) 0%, rgba(10,10,15,0.4) 60%, rgba(10,10,15,1) 100%)'
+          background:'linear-gradient(to bottom, transparent 30%, rgba(10,10,15,0.7) 70%, rgba(10,10,15,1) 100%)'
         }}/>
+
+        {/* Хурдны шугамууд */}
+        <div style={{position:'absolute', inset:0, overflow:'hidden', opacity: visible ? 0 : 1, transition:'opacity 1s ease 0.8s'}}>
+          {[35,45,55,65,75].map((top, i) => (
+            <div key={i} style={{
+              position:'absolute', top:`${top}%`, left:0, right:0, height:'1px',
+              background:'rgba(255,255,255,0.08)',
+              animation:`speedLine 0.6s ease-out ${i * 0.08}s forwards`
+            }}/>
+          ))}
+        </div>
+
+        {/* Текст */}
         <div style={{
           position:'absolute', bottom:'2rem', left:'1.5rem', right:'1.5rem',
           opacity: visible ? 1 : 0,
-          transform: visible ? 'translateY(0)' : 'translateY(20px)',
-          transition:'all 0.8s ease'
+          transform: visible ? 'translateY(0)' : 'translateY(25px)',
+          transition:'all 0.9s cubic-bezier(0.25,0.46,0.45,0.94) 0.4s'
         }}>
-          <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px'}}>
-            <div style={{width:'3px', height:'28px', background:'#e8433a', borderRadius:'2px'}}/>
-            <p style={{color:'rgba(255,255,255,0.6)', fontSize:'13px', letterSpacing:'3px', textTransform:'uppercase', margin:0}}>Аварийн тусламж</p>
+          {/* Badge */}
+          <div style={{
+            display:'inline-flex', alignItems:'center', gap:'6px',
+            background:'rgba(232,67,58,0.2)', border:'1px solid rgba(232,67,58,0.4)',
+            borderRadius:'20px', padding:'4px 12px', marginBottom:'12px'
+          }}>
+            <div style={{width:'6px', height:'6px', borderRadius:'50%', background:'#e8433a', animation:'pulse 1.5s infinite'}}/>
+            <span style={{color:'#ff6b5b', fontSize:'11px', fontWeight:'700', letterSpacing:'2px', textTransform:'uppercase'}}>24/7 Дуудлага</span>
           </div>
-          <h1 style={{color:'white', fontSize:'2.8rem', fontWeight:'800', margin:0, lineHeight:1.1, letterSpacing:'-1px'}}>
+
+          <h1 style={{
+            color:'white', fontSize:'3rem', fontWeight:'900', margin:0,
+            lineHeight:1, letterSpacing:'-2px',
+            textShadow:'0 2px 20px rgba(0,0,0,0.5)'
+          }}>
             Ачилт
           </h1>
-          <p style={{color:'rgba(255,255,255,0.5)', fontSize:'14px', marginTop:'8px'}}>
-            24/7 аварийн машин дуудах
-          </p>
+
+          <div style={{display:'flex', alignItems:'center', gap:'8px', marginTop:'10px'}}>
+            <div style={{width:'20px', height:'2px', background:'#e8433a', borderRadius:'1px'}}/>
+            <p style={{color:'rgba(255,255,255,0.6)', fontSize:'13px', margin:0, fontWeight:'500', letterSpacing:'1px'}}>
+              Хамгийн ойр · Хамгийн хурдан
+            </p>
+          </div>
         </div>
       </div>
 
       {/* Form */}
       <div style={{
-        flex:1, padding:'2rem 1.5rem',
+        flex:1, padding:'1.8rem 1.5rem 2rem',
         opacity: visible ? 1 : 0,
-        transform: visible ? 'translateY(0)' : 'translateY(30px)',
-        transition:'all 0.8s ease 0.2s'
+        transform: visible ? 'translateY(0)' : 'translateY(40px)',
+        transition:'all 0.9s cubic-bezier(0.25,0.46,0.45,0.94) 0.6s'
       }}>
-        <p style={{color:'rgba(255,255,255,0.5)', fontSize:'13px', marginBottom:'1.2rem', letterSpacing:'0.5px'}}>
+
+        <p style={{color:'rgba(255,255,255,0.45)', fontSize:'13px', marginBottom:'14px', letterSpacing:'0.3px'}}>
           Утасны дугаараар нэвтрэх
         </p>
 
-        <div style={{display:'flex', gap:'10px', marginBottom:'16px'}}>
+        <div style={{display:'flex', gap:'10px', marginBottom:'14px'}}>
           <div style={{
             borderRadius:'14px', padding:'0 14px',
             background:'rgba(255,255,255,0.06)',
-            border:'1px solid rgba(255,255,255,0.12)',
+            border:'1px solid rgba(255,255,255,0.1)',
             display:'flex', alignItems:'center',
-            color:'rgba(255,255,255,0.7)', fontSize:'14px',
-            whiteSpace:'nowrap'
+            color:'rgba(255,255,255,0.6)', fontSize:'14px',
+            whiteSpace:'nowrap', fontWeight:'500'
           }}>🇲🇳 +976</div>
           <input
             type="tel"
@@ -108,17 +145,17 @@ export default function LoginPage() {
             style={{
               flex:1, borderRadius:'14px', padding:'14px 16px',
               background:'rgba(255,255,255,0.06)',
-              border:'1px solid rgba(255,255,255,0.12)',
+              border:'1px solid rgba(255,255,255,0.1)',
               color:'white', fontSize:'16px', outline:'none',
-              fontWeight:'500'
+              fontWeight:'600', letterSpacing:'1px'
             }}
           />
         </div>
 
         {error && (
           <div style={{
-            background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.3)',
-            borderRadius:'12px', padding:'10px 14px', marginBottom:'16px'
+            background:'rgba(232,67,58,0.12)', border:'1px solid rgba(232,67,58,0.25)',
+            borderRadius:'12px', padding:'10px 14px', marginBottom:'14px'
           }}>
             <p style={{color:'#ff6b6b', fontSize:'13px', margin:0}}>⚠️ {error}</p>
           </div>
@@ -128,32 +165,34 @@ export default function LoginPage() {
           onClick={handleLogin}
           disabled={loading}
           style={{
-            width:'100%', borderRadius:'16px', padding:'16px',
-            background: loading ? 'rgba(232,67,58,0.5)' : '#e8433a',
-            border:'none', color:'white', fontSize:'16px', fontWeight:'700',
+            width:'100%', borderRadius:'16px', padding:'17px',
+            background: loading ? 'rgba(232,67,58,0.4)' : '#e8433a',
+            border:'none', color:'white', fontSize:'17px', fontWeight:'800',
             cursor: loading ? 'not-allowed' : 'pointer',
             letterSpacing:'0.5px',
             transition:'all 0.2s',
-            boxShadow: loading ? 'none' : '0 4px 20px rgba(232,67,58,0.4)'
+            boxShadow: loading ? 'none' : '0 6px 30px rgba(232,67,58,0.45)',
+            transform: loading ? 'scale(0.98)' : 'scale(1)'
           }}
         >
           {loading ? 'Нэвтэрч байна...' : 'Нэвтрэх →'}
         </button>
 
-        <div style={{display:'flex', alignItems:'center', gap:'12px', margin:'1.5rem 0'}}>
-          <div style={{flex:1, height:'1px', background:'rgba(255,255,255,0.08)'}}/>
-          <span style={{color:'rgba(255,255,255,0.2)', fontSize:'12px'}}>эсвэл</span>
-          <div style={{flex:1, height:'1px', background:'rgba(255,255,255,0.08)'}}/>
+        <div style={{display:'flex', alignItems:'center', gap:'12px', margin:'1.2rem 0'}}>
+          <div style={{flex:1, height:'1px', background:'rgba(255,255,255,0.07)'}}/>
+          <span style={{color:'rgba(255,255,255,0.18)', fontSize:'12px'}}>эсвэл</span>
+          <div style={{flex:1, height:'1px', background:'rgba(255,255,255,0.07)'}}/>
         </div>
 
         <button
           onClick={() => router.push('/register')}
           style={{
-            width:'100%', borderRadius:'16px', padding:'15px',
+            width:'100%', borderRadius:'16px', padding:'16px',
             background:'transparent',
-            border:'1px solid rgba(255,255,255,0.15)',
-            color:'rgba(255,255,255,0.7)', fontSize:'15px', fontWeight:'600',
-            cursor:'pointer', letterSpacing:'0.5px'
+            border:'1px solid rgba(255,255,255,0.12)',
+            color:'rgba(255,255,255,0.6)', fontSize:'15px', fontWeight:'600',
+            cursor:'pointer', letterSpacing:'0.5px',
+            transition:'all 0.2s'
           }}
         >
           Шинэ бүртгэл үүсгэх
@@ -161,12 +200,25 @@ export default function LoginPage() {
       </div>
 
       <style>{`
-        @keyframes zoomIn {
-          from { transform: scale(1.12); }
-          to { transform: scale(1); }
+        @keyframes truckDrive {
+          0% { transform: scale(1.3) translateX(-8%); filter: brightness(0.3) saturate(1.2) blur(3px); }
+          60% { filter: brightness(0.45) saturate(1.2) blur(1px); }
+          100% { transform: scale(1.05) translateX(0); filter: brightness(0.5) saturate(1.2) blur(0px); }
         }
-        input::placeholder { color: rgba(255,255,255,0.25); }
-        input:focus { border-color: rgba(232,67,58,0.6) !important; }
+        @keyframes speedLine {
+          0% { transform: scaleX(0); transform-origin: left; opacity: 1; }
+          100% { transform: scaleX(1); transform-origin: left; opacity: 0; }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; } to { opacity: 1; }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(0.8); }
+        }
+        input::placeholder { color: rgba(255,255,255,0.2); }
+        input:focus { border-color: rgba(232,67,58,0.5) !important; background: rgba(255,255,255,0.08) !important; }
+        button:active { transform: scale(0.97) !important; }
       `}</style>
     </div>
   )
