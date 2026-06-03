@@ -1,4 +1,3 @@
-$code = @'
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -85,7 +84,12 @@ export default function DriverPage() {
   }
 
   const acceptOrder = async (order: any) => {
-    await supabase.from('orders').update({ status: 'confirmed', driver_id: driver.id, driver_name: driver.name, driver_phone: driver.phone }).eq('id', order.id)
+    await supabase.from('orders').update({
+      status: 'confirmed',
+      driver_id: driver.id,
+      driver_name: driver.name,
+      driver_phone: driver.phone
+    }).eq('id', order.id)
     fetchOrders()
   }
 
@@ -219,7 +223,3 @@ export default function DriverPage() {
     </div>
   )
 }
-'@
-
-$code | Out-File -FilePath "app\driver\page.tsx" -Encoding UTF8
-Write-Host "Done!"
