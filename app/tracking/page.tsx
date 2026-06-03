@@ -179,23 +179,17 @@ export default function TrackingPage() {
         {/* Дуудлага товч */}
         {order?.driver_phone ? (
           <div>
-            <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', marginBottom:'10px'}}>
-              <div style={{flex:1, height:'1px', background:'rgba(255,255,255,0.06)'}}/>
-              <p style={{color:'rgba(255,255,255,0.35)', fontSize:'12px', margin:0, whiteSpace:'nowrap'}}>
-                Та залгаж баталгаажуулна уу
-              </p>
-              <div style={{flex:1, height:'1px', background:'rgba(255,255,255,0.06)'}}/>
-            </div>
+
             <a href={'tel:' + order.driver_phone} style={{
               display:'flex', alignItems:'center', justifyContent:'center', gap:'12px',
               borderRadius:'16px', padding:'16px',
-              background:'#e8433a', color:'white', textDecoration:'none',
+              background:'#ff6b5b', color:'white', textDecoration:'none',
               animation:'btnPulse 2s ease-in-out infinite'
             }}>
               <span style={{fontSize:'22px'}}>📞</span>
               <div style={{textAlign:'left'}}>
-                <p style={{color:'rgba(255,255,255,0.75)', fontSize:'12px', margin:'0 0 3px', fontWeight:'500'}}>Та залгаж баталгаажуулна уу</p>
-                <p style={{color:'white', fontWeight:'800', fontSize:'18px', margin:0, letterSpacing:'2px'}}>{order.driver_phone}</p>
+                <p style={{color:'rgba(0,0,0,0.6)', fontSize:'13px', margin:'0 0 4px', fontWeight:'700'}}>Та залгаж баталгаажуулна уу</p>
+                <p style={{color:'#1a0000', fontWeight:'900', fontSize:'20px', margin:0, letterSpacing:'2px'}}>{order.driver_phone}</p>
               </div>
             </a>
           </div>
