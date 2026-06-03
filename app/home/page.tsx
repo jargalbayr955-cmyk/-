@@ -1,84 +1,214 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function HomePage() {
   const router = useRouter()
+  const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    const user = localStorage.getItem('user')
-    if (!user) router.push('/')
+    setTimeout(() => setVisible(true), 100)
   }, [])
 
   return (
-    <div className="min-h-screen flex flex-col" style={{background:'#f5f5f7'}}>
-      <div className="bg-white px-5 py-4 flex items-center justify-between border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-sm font-medium" style={{background:'#e8433a'}}>А</div>
-          <span className="font-medium text-base">Ачилт</span>
-        </div>
-        <span className="text-xl">🔔</span>
-      </div>
+    <div style={{minHeight:'100vh', background:'#0a0a0f', display:'flex', flexDirection:'column', overflow:'hidden'}}>
 
-      <div className="px-5 pt-6 pb-2">
-        <h2 className="text-xl font-medium" style={{color:'#1a1a1a'}}>Сайн байна уу 👋</h2>
-        <p className="text-sm mt-1" style={{color:'#888'}}>Машинаа хаанаас ачуулах вэ?</p>
-      </div>
-
-      <div className="px-5 pt-4 flex flex-col gap-3">
-        <div
-          onClick={() => router.push('/current')}
-          className="bg-white rounded-2xl p-4 flex items-center gap-4 cursor-pointer active:opacity-80"
-          style={{border:'0.5px solid #eee'}}
-        >
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl" style={{background:'#fff0ef'}}>📍</div>
-          <div className="flex-1">
-            <p className="font-medium text-sm" style={{color:'#1a1a1a'}}>Энэ байгаа байршлаас</p>
-            <p className="text-xs mt-0.5" style={{color:'#aaa'}}>GPS байршлыг ашиглана</p>
+      {/* Hero зураг */}
+      <div style={{position:'relative', height:'42vh', overflow:'hidden'}}>
+        <div style={{
+          position:'absolute', inset:'-20px',
+          backgroundImage:'url(https://i.ibb.co/5WrSCdV3/Jun-4-2026-12-21-53-AM.png)',
+          backgroundSize:'cover', backgroundPosition:'center 30%',
+          animation:'truckDrive 1.2s cubic-bezier(0.25,0.46,0.45,0.94) forwards',
+          filter:'brightness(0.45) saturate(1.1)'
+        }}/>
+        <div style={{
+          position:'absolute', inset:0,
+          background:'linear-gradient(to bottom, rgba(10,10,15,0.2) 0%, rgba(10,10,15,0.6) 70%, rgba(10,10,15,1) 100%)'
+        }}/>
+        {/* Header */}
+        <div style={{
+          position:'absolute', top:0, left:0, right:0,
+          padding:'16px 20px',
+          display:'flex', alignItems:'center', justifyContent:'space-between'
+        }}>
+          <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+            <div style={{
+              width:'34px', height:'34px', borderRadius:'10px',
+              background:'#e8433a', display:'flex', alignItems:'center',
+              justifyContent:'center', color:'white', fontWeight:'900', fontSize:'16px'
+            }}>А</div>
+            <span style={{color:'white', fontWeight:'800', fontSize:'17px', letterSpacing:'-0.5px'}}>Ачилт</span>
           </div>
-          <span style={{color:'#ccc', fontSize:'20px'}}>›</span>
+          <div style={{
+            display:'flex', alignItems:'center', gap:'6px',
+            background:'rgba(232,67,58,0.2)', border:'1px solid rgba(232,67,58,0.35)',
+            borderRadius:'20px', padding:'5px 12px'
+          }}>
+            <div style={{width:'6px', height:'6px', borderRadius:'50%', background:'#e8433a', animation:'pulse 1.5s infinite'}}/>
+            <span style={{color:'#ff6b5b', fontSize:'11px', fontWeight:'700', letterSpacing:'1px'}}>24/7</span>
+          </div>
         </div>
 
-        <div
-          onClick={() => router.push('/manual')}
-          className="bg-white rounded-2xl p-4 flex items-center gap-4 cursor-pointer active:opacity-80"
-          style={{border:'0.5px solid #eee'}}
-        >
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl" style={{background:'#eff5ff'}}>✏️</div>
-          <div className="flex-1">
-            <p className="font-medium text-sm" style={{color:'#1a1a1a'}}>Өөр газрын байршил</p>
-            <p className="text-xs mt-0.5" style={{color:'#aaa'}}>Гараар хаяг оруулна</p>
-          </div>
-          <span style={{color:'#ccc', fontSize:'20px'}}>›</span>
+        {/* Хурдны шугамууд */}
+        <div style={{position:'absolute', inset:0, overflow:'hidden', pointerEvents:'none'}}>
+          {[30,42,54,66,78].map((top, i) => (
+            <div key={i} style={{
+              position:'absolute', top:`${top}%`, left:0, right:0, height:'1px',
+              background:'rgba(255,255,255,0.06)',
+              animation:`speedLine 0.5s ease-out ${i*0.07}s both`
+            }}/>
+          ))}
         </div>
 
-        <div
-          className="rounded-2xl p-4 flex items-center gap-4 cursor-pointer active:opacity-80"
-          style={{background:'#fff0ef', border:'0.5px solid #ffd5d0'}}
-        >
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl" style={{background:'#ffe0dc'}}>🚨</div>
-          <div className="flex-1">
-            <p className="font-medium text-sm" style={{color:'#e8433a'}}>Яаралтай тусламж</p>
-            <p className="text-xs mt-0.5" style={{color:'#e8433a', opacity:0.6}}>24/7 ажилладаг</p>
+        {/* Greeting */}
+        <div style={{
+          position:'absolute', bottom:'1.5rem', left:'1.5rem',
+          opacity: visible ? 1 : 0,
+          transform: visible ? 'translateY(0)' : 'translateY(15px)',
+          transition:'all 0.8s ease 0.2s'
+        }}>
+          <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px'}}>
+            <div style={{width:'3px', height:'24px', background:'#e8433a', borderRadius:'2px'}}/>
+            <span style={{color:'rgba(255,255,255,0.5)', fontSize:'11px', letterSpacing:'3px', textTransform:'uppercase', fontWeight:'700'}}>Ачилт апп</span>
           </div>
-          <span style={{color:'#e8433a', fontSize:'20px'}}>›</span>
+          <h2 style={{color:'white', fontSize:'28px', fontWeight:'900', margin:0, letterSpacing:'-1px', textShadow:'0 2px 15px rgba(0,0,0,0.6)'}}>
+            Сайн байна уу 👋
+          </h2>
+          <div style={{display:'flex', alignItems:'center', gap:'8px', marginTop:'8px'}}>
+            <div style={{width:'16px', height:'2px', background:'#e8433a', borderRadius:'1px'}}/>
+            <p style={{color:'rgba(255,255,255,0.45)', fontSize:'13px', margin:0, fontWeight:'500', letterSpacing:'0.5px'}}>
+              Хамгийн ойр · Хамгийн хурдан
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="mt-auto flex bg-white border-t border-gray-100">
-        <div className="flex-1 flex flex-col items-center py-3 gap-0.5" style={{color:'#e8433a'}}>
-          <span className="text-xl">🏠</span>
-          <span className="text-xs font-medium">Нүүр</span>
+      {/* Cards */}
+      <div style={{
+        padding:'16px',
+        display:'flex', flexDirection:'column', gap:'10px',
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(20px)',
+        transition:'all 0.8s ease 0.4s'
+      }}>
+
+        {/* GPS */}
+        <div onClick={() => router.push('/current')} style={{
+          background:'rgba(255,255,255,0.05)',
+          border:'1px solid rgba(255,255,255,0.08)',
+          borderRadius:'20px', padding:'18px 20px',
+          display:'flex', alignItems:'center', gap:'16px', cursor:'pointer'
+        }}>
+          <div style={{
+            width:'50px', height:'50px', borderRadius:'15px',
+            background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.2)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:'24px', flexShrink:0
+          }}>📍</div>
+          <div style={{flex:1}}>
+            <p style={{color:'white', fontWeight:'700', fontSize:'15px', margin:0}}>Энэ байгаа байршлаас</p>
+            <p style={{color:'rgba(255,255,255,0.35)', fontSize:'13px', marginTop:'3px'}}>GPS байршлыг автоматаар тогтооно</p>
+          </div>
+          <span style={{color:'rgba(255,255,255,0.15)', fontSize:'20px'}}>›</span>
         </div>
-        <div className="flex-1 flex flex-col items-center py-3 gap-0.5" style={{color:'#bbb'}}>
-          <span className="text-xl">🕐</span>
-          <span className="text-xs">Түүх</span>
+
+        {/* Гараар */}
+        <div onClick={() => router.push('/manual')} style={{
+          background:'rgba(255,255,255,0.05)',
+          border:'1px solid rgba(255,255,255,0.08)',
+          borderRadius:'20px', padding:'18px 20px',
+          display:'flex', alignItems:'center', gap:'16px', cursor:'pointer'
+        }}>
+          <div style={{
+            width:'50px', height:'50px', borderRadius:'15px',
+            background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.2)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:'24px', flexShrink:0
+          }}>✏️</div>
+          <div style={{flex:1}}>
+            <p style={{color:'white', fontWeight:'700', fontSize:'15px', margin:0}}>Өөр газрын байршил</p>
+            <p style={{color:'rgba(255,255,255,0.35)', fontSize:'13px', marginTop:'3px'}}>Гараар хаяг оруулна</p>
+          </div>
+          <span style={{color:'rgba(255,255,255,0.15)', fontSize:'20px'}}>›</span>
         </div>
-        <div className="flex-1 flex flex-col items-center py-3 gap-0.5" style={{color:'#bbb'}}>
-          <span className="text-xl">👤</span>
-          <span className="text-xs">Профайл</span>
+
+        {/* Яаралтай */}
+        <div style={{
+          background:'rgba(232,67,58,0.08)',
+          border:'1px solid rgba(232,67,58,0.18)',
+          borderRadius:'20px', padding:'18px 20px',
+          display:'flex', alignItems:'center', gap:'16px', cursor:'pointer'
+        }}>
+          <div style={{
+            width:'50px', height:'50px', borderRadius:'15px',
+            background:'rgba(232,67,58,0.18)', border:'1px solid rgba(232,67,58,0.3)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:'24px', flexShrink:0
+          }}>🚨</div>
+          <div style={{flex:1}}>
+            <p style={{color:'#ff6b5b', fontWeight:'700', fontSize:'15px', margin:0}}>Яаралтай тусламж</p>
+            <p style={{color:'rgba(232,67,58,0.45)', fontSize:'13px', marginTop:'3px'}}>Хамгийн ойр · Хамгийн хурдан</p>
+          </div>
+          <span style={{color:'rgba(232,67,58,0.3)', fontSize:'20px'}}>›</span>
+        </div>
+
+        {/* Info */}
+        <div style={{
+          background:'rgba(255,255,255,0.03)',
+          border:'1px solid rgba(255,255,255,0.05)',
+          borderRadius:'16px', padding:'14px 16px',
+          display:'flex', alignItems:'center', gap:'12px', marginTop:'4px'
+        }}>
+          <span style={{fontSize:'26px'}}>🚛</span>
+          <div>
+            <p style={{color:'rgba(255,255,255,0.6)', fontSize:'13px', fontWeight:'600', margin:0}}>Улаанбаатар хот даяар</p>
+            <p style={{color:'rgba(255,255,255,0.25)', fontSize:'12px', marginTop:'2px'}}>Тавцан · Чирэгч · Аварийн тусламж</p>
+          </div>
         </div>
       </div>
+
+      {/* Bottom nav */}
+      <div style={{
+        marginTop:'auto',
+        display:'flex',
+        borderTop:'1px solid rgba(255,255,255,0.06)',
+        background:'rgba(10,10,15,0.95)'
+      }}>
+        {[
+          {icon:'🏠', label:'Нүүр', active:true},
+          {icon:'🕐', label:'Түүх', active:false},
+          {icon:'👤', label:'Профайл', active:false},
+        ].map((item, i) => (
+          <div key={i} style={{
+            flex:1, display:'flex', flexDirection:'column',
+            alignItems:'center', padding:'12px 0', gap:'3px',
+            cursor:'pointer'
+          }}>
+            <span style={{fontSize:'20px'}}>{item.icon}</span>
+            <span style={{
+              fontSize:'11px', fontWeight: item.active ? '700' : '400',
+              color: item.active ? '#e8433a' : 'rgba(255,255,255,0.3)'
+            }}>{item.label}</span>
+          </div>
+        ))}
+      </div>
+
+      <style>{`
+        @keyframes truckDrive {
+          0% { transform: scale(1.3) translateX(-8%); filter: brightness(0.25) saturate(1.1) blur(3px); }
+          60% { filter: brightness(0.4) saturate(1.1) blur(1px); }
+          100% { transform: scale(1.02) translateX(0); filter: brightness(0.45) saturate(1.1) blur(0px); }
+        }
+        @keyframes speedLine {
+          0% { transform: scaleX(0); transform-origin: left; opacity: 1; }
+          100% { transform: scaleX(1); transform-origin: left; opacity: 0; }
+        }
+        @keyframes pulse {
+          0%,100% { opacity:1; transform:scale(1); }
+          50% { opacity:0.4; transform:scale(0.7); }
+        }
+      `}</style>
     </div>
   )
 }
