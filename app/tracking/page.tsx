@@ -188,8 +188,8 @@ export default function TrackingPage() {
             }}>
               <span style={{fontSize:'22px'}}>📞</span>
               <div style={{textAlign:'left'}}>
-                <p style={{color:'rgba(0,0,0,0.6)', fontSize:'13px', margin:'0 0 4px', fontWeight:'700'}}>Та залгаж баталгаажуулна уу</p>
-                <p style={{color:'#1a0000', fontWeight:'900', fontSize:'20px', margin:0, letterSpacing:'2px'}}>{order.driver_phone}</p>
+                <p style={{color:'rgba(0,0,0,0.7)', fontSize:'13px', margin:'0 0 4px', fontWeight:'700'}}>Та залгаж баталгаажуулна уу</p>
+                <p style={{color:'black', fontWeight:'900', fontSize:'20px', margin:0, letterSpacing:'2px'}}>{order.driver_phone}</p>
               </div>
             </a>
           </div>
