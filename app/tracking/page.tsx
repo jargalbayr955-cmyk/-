@@ -156,7 +156,7 @@ export default function TrackingPage() {
         <div className="w-16"></div>
       </div>
 
-      <div ref={mapRef} style={{flex: 1, minHeight: '420px'}}></div>
+      <div ref={mapRef} style={{height: '45vh', minHeight: '280px'}}></div>
 
       <div className="bg-white border-t border-gray-100 p-4" style={{zIndex: 1000, position: 'relative'}}>
         {distance && driverLat ? (

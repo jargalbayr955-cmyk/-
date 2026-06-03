@@ -96,45 +96,8 @@ export default function DriversPage() {
 
         localStorage.setItem('tracking_driver_id', offer.driver_id || '')
 
-        setAcceptedDriver(offer)
         setAccepting(null)
-    }
-
-    // Жолооч сонгосны дараа modal
-    if (acceptedDriver) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
-                <div className="bg-white rounded-3xl p-8 w-full max-w-sm text-center shadow-lg">
-                    <div className="text-5xl mb-4">✅</div>
-                    <h2 className="text-xl font-medium mb-1">Жолооч сонгогдлоо!</h2>
-                    <p className="text-gray-400 text-sm mb-6">Жолоочтойгоо холбогдоно уу</p>
-
-                    <div className="bg-gray-50 rounded-2xl p-4 mb-6">
-                        <div className="w-14 h-14 rounded-full bg-red-500 flex items-center justify-center text-white text-xl font-medium mx-auto mb-3">
-                            {acceptedDriver.driver_name.charAt(0)}
-                        </div>
-                        <p className="font-medium text-lg">{acceptedDriver.driver_name}</p>
-                        <p className="text-gray-400 text-sm mt-1">🚛 {acceptedDriver.car_type}</p>
-                        <p className="text-red-500 font-medium mt-1">₮{acceptedDriver.price.toLocaleString()}</p>
-                    </div>
-
-                    <a
-                        href={"tel:" + acceptedDriver.driver_phone}
-                        className="w-full flex items-center justify-center gap-2 rounded-2xl py-4 font-medium text-white text-base mb-3"
-                        style={{background:'#e8433a'}}
-                    >
-                        📞 {acceptedDriver.driver_phone} руу залгах
-                    </a>
-
-                    <button
-                        onClick={() => router.push('/tracking')}
-                        className="w-full rounded-2xl py-3 text-sm text-gray-500 border border-gray-200"
-                    >
-                        Байршил харах →
-                    </button>
-                </div>
-            </div>
-        )
+        router.push('/tracking')
     }
 
     return (
