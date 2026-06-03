@@ -1,14 +1,26 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function HomePage() {
   const router = useRouter()
   const [visible, setVisible] = useState(false)
 
+  const pressTimer = useRef<any>(null)
+
   useEffect(() => {
     setTimeout(() => setVisible(true), 100)
   }, [])
+
+  const handleLogoPress = () => {
+    pressTimer.current = setTimeout(() => {
+      router.push('/driver')
+    }, 5000)
+  }
+
+  const handleLogoRelease = () => {
+    if (pressTimer.current) clearTimeout(pressTimer.current)
+  }
 
   return (
     <div style={{minHeight:'100vh', background:'#0a0a0f', display:'flex', flexDirection:'column', overflow:'hidden'}}>
