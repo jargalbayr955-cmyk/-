@@ -183,13 +183,13 @@ export default function TrackingPage() {
             <a href={'tel:' + order.driver_phone} style={{
               display:'flex', alignItems:'center', justifyContent:'center', gap:'12px',
               borderRadius:'16px', padding:'16px',
-              background:'white', color:'black', textDecoration:'none',
+              background:'#e8433a', color:'white', textDecoration:'none',
               animation:'btnPulse 2s ease-in-out infinite'
             }}>
               <span style={{fontSize:'22px'}}>📞</span>
               <div style={{textAlign:'left'}}>
-                <p style={{color:'rgba(0,0,0,0.7)', fontSize:'13px', margin:'0 0 4px', fontWeight:'700'}}>Та залгаж баталгаажуулна уу</p>
-                <p style={{color:'black', fontWeight:'900', fontSize:'20px', margin:0, letterSpacing:'2px'}}>{order.driver_phone}</p>
+                <p style={{color:'rgba(255,255,255,0.75)', fontSize:'13px', margin:'0 0 4px', fontWeight:'600'}}>Та залгаж баталгаажуулна уу</p>
+                <p style={{color:'white', fontWeight:'900', fontSize:'20px', margin:0, letterSpacing:'2px'}}>{order.driver_phone}</p>
               </div>
             </a>
           </div>
