@@ -142,35 +142,10 @@ export default function RegisterPage() {
             <span style={{color:'#ff6b5b', fontSize:'11px', fontWeight:'700', letterSpacing:'2px'}}>АЧИЛТ АПП</span>
           </div>
           <h1 style={{color:'white', fontSize:'2.4rem', fontWeight:'900', margin:'0 0 4px', lineHeight:1, letterSpacing:'-2px', textShadow:'0 4px 20px rgba(0,0,0,0.8)'}}>
-            Бүртгүүлэх
+            Нэвтрэх
           </h1>
           <div style={{display:'flex', alignItems:'center', gap:'8px', marginTop:'6px'}}>
             <div style={{width:'16px', height:'2px', background:'#e8433a', borderRadius:'1px'}}/>
-            <p style={{color:'rgba(255,255,255,0.4)', fontSize:'13px', margin:0, fontWeight:'500'}}>Хамгийн ойр · Хамгийн хурдан</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Form */}
-      <div style={{
-        flex:1, padding:'1.8rem 1.5rem 2.5rem',
-        opacity: visible ? 1 : 0,
-        transform: visible ? 'translateY(0)' : 'translateY(30px)',
-        transition:'all 0.8s ease 0.2s'
-      }}>
-        <p style={{color:'rgba(255,255,255,0.4)', fontSize:'13px', marginBottom:'14px'}}>Утасны дугаараа оруулна уу</p>
-        <div style={{display:'flex', gap:'10px', marginBottom:'14px'}}>
-          <div style={{borderRadius:'14px', padding:'0 14px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', display:'flex', alignItems:'center', color:'rgba(255,255,255,0.6)', fontSize:'14px', whiteSpace:'nowrap', fontWeight:'600'}}>🇲🇳 +976</div>
-          <input type="tel" placeholder="8 оронтой дугаар" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g,'').slice(0,8))}
-            style={{flex:1, borderRadius:'14px', padding:'14px 16px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'white', fontSize:'16px', outline:'none', fontWeight:'700', letterSpacing:'2px'}}/>
-        </div>
-        {error && <div style={{background:'rgba(232,67,58,0.1)', border:'1px solid rgba(232,67,58,0.25)', borderRadius:'12px', padding:'10px 14px', marginBottom:'14px'}}><p style={{color:'#ff6b6b', fontSize:'13px', margin:0}}>⚠️ {error}</p></div>}
-        <button onClick={handleRegister} disabled={loading} style={{width:'100%', borderRadius:'16px', padding:'17px', background: loading ? 'rgba(232,67,58,0.4)' : '#e8433a', border:'none', color:'white', fontSize:'17px', fontWeight:'800', cursor: loading ? 'not-allowed' : 'pointer', letterSpacing:'0.5px', transition:'all 0.2s', boxShadow: loading ? 'none' : '0 6px 30px rgba(232,67,58,0.4)'}}>
-          {loading ? 'Нэвтэрч байна...' : 'Нэвтрэх →'}
-        </button>
-        <p style={{textAlign:'center', fontSize:'13px', marginTop:'1.5rem', color:'rgba(255,255,255,0.3)'}}>
-          Бүртгэлтэй юу? <span onClick={() => router.push('/login')} style={{color:'#e8433a', cursor:'pointer', fontWeight:'700'}}>Нэвтрэх</span>
-        </p>
       </div>
 
       <style>{`
