@@ -117,10 +117,35 @@ export default function CurrentPage() {
         )}
         {/* Hint */}
         {location && (
-          <div style={{position:'absolute', top:'12px', left:'50%', transform:'translateX(-50%)', background:'rgba(10,10,15,0.85)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'20px', padding:'6px 14px', whiteSpace:'nowrap'}}>
+          <div style={{position:'absolute', top:'12px', left:'50%', transform:'translateX(-50%)', background:'rgba(10,10,15,0.85)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'20px', padding:'6px 14px', whiteSpace:'nowrap', zIndex:1000}}>
             <p style={{color:'rgba(255,255,255,0.6)', fontSize:'12px', margin:0}}>📍 Тэмдэгийг чирж байршлаа тохируул</p>
           </div>
         )}
+
+        {/* GPS товч */}
+        <button onClick={async () => {
+          if (!navigator.geolocation) return
+          navigator.geolocation.getCurrentPosition(async (pos) => {
+            const lat = pos.coords.latitude
+            const lng = pos.coords.longitude
+            setLocation({ lat, lng })
+            setAddress('Хаяг тогтоож байна...')
+            if (mapInstanceRef.current && markerRef.current) {
+              mapInstanceRef.current.setView([lat, lng], 16)
+              markerRef.current.setLatLng([lat, lng])
+            }
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+            const data = await res.json()
+            setAddress(data.display_name?.split(',').slice(0,3).join(',') || `${lat.toFixed(4)}, ${lng.toFixed(4)}`)
+          })
+        }} style={{
+          position:'absolute', bottom:'60px', right:'12px',
+          width:'44px', height:'44px', borderRadius:'50%',
+          background:'#e8433a', border:'none',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          fontSize:'20px', cursor:'pointer', zIndex:1000,
+          boxShadow:'0 4px 15px rgba(232,67,58,0.5)'
+        }}>📍</button>
         <div style={{position:'absolute', inset:0, background:'linear-gradient(to bottom, transparent 80%, rgba(10,10,15,1) 100%)', pointerEvents:'none'}}/>
         <button onClick={() => router.back()} style={{position:'absolute', top:'12px', left:'12px', background:'rgba(10,10,15,0.8)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'20px', padding:'7px 16px', color:'rgba(255,255,255,0.7)', fontSize:'13px', cursor:'pointer', fontWeight:'600', zIndex:1000}}>← Буцах</button>
       </div>
@@ -160,9 +185,9 @@ export default function CurrentPage() {
         <p style={{color:'rgba(255,255,255,0.4)', fontSize:'11px', fontWeight:'700', letterSpacing:'1px', marginBottom:'10px'}}>МАШИНЫ ТӨРӨЛ</p>
         <div style={{display:'flex', flexDirection:'column', gap:'8px', marginBottom:'20px'}}>
           {[
-            {id:'butten', label:'Бүтэн ачигч', icon:'🚛', desc:'Том ачаа тээвэрлэх'},
-            {id:'tavtsan', label:'Тавцант машин', icon:'🚐', desc:'Машин ачих тавцантай'},
-            {id:'chiregch', label:'Чирэгч машин', icon:'🔧', desc:'Эвдэрсэн машин чирэх'},
+            {id:'tavtsan', label:'Бүтэн тавцант ачигч', icon:'🚛', desc:'Машин ачих тавцантай'},
+            {id:'chiregch', label:'Чирэгч', icon:'🔧', desc:'Эвдэрсэн машин чирэх'},
+            {id:'duguitai', label:'Дугуйтай чирэгч', icon:'🚜', desc:'Дугуйгаар чирэх'},
           ].map(type => (
             <div key={type.id} onClick={() => setCarType(type.id)} style={{
               background: carType === type.id ? 'rgba(232,67,58,0.12)' : 'rgba(255,255,255,0.04)',
