@@ -107,7 +107,7 @@ export default function DriversPage() {
     }
 
     return (
-        <div style={{minHeight:'100vh', background:'linear-gradient(160deg, #0a0a0f 0%, #1a0505 50%, #0a0a0f 100%)', display:'flex', flexDirection:'column', minHeight:'100vh'}}>
+        <div style={{minHeight:'100vh', background:'linear-gradient(160deg, #0a0a0f 0%, #1a0505 50%, #0a0a0f 100%)', display:'flex', flexDirection:'column'}}>
 
             {/* Header */}
             <div style={{padding:'16px 20px', display:'flex', alignItems:'center', gap:'12px', borderBottom:'1px solid rgba(232,67,58,0.1)', background:'rgba(10,0,0,0.5)'}}>
