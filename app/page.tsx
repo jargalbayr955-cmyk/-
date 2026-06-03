@@ -9,11 +9,16 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [heroUrl, setHeroUrl] = useState('')
+  const [checking, setChecking] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
     const user = localStorage.getItem('user')
-    if (user) router.push('/home')
+    if (user) {
+      router.push('/home')
+    } else {
+      setChecking(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -41,6 +46,8 @@ export default function LoginPage() {
     }
     setLoading(false)
   }
+
+  if (checking) return null
 
   return (
     <div className="min-h-screen flex flex-col" style={{background:'#0f0f1a'}}>
