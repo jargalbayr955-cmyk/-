@@ -11,6 +11,7 @@ type Offer = {
     price: number
     driver_lat: number
     driver_lng: number
+    driver_id: string
 }
 
 export default function DriversPage() {
@@ -21,7 +22,6 @@ export default function DriversPage() {
     const [toAddress, setToAddress] = useState('')
     const [userLat, setUserLat] = useState<number | null>(null)
     const [userLng, setUserLng] = useState<number | null>(null)
-    const [accepted, setAccepted] = useState<Offer | null>(null)
     const [accepting, setAccepting] = useState<string | null>(null)
     const router = useRouter()
 
@@ -44,7 +44,6 @@ export default function DriversPage() {
         setFromAddress(from)
         setToAddress(to)
 
-        // GPS авах
         navigator.geolocation.getCurrentPosition(
             (pos) => { setUserLat(pos.coords.latitude); setUserLng(pos.coords.longitude) },
             () => {}
@@ -73,52 +72,24 @@ export default function DriversPage() {
     const acceptOffer = async (offer: Offer) => {
         if (!orderId) return
         setAccepting(offer.id)
+
         await supabase.from('orders').update({
             status: 'confirmed',
             driver_name: offer.driver_name,
             driver_phone: offer.driver_phone,
+            driver_id: offer.driver_id,
         }).eq('id', orderId)
+
         await supabase.from('offers').update({ status: 'accepted' }).eq('id', offer.id)
         await supabase.from('offers').update({ status: 'declined' })
             .eq('order_id', orderId)
             .neq('id', offer.id)
-        setAccepted(offer)
-        setAccepting(null)
-    }
 
-    if (accepted) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-                <div className="max-w-sm w-full">
-                    <div className="bg-white rounded-3xl p-8 text-center shadow-sm">
-                        <div className="text-6xl mb-4">🎉</div>
-                        <h2 className="text-xl font-medium mb-2">Захиалга баталгаажлаа!</h2>
-                        <p className="text-gray-400 text-sm mb-6">Жолооч таны байршил руу явж байна</p>
-                        <div className="bg-gray-50 rounded-2xl p-4 mb-6 text-left">
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center text-white text-lg font-medium">
-                                    {accepted.driver_name.charAt(0)}
-                                </div>
-                                <div>
-                                    <p className="font-medium">{accepted.driver_name}</p>
-                                    <p className="text-xs text-gray-400">🚛 {accepted.car_type}</p>
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <p className="text-sm text-gray-500">Тохирсон үнэ</p>
-                                <p className="text-red-500 font-medium">₮{accepted.price.toLocaleString()}</p>
-                            </div>
-                        </div>
-                        <a href={'tel:' + accepted.driver_phone} className="w-full flex items-center justify-center gap-2 rounded-2xl py-4 font-medium text-sm text-white mb-3" style={{background:'#e8433a'}}>
-                            📞 Жолоочтой холбогдох
-                        </a>
-                        <button onClick={() => router.push('/home')} className="w-full rounded-2xl py-3 text-sm text-gray-500 border border-gray-200">
-                            Нүүр хуудас руу буцах
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )
+        // Save driver id for tracking
+        localStorage.setItem('tracking_driver_id', offer.driver_id || '')
+
+        setAccepting(null)
+        router.push('/tracking')
     }
 
     return (

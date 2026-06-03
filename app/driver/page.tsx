@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 export default function DriverPage() {
@@ -15,7 +16,9 @@ export default function DriverPage() {
   const [sentOffers, setSentOffers] = useState<{[key: string]: boolean}>({})
   const [sendingOffer, setSendingOffer] = useState<string | null>(null)
   const [newOrderAlert, setNewOrderAlert] = useState(false)
+  const [acceptedOrder, setAcceptedOrder] = useState<any>(null)
   const prevOrderIds = useRef<string[]>([])
+  const router = useRouter()
 
   const handleLogin = async () => {
     if (!phone || !pin) return setError('Дугаар болон PIN оруулна уу')
@@ -26,6 +29,7 @@ export default function DriverPage() {
       setError('Дугаар эсвэл PIN буруу байна')
     } else {
       setDriver(data[0])
+      localStorage.setItem('driver_session', JSON.stringify(data[0]))
     }
     setLoading(false)
   }
@@ -68,19 +72,32 @@ export default function DriverPage() {
     )
   }
 
+  // Auto update location every 10 seconds when tracking
+  useEffect(() => {
+    if (!driver || !acceptedOrder) return
+    const interval = setInterval(() => {
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        await supabase.from('drivers').update({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude
+        }).eq('id', driver.id)
+        setDriver((d: any) => ({ ...d, lat: pos.coords.latitude, lng: pos.coords.longitude }))
+      })
+    }, 10000)
+    return () => clearInterval(interval)
+  }, [driver, acceptedOrder])
+
   const toggleAvailable = async () => {
     const newVal = !driver.available
     await supabase.from('drivers').update({ available: newVal }).eq('id', driver.id)
     setDriver({ ...driver, available: newVal })
   }
 
-  // Санал явуулахад GPS-ийг автоматаар авна
   const sendOffer = async (order: any) => {
     const price = offerPrices[order.id]
     if (!price) return alert('Үнэ оруулна уу')
     setSendingOffer(order.id)
 
-    // GPS авах
     const getPos = (): Promise<{lat: number, lng: number} | null> =>
       new Promise((resolve) => {
         if (!navigator.geolocation) return resolve(null)
@@ -105,7 +122,6 @@ export default function DriverPage() {
       driver_lng: pos?.lng || driver.lng || null
     })
 
-    // Жолоочийн байршлыг шинэчлэх
     if (pos) {
       await supabase.from('drivers').update({ lat: pos.lat, lng: pos.lng }).eq('id', driver.id)
       setDriver({ ...driver, lat: pos.lat, lng: pos.lng })
@@ -129,6 +145,8 @@ export default function DriverPage() {
   useEffect(() => {
     if (!driver) return
     fetchOrders()
+
+    // Listen for confirmed orders
     const channel = supabase
       .channel('orders-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
@@ -136,7 +154,10 @@ export default function DriverPage() {
         setNewOrderAlert(true)
         setTimeout(() => setNewOrderAlert(false), 3000)
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, async (payload: any) => {
+        if (payload.new?.status === 'confirmed' && payload.new?.driver_phone === driver.phone) {
+          setAcceptedOrder(payload.new)
+        }
         fetchOrders()
       })
       .subscribe()
@@ -157,6 +178,72 @@ export default function DriverPage() {
           {error && <p className="text-red-400 text-xs mb-3">{error}</p>}
           <button onClick={handleLogin} disabled={loading} className="w-full rounded-2xl py-4 font-medium text-sm text-white disabled:opacity-50" style={{background:'#e8433a'}}>
             {loading ? 'Нэвтэрч байна...' : 'Нэвтрэх'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Accepted order - show navigation map
+  if (acceptedOrder) {
+    const userLat = acceptedOrder.from_lat
+    const userLng = acceptedOrder.from_lng
+    const mapUrl = userLat && userLng
+      ? `https://www.openstreetmap.org/export/embed.html?bbox=${userLng - 0.02},${userLat - 0.02},${userLng + 0.02},${userLat + 0.02}&layer=mapnik&marker=${userLat},${userLng}`
+      : null
+
+    return (
+      <div className="min-h-screen flex flex-col">
+        <div className="bg-white px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <p className="font-medium text-sm">{driver.name}</p>
+            <p className="text-xs text-green-500">Захиалга хүлээн авсан</p>
+          </div>
+          <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+        </div>
+
+        <div className="relative flex-1" style={{minHeight: '400px'}}>
+          {mapUrl ? (
+            <iframe
+              key={`${driver.lat}-${driver.lng}`}
+              width="100%"
+              height="100%"
+              style={{border: 0, minHeight: '400px'}}
+              src={mapUrl}
+            />
+          ) : (
+            <div className="w-full flex items-center justify-center bg-gray-200" style={{minHeight: '400px'}}>
+              <p className="text-gray-400 text-sm">Газрын зураг ачааллаж байна...</p>
+            </div>
+          )}
+          <div className="absolute top-3 right-3 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+            LIVE
+          </div>
+        </div>
+
+        <div className="bg-white p-4 border-t border-gray-100">
+          <div className="bg-gray-50 rounded-2xl p-3 mb-3">
+            <div className="flex items-start gap-2 mb-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-blue-500 mt-1 flex-shrink-0"></div>
+              <div>
+                <p className="text-xs text-gray-400">Авах газар</p>
+                <p className="text-sm font-medium">{acceptedOrder.from_address}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500 mt-1 flex-shrink-0"></div>
+              <div>
+                <p className="text-xs text-gray-400">Хүргэх газар</p>
+                <p className="text-sm font-medium">{acceptedOrder.to_address}</p>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setAcceptedOrder(null)}
+            className="w-full rounded-xl py-2.5 text-sm text-gray-500 border border-gray-200"
+          >
+            Захиалга дуусгах
           </button>
         </div>
       </div>

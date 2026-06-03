@@ -45,6 +45,8 @@ export default function CurrentPage() {
       .insert({
         from_address: address,
         to_address: dest,
+        from_lat: location.lat,
+        from_lng: location.lng,
         status: 'pending',
         user_phone: user.phone || ''
       })
