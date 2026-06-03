@@ -193,10 +193,7 @@ export default function TrackingPage() {
               animation:'btnPulse 2s ease-in-out infinite'
             }}>
               <span style={{fontSize:'22px'}}>📞</span>
-              <div style={{textAlign:'left'}}>
-                <p style={{color:'white', fontWeight:'800', fontSize:'16px', margin:0, letterSpacing:'-0.3px'}}>{order.driver_name}</p>
-                <p style={{color:'rgba(255,255,255,0.75)', fontSize:'14px', margin:'2px 0 0', fontWeight:'600', letterSpacing:'1px'}}>{order.driver_phone}</p>
-              </div>
+              <p style={{color:'white', fontWeight:'800', fontSize:'18px', margin:0, letterSpacing:'2px'}}>{order.driver_phone}</p>
             </a>
           </div>
         ) : (
