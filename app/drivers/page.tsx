@@ -107,10 +107,10 @@ export default function DriversPage() {
     }
 
     return (
-        <div style={{minHeight:'100vh', background:'#0a0a0f', display:'flex', flexDirection:'column'}}>
+        <div style={{minHeight:'100vh', background:'linear-gradient(160deg, #0a0a0f 0%, #1a0505 50%, #0a0a0f 100%)', display:'flex', flexDirection:'column', minHeight:'100vh'}}>
 
             {/* Header */}
-            <div style={{padding:'16px 20px', display:'flex', alignItems:'center', gap:'12px', borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
+            <div style={{padding:'16px 20px', display:'flex', alignItems:'center', gap:'12px', borderBottom:'1px solid rgba(232,67,58,0.1)', background:'rgba(10,0,0,0.5)'}}>
                 <button onClick={() => router.back()} style={{background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'20px', padding:'7px 14px', color:'rgba(255,255,255,0.6)', fontSize:'13px', cursor:'pointer', fontWeight:'600'}}>← Буцах</button>
                 <div style={{flex:1}}>
                     <p style={{color:'white', fontWeight:'700', fontSize:'15px', margin:0}}>Жолооч хайж байна</p>
@@ -161,17 +161,13 @@ export default function DriversPage() {
                             const dist = getDistance(userLat!, userLng!, o.driver_lat, o.driver_lng)
                             return (
                                 <div key={o.id} style={{
-                                    background: idx === 0 ? 'rgba(232,67,58,0.08)' : 'rgba(255,255,255,0.04)',
-                                    border: `1px solid ${idx === 0 ? 'rgba(232,67,58,0.3)' : 'rgba(255,255,255,0.07)'}`,
+                                    background:'rgba(232,67,58,0.06)',
+                                    border:'1px solid rgba(232,67,58,0.2)',
                                     borderRadius:'18px', padding:'16px',
                                     animation:'slideUp 0.3s ease forwards',
                                     animationDelay:`${idx*0.05}s`, opacity:0
                                 }}>
-                                    {idx === 0 && (
-                                        <div style={{display:'inline-flex', alignItems:'center', gap:'5px', background:'rgba(232,67,58,0.2)', border:'1px solid rgba(232,67,58,0.3)', borderRadius:'20px', padding:'3px 10px', marginBottom:'10px'}}>
-                                            <span style={{color:'#ff6b5b', fontSize:'11px', fontWeight:'700', letterSpacing:'1px'}}>⭐ ХАМГИЙН ХЯМД</span>
-                                        </div>
-                                    )}
+
                                     <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'12px'}}>
                                         <div style={{width:'46px', height:'46px', borderRadius:'50%', background:'#e8433a', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'18px', fontWeight:'800', flexShrink:0}}>
                                             {o.driver_name.charAt(0)}
@@ -194,7 +190,7 @@ export default function DriversPage() {
                                             border:'none', color:'white', fontSize:'15px', fontWeight:'800',
                                             cursor: accepting === o.id ? 'not-allowed' : 'pointer',
                                             boxShadow: accepting === o.id ? 'none' : '0 4px 20px rgba(232,67,58,0.35)',
-                                            transition:'all 0.2s', letterSpacing:'0.3px'
+                                            transition:'all 0.2s', letterSpacing:'0.3px', animation: accepting === o.id ? 'none' : 'btnPulse 2s ease-in-out infinite'
                                         }}
                                     >
                                         {accepting === o.id ? 'Баталгаажуулж байна...' : '✅ Энэ жолоочийг сонгох'}
@@ -214,6 +210,10 @@ export default function DriversPage() {
                 @keyframes dotPulse {
                     0%,100%{transform:scale(1);opacity:0.4}
                     50%{transform:scale(1.4);opacity:1}
+                }
+                @keyframes btnPulse {
+                    0%,100%{box-shadow:0 4px 20px rgba(232,67,58,0.35)}
+                    50%{box-shadow:0 4px 35px rgba(232,67,58,0.7)}
                 }
                 @keyframes slideUp {
                     from{transform:translateY(20px);opacity:0}
