@@ -17,6 +17,8 @@ export default function DriversPage() {
     const [orderId, setOrderId] = useState<string | null>(null)
     const [fromAddress, setFromAddress] = useState('')
     const [toAddress, setToAddress] = useState('')
+    const [accepted, setAccepted] = useState<Offer | null>(null)
+    const [accepting, setAccepting] = useState<string | null>(null)
     const router = useRouter()
 
     useEffect(() => {
@@ -47,8 +49,73 @@ export default function DriversPage() {
         return () => clearInterval(interval)
     }, [])
 
-    const callDriver = (phone: string) => {
-        window.location.href = 'tel:' + phone
+    const acceptOffer = async (offer: Offer) => {
+        if (!orderId) return
+        setAccepting(offer.id)
+
+        // Захиалгыг confirmed болгох
+        await supabase.from('orders').update({
+            status: 'confirmed',
+            driver_name: offer.driver_name,
+            driver_phone: offer.driver_phone,
+        }).eq('id', orderId)
+
+        // Саналыг accepted болгох
+        await supabase.from('offers').update({ status: 'accepted' }).eq('id', offer.id)
+
+        // Бусад саналыг declined болгох
+        await supabase.from('offers').update({ status: 'declined' })
+            .eq('order_id', orderId)
+            .neq('id', offer.id)
+
+        setAccepted(offer)
+        setAccepting(null)
+    }
+
+    // Захиалга баталгаажсан бол
+    if (accepted) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+                <div className="max-w-sm w-full">
+                    <div className="bg-white rounded-3xl p-8 text-center shadow-sm">
+                        <div className="text-6xl mb-4">🎉</div>
+                        <h2 className="text-xl font-medium mb-2">Захиалга баталгаажлаа!</h2>
+                        <p className="text-gray-400 text-sm mb-6">Жолооч таны байршил руу явж байна</p>
+
+                        <div className="bg-gray-50 rounded-2xl p-4 mb-6 text-left">
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center text-white text-lg font-medium">
+                                    {accepted.driver_name.charAt(0)}
+                                </div>
+                                <div>
+                                    <p className="font-medium">{accepted.driver_name}</p>
+                                    <p className="text-xs text-gray-400">🚛 {accepted.car_type}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm text-gray-500">Тохирсон үнэ</p>
+                                <p className="text-red-500 font-medium">₮{accepted.price.toLocaleString()}</p>
+                            </div>
+                        </div>
+
+                        <a
+                            href={'tel:' + accepted.driver_phone}
+                            className="w-full flex items-center justify-center gap-2 rounded-2xl py-4 font-medium text-sm text-white mb-3"
+                            style={{background:'#e8433a'}}
+                        >
+                            📞 Жолоочтой холбогдох
+                        </a>
+
+                        <button
+                            onClick={() => router.push('/home')}
+                            className="w-full rounded-2xl py-3 text-sm text-gray-500 border border-gray-200"
+                        >
+                            Нүүр хуудас руу буцах
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )
     }
 
     return (
@@ -91,24 +158,25 @@ export default function DriversPage() {
                         <p className="text-gray-400 text-sm mb-4">{offers.length} жолооч санал явуулсан</p>
                         <div className="space-y-3">
                             {offers.map((o) => (
-                                <div key={o.id} className="bg-white border-2 rounded-2xl p-4 flex items-center gap-3" style={{ borderColor: '#e8433a' }}>
-                                    <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
-                                        {o.driver_name.charAt(0)}
+                                <div key={o.id} className="bg-white border-2 rounded-2xl p-4" style={{ borderColor: '#e8433a' }}>
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                                            {o.driver_name.charAt(0)}
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-medium text-sm">{o.driver_name}</p>
+                                            <p className="text-xs text-gray-400 mt-0.5">🚛 {o.car_type}</p>
+                                        </div>
+                                        <p className="text-red-500 font-medium text-sm">₮{o.price.toLocaleString()}</p>
                                     </div>
-                                    <div className="flex-1">
-                                        <p className="font-medium text-sm">{o.driver_name}</p>
-                                        <p className="text-xs text-gray-400 mt-0.5">🚛 {o.car_type}</p>
-                                    </div>
-                                    <div className="flex flex-col items-end gap-2">
-                                        <p className="text-red-500 font-medium text-sm">₮
-                                            {o.price.toLocaleString()}</p>
-                                        <button
-                                            onClick={() => callDriver(o.driver_phone)}
-                                            className="bg-red-500 text-white text-xs px-3 py-1.5 rounded-xl font-medium"
-                                        >
-                                            📞 Залгах
-                                        </button>
-                                    </div>
+                                    <button
+                                        onClick={() => acceptOffer(o)}
+                                        disabled={accepting === o.id}
+                                        className="w-full rounded-xl py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                                        style={{background:'#e8433a'}}
+                                    >
+                                        {accepting === o.id ? 'Баталгаажуулж байна...' : '✅ Энэ жолоочийг сонгох'}
+                                    </button>
                                 </div>
                             ))}
                         </div>
