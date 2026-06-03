@@ -9,15 +9,14 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [heroUrl, setHeroUrl] = useState('')
   const [checking, setChecking] = useState(true)
+  const [visible, setVisible] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
     const user = localStorage.getItem('user')
-    if (user) {
-      router.push('/home')
-    } else {
-      setChecking(false)
-    }
+    if (user) { router.push('/home'); return }
+    setChecking(false)
+    setTimeout(() => setVisible(true), 100)
   }, [])
 
   useEffect(() => {
@@ -43,62 +42,132 @@ export default function LoginPage() {
 
   if (checking) return null
 
+  const bgImage = heroUrl || 'https://i.ibb.co/5WrSCdV3/Jun-4-2026-12-21-53-AM.png'
+
   return (
-    <div className="min-h-screen flex flex-col" style={{background:'#0f0f1a'}}>
-      <div className="relative h-64 overflow-hidden">
-        {heroUrl ? (
-          <img src={heroUrl} alt="hero" className="w-full h-full object-cover opacity-80" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center" style={{background:'#1a0a2e'}}>
-            <div className="text-center">
-              <div className="text-6xl mb-2">🚛</div>
-              <div className="text-white text-lg font-medium opacity-50">Ачилт</div>
-            </div>
+    <div style={{minHeight:'100vh', background:'#0a0a0f', display:'flex', flexDirection:'column', overflow:'hidden'}}>
+
+      {/* Hero */}
+      <div style={{position:'relative', height:'55vh', overflow:'hidden'}}>
+        <div style={{
+          position:'absolute', inset:'-20px',
+          backgroundImage:`url(${bgImage})`,
+          backgroundSize:'cover',
+          backgroundPosition:'center',
+          animation:'zoomIn 8s ease-out forwards',
+          filter:'brightness(0.5)'
+        }}/>
+        <div style={{
+          position:'absolute', inset:0,
+          background:'linear-gradient(to bottom, rgba(10,10,15,0.1) 0%, rgba(10,10,15,0.4) 60%, rgba(10,10,15,1) 100%)'
+        }}/>
+        <div style={{
+          position:'absolute', bottom:'2rem', left:'1.5rem', right:'1.5rem',
+          opacity: visible ? 1 : 0,
+          transform: visible ? 'translateY(0)' : 'translateY(20px)',
+          transition:'all 0.8s ease'
+        }}>
+          <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px'}}>
+            <div style={{width:'3px', height:'28px', background:'#e8433a', borderRadius:'2px'}}/>
+            <p style={{color:'rgba(255,255,255,0.6)', fontSize:'13px', letterSpacing:'3px', textTransform:'uppercase', margin:0}}>Аварийн тусламж</p>
           </div>
-        )}
-        <div className="absolute inset-0" style={{background:'linear-gradient(to bottom, transparent 40%, #0f0f1a 100%)'}}></div>
-        <div className="absolute bottom-4 left-6">
-          <h1 className="text-white text-3xl font-medium tracking-tight">Ачилт</h1>
-          <p className="text-white text-sm opacity-50 mt-1">Аварийн машин дуудах</p>
+          <h1 style={{color:'white', fontSize:'2.8rem', fontWeight:'800', margin:0, lineHeight:1.1, letterSpacing:'-1px'}}>
+            Ачилт
+          </h1>
+          <p style={{color:'rgba(255,255,255,0.5)', fontSize:'14px', marginTop:'8px'}}>
+            24/7 аварийн машин дуудах
+          </p>
         </div>
       </div>
 
-      <div className="flex-1 px-6 pt-6 pb-10">
-        <p className="text-sm mb-6" style={{color:'rgba(255,255,255,0.4)'}}>Утасны дугаараар нэвтрэх</p>
+      {/* Form */}
+      <div style={{
+        flex:1, padding:'2rem 1.5rem',
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(30px)',
+        transition:'all 0.8s ease 0.2s'
+      }}>
+        <p style={{color:'rgba(255,255,255,0.5)', fontSize:'13px', marginBottom:'1.2rem', letterSpacing:'0.5px'}}>
+          Утасны дугаараар нэвтрэх
+        </p>
 
-        <div className="flex gap-2 mb-4">
-          <div className="rounded-2xl px-3 py-3.5 text-sm flex items-center" style={{background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.6)'}}>🇲🇳 +976</div>
+        <div style={{display:'flex', gap:'10px', marginBottom:'16px'}}>
+          <div style={{
+            borderRadius:'14px', padding:'0 14px',
+            background:'rgba(255,255,255,0.06)',
+            border:'1px solid rgba(255,255,255,0.12)',
+            display:'flex', alignItems:'center',
+            color:'rgba(255,255,255,0.7)', fontSize:'14px',
+            whiteSpace:'nowrap'
+          }}>🇲🇳 +976</div>
           <input
             type="tel"
             placeholder="8 оронтой дугаар"
             value={phone}
             onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 8))}
-            className="flex-1 rounded-2xl px-4 py-3.5 text-sm outline-none"
-            style={{background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff'}}
+            style={{
+              flex:1, borderRadius:'14px', padding:'14px 16px',
+              background:'rgba(255,255,255,0.06)',
+              border:'1px solid rgba(255,255,255,0.12)',
+              color:'white', fontSize:'16px', outline:'none',
+              fontWeight:'500'
+            }}
           />
         </div>
 
-        {error && <p className="text-red-400 text-xs mb-3">{error}</p>}
+        {error && (
+          <div style={{
+            background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.3)',
+            borderRadius:'12px', padding:'10px 14px', marginBottom:'16px'
+          }}>
+            <p style={{color:'#ff6b6b', fontSize:'13px', margin:0}}>⚠️ {error}</p>
+          </div>
+        )}
 
         <button
           onClick={handleLogin}
           disabled={loading}
-          className="w-full rounded-2xl py-4 font-medium text-sm text-white disabled:opacity-50"
-          style={{background:'#e8433a'}}
+          style={{
+            width:'100%', borderRadius:'16px', padding:'16px',
+            background: loading ? 'rgba(232,67,58,0.5)' : '#e8433a',
+            border:'none', color:'white', fontSize:'16px', fontWeight:'700',
+            cursor: loading ? 'not-allowed' : 'pointer',
+            letterSpacing:'0.5px',
+            transition:'all 0.2s',
+            boxShadow: loading ? 'none' : '0 4px 20px rgba(232,67,58,0.4)'
+          }}
         >
-          {loading ? 'Түр хүлээнэ үү...' : 'Нэвтрэх'}
+          {loading ? 'Нэвтэрч байна...' : 'Нэвтрэх →'}
         </button>
 
-        <div className="flex items-center gap-3 my-5">
-          <div className="flex-1 h-px" style={{background:'rgba(255,255,255,0.08)'}}></div>
-          <span className="text-xs" style={{color:'rgba(255,255,255,0.25)'}}>эсвэл</span>
-          <div className="flex-1 h-px" style={{background:'rgba(255,255,255,0.08)'}}></div>
+        <div style={{display:'flex', alignItems:'center', gap:'12px', margin:'1.5rem 0'}}>
+          <div style={{flex:1, height:'1px', background:'rgba(255,255,255,0.08)'}}/>
+          <span style={{color:'rgba(255,255,255,0.2)', fontSize:'12px'}}>эсвэл</span>
+          <div style={{flex:1, height:'1px', background:'rgba(255,255,255,0.08)'}}/>
         </div>
 
-        <p className="text-center text-xs" style={{color:'rgba(255,255,255,0.4)'}}>
-          Шинэ хэрэглэгч? <span style={{color:'#e8433a'}} className="cursor-pointer" onClick={() => router.push('/register')}>Бүртгүүлэх</span>
-        </p>
+        <button
+          onClick={() => router.push('/register')}
+          style={{
+            width:'100%', borderRadius:'16px', padding:'15px',
+            background:'transparent',
+            border:'1px solid rgba(255,255,255,0.15)',
+            color:'rgba(255,255,255,0.7)', fontSize:'15px', fontWeight:'600',
+            cursor:'pointer', letterSpacing:'0.5px'
+          }}
+        >
+          Шинэ бүртгэл үүсгэх
+        </button>
       </div>
+
+      <style>{`
+        @keyframes zoomIn {
+          from { transform: scale(1.12); }
+          to { transform: scale(1); }
+        }
+        input::placeholder { color: rgba(255,255,255,0.25); }
+        input:focus { border-color: rgba(232,67,58,0.6) !important; }
+      `}</style>
     </div>
   )
 }
