@@ -10,6 +10,8 @@ export default function CurrentPage() {
   const [carType, setCarType] = useState('')
   const [carMark, setCarMark] = useState('')
   const [extraAddress, setExtraAddress] = useState('')
+  const [gpsError, setGpsError] = useState(false)
+  const [manualFrom, setManualFrom] = useState('')
   const [errors, setErrors] = useState<{dest?:boolean, carType?:boolean, carMark?:boolean}>({})
   const [mapReady, setMapReady] = useState(false)
   const mapRef = useRef<any>(null)
@@ -96,14 +98,14 @@ export default function CurrentPage() {
     }
     setErrors({})
 
-    localStorage.setItem('fromLat', location!.lat.toString())
-    localStorage.setItem('fromLng', location!.lng.toString())
+    localStorage.setItem('fromLat', gpsError ? '0' : location!.lat.toString())
+    localStorage.setItem('fromLng', gpsError ? '0' : location!.lng.toString())
     localStorage.setItem('fromAddress', address)
     localStorage.setItem('dest', dest)
 
     const user = JSON.parse(localStorage.getItem('user') || 'null')
     const { data: orderData } = await supabase.from('orders').insert({
-      from_address: extraAddress ? `${address} (${extraAddress})` : address,
+      from_address: gpsError ? (manualFrom || 'Гараар оруулаагүй') : (extraAddress ? `${address} (${extraAddress})` : address),
       to_address: dest,
       from_lat: location!.lat,
       from_lng: location!.lng,
@@ -145,7 +147,16 @@ export default function CurrentPage() {
             <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#3b82f6', flexShrink:0}}/>
             <span style={{color:'rgba(255,255,255,0.35)', fontSize:'11px', fontWeight:'700', letterSpacing:'1px'}}>ТАНЫ БАЙРШИЛ</span>
           </div>
-          <p style={{color:'rgba(255,255,255,0.7)', fontSize:'13px', margin:'0 0 8px'}}>{address}</p>
+          <p style={{color: gpsError ? '#ff6b6b' : 'rgba(255,255,255,0.7)', fontSize:'13px', margin:'0 0 8px'}}>{address}</p>
+          {gpsError && (
+            <input
+              type="text"
+              placeholder="Гараар хаяг оруулна уу..."
+              value={manualFrom}
+              onChange={e => setManualFrom(e.target.value)}
+              style={{width:'100%', background:'rgba(232,67,58,0.08)', border:'1px solid rgba(232,67,58,0.3)', borderRadius:'10px', padding:'10px 12px', color:'white', fontSize:'13px', outline:'none', marginTop:'4px'}}
+            />
+          )}
           <div style={{borderTop:'1px solid rgba(255,255,255,0.06)', paddingTop:'8px'}}>
             <input
               type="text"
@@ -207,10 +218,10 @@ export default function CurrentPage() {
 
         <button onClick={handleSearch} disabled={!location} style={{
           width:'100%', borderRadius:'16px', padding:'17px',
-          background: !location ? 'rgba(232,67,58,0.3)' : '#e8433a',
+          background: (gpsError ? !manualFrom : !location) ? 'rgba(232,67,58,0.3)' : '#e8433a',
           border:'none', color:'white', fontSize:'16px', fontWeight:'800',
-          cursor: !location ? 'not-allowed' : 'pointer',
-          boxShadow: !location ? 'none' : '0 6px 25px rgba(232,67,58,0.4)',
+          cursor: (gpsError ? !manualFrom : !location) ? 'not-allowed' : 'pointer',
+          boxShadow: (gpsError ? !manualFrom : !location) ? 'none' : '0 6px 25px rgba(232,67,58,0.4)',
           transition:'all 0.2s', letterSpacing:'0.3px'
         }}>
           {!location ? 'Байршил тогтоож байна...' : 'Машин хайх →'}
