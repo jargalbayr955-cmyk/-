@@ -10,19 +10,8 @@ export default function HomePage() {
   const [tapCount, setTapCount] = useState(0)
   const tapTimer = useRef<any>(null)
 
-  const [gpsStatus, setGpsStatus] = useState<'idle'|'asking'|'granted'|'denied'>('idle')
-
   useEffect(() => {
     setTimeout(() => setVisible(true), 100)
-    // GPS зөвшөөрөл автоматаар асуух
-    if (navigator.geolocation) {
-      setGpsStatus('asking')
-      navigator.geolocation.getCurrentPosition(
-        () => setGpsStatus('granted'),
-        () => setGpsStatus('denied'),
-        { timeout: 10000 }
-      )
-    }
   }, [])
 
   const handleLogoPress = () => {
