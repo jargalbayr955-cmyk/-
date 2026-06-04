@@ -57,7 +57,7 @@ export default function CurrentPage() {
         shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
       })
       const map = Leaflet.map(mapRef.current!).setView([location.lat, location.lng], 16)
-      Leaflet.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB' }).addTo(map)
+      Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map)
       const marker = Leaflet.marker([location.lat, location.lng], { draggable: true }).addTo(map)
       marker.on('dragend', async (e: any) => {
         const pos = e.target.getLatLng()
