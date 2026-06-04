@@ -133,7 +133,12 @@ export default function CurrentPage() {
         <div style={{position:'absolute', top:'12px', left:'50%', transform:'translateX(-50%)', background:'rgba(10,10,15,0.85)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'20px', padding:'6px 14px', whiteSpace:'nowrap', zIndex:1000}}>
           <p style={{color:'rgba(255,255,255,0.5)', fontSize:'11px', margin:0}}>📍 Тэмдэгийг чирж байршлаа тохируул</p>
         </div>
-        <button onClick={goToMyLocation} style={{position:'absolute', bottom:'55px', right:'12px', width:'42px', height:'42px', borderRadius:'50%', background:'#e8433a', border:'none', fontSize:'18px', cursor:'pointer', zIndex:1000, boxShadow:'0 4px 15px rgba(232,67,58,0.5)'}}>📍</button>
+        <button onClick={goToMyLocation} style={{position:'absolute', bottom:'55px', right:'12px', width:'42px', height:'42px', borderRadius:'50%', background:'#e8433a', border:'none', cursor:'pointer', zIndex:1000, boxShadow:'0 4px 15px rgba(232,67,58,0.5)', display:'flex', alignItems:'center', justifyContent:'center'}}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+        </svg>
+      </button>
         <div style={{position:'absolute', inset:0, background:'linear-gradient(to bottom, transparent 80%, rgba(10,10,15,1) 100%)', pointerEvents:'none'}}/>
         <button onClick={() => router.back()} style={{position:'absolute', top:'12px', left:'12px', background:'rgba(10,10,15,0.8)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'20px', padding:'7px 14px', color:'rgba(255,255,255,0.7)', fontSize:'13px', cursor:'pointer', fontWeight:'600', zIndex:1000}}>← Буцах</button>
       </div>
@@ -150,9 +155,11 @@ export default function CurrentPage() {
           <p style={{color: gpsError ? '#ff6b6b' : 'rgba(255,255,255,0.7)', fontSize:'13px', margin:'0 0 8px'}}>{address}</p>
           {gpsError && (
             <div style={{background:'rgba(232,67,58,0.12)', border:'1px solid rgba(232,67,58,0.35)', borderRadius:'12px', padding:'12px 14px', display:'flex', gap:'10px', alignItems:'flex-start', marginBottom:'8px'}}>
-              <span style={{fontSize:'20px', flexShrink:0, marginTop:'1px'}}>⚠️</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="#e8433a" style={{flexShrink:0, marginTop:'1px'}}>
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+              </svg>
               <div>
-                <p style={{color:'white', fontWeight:'600', fontSize:'13px', margin:'0 0 4px'}}>Та заавал утасныхаа location-ийг асаана уу</p>
+                <p style={{color:'white', fontWeight:'600', fontSize:'13px', margin:'0 0 4px'}}>Та заавал утасныхаа <svg width="14" height="14" viewBox="0 0 24 24" fill="#e8433a" style={{verticalAlign:'middle', marginRight:'1px'}}><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>location-ийг асаана уу</p>
                 <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:0, lineHeight:'1.5'}}>Таны location ассанаар танд хамгийн ойр 3 жолооч холбогдоно</p>
               </div>
             </div>
