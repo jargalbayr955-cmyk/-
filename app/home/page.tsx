@@ -256,12 +256,27 @@ export default function HomePage() {
             <p style={{color:'rgba(255,255,255,0.75)', fontSize:'12px', margin:'3px 0 0'}}>Байршлаа тодорхойлохын тулд GPS-ийг асаана уу</p>
           </div>
           <button onClick={() => {
-            navigator.geolocation.getCurrentPosition(
-              () => setGpsStatus('granted'),
-              () => setGpsStatus('denied')
-            )
+            // iOS Safari
+            if (navigator.userAgent.match(/iPhone|iPad|iPod/i)) {
+              alert('📍 GPS асаах заавар:\n\nТохиргоо → Нууцлал → Байршилтай үйлчилгээ → Safari → Зөвшөөрөх')
+            }
+            // Android Chrome
+            else if (navigator.userAgent.match(/Android/i)) {
+              alert('📍 GPS асаах заавар:\n\nХаягийн мөрний зүүн талд 🔒 дарна → Байршил → Зөвшөөрөх')
+            }
+            // Desktop
+            else {
+              alert('📍 GPS асаах заавар:\n\nХаягийн мөрний зүүн талд 🔒 дарна → Байршил → Зөвшөөрөх')
+            }
+            // Дахин оролдох
+            setTimeout(() => {
+              navigator.geolocation.getCurrentPosition(
+                () => setGpsStatus('granted'),
+                () => {}
+              )
+            }, 3000)
           }} style={{background:'white', border:'none', borderRadius:'10px', padding:'8px 12px', color:'#e8433a', fontSize:'12px', fontWeight:'800', cursor:'pointer', flexShrink:0}}>
-            Асаах
+            Яаж асаах?
           </button>
         </div>
       )}
