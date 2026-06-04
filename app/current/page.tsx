@@ -149,13 +149,19 @@ export default function CurrentPage() {
           </div>
           <p style={{color: gpsError ? '#ff6b6b' : 'rgba(255,255,255,0.7)', fontSize:'13px', margin:'0 0 8px'}}>{address}</p>
           {gpsError && (
-            <input
-              type="text"
-              placeholder="Гараар хаяг оруулна уу..."
-              value={manualFrom}
-              onChange={e => setManualFrom(e.target.value)}
-              style={{width:'100%', background:'rgba(232,67,58,0.08)', border:'1px solid rgba(232,67,58,0.3)', borderRadius:'10px', padding:'10px 12px', color:'white', fontSize:'13px', outline:'none', marginTop:'4px'}}
-            />
+            <div>
+              <div style={{background:'rgba(232,67,58,0.1)', border:'1px solid rgba(232,67,58,0.3)', borderRadius:'10px', padding:'8px 12px', marginTop:'6px', display:'flex', alignItems:'center', gap:'8px'}}>
+                <span style={{fontSize:'14px'}}>⚙️</span>
+                <p style={{color:'#ff6b6b', fontSize:'12px', margin:0}}>Тохиргоо → Хөтөч → Байршил → Зөвшөөрөх</p>
+              </div>
+              <input
+                type="text"
+                placeholder="Эсвэл гараар хаяг бичнэ үү..."
+                value={manualFrom}
+                onChange={e => setManualFrom(e.target.value)}
+                style={{width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'10px', padding:'10px 12px', color:'white', fontSize:'13px', outline:'none', marginTop:'8px', boxSizing:'border-box'}}
+              />
+            </div>
           )}
           <div style={{borderTop:'1px solid rgba(255,255,255,0.06)', paddingTop:'8px'}}>
             <input
