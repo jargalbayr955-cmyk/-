@@ -98,8 +98,8 @@ export default function CurrentPage() {
     }
     setErrors({})
 
-    localStorage.setItem('fromLat', gpsError ? '0' : location!.lat.toString())
-    localStorage.setItem('fromLng', gpsError ? '0' : location!.lng.toString())
+    localStorage.setItem('fromLat', location?.lat.toString() || '0')
+    localStorage.setItem('fromLng', location?.lng.toString() || '0')
     localStorage.setItem('fromAddress', address)
     localStorage.setItem('dest', dest)
 
@@ -107,8 +107,8 @@ export default function CurrentPage() {
     const { data: orderData } = await supabase.from('orders').insert({
       from_address: gpsError ? (manualFrom || 'Гараар оруулаагүй') : (extraAddress ? `${address} (${extraAddress})` : address),
       to_address: dest,
-      from_lat: location!.lat,
-      from_lng: location!.lng,
+      from_lat: location?.lat || 0,
+      from_lng: location?.lng || 0,
       car_type: carType,
       car_mark: carMark,
       status: 'pending',
