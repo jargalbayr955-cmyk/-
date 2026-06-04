@@ -12,6 +12,14 @@ export default function HomePage() {
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 100)
+    // Home нээгдэхэд GPS зөвшөөрөл автоматаар асуух
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        () => {},
+        () => {},
+        { timeout: 10000, enableHighAccuracy: true }
+      )
+    }
   }, [])
 
   const handleLogoPress = () => {
