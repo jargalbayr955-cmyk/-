@@ -42,7 +42,7 @@ export default function CurrentPage() {
         setLocation({ lat, lng })
         const addr = await reverseGeocode(lat, lng)
         setAddress(addr)
-      }, () => setAddress('Байршил тогтоох боломжгүй'))
+      }, () => { setAddress('GPS ажиллахгүй байна'); setGpsError(true) }, { timeout: 8000, enableHighAccuracy: true })
     }
   }, [])
 
