@@ -158,7 +158,26 @@ export default function CurrentPage() {
                 type="text"
                 placeholder="Эсвэл гараар хаяг бичнэ үү..."
                 value={manualFrom}
-                onChange={e => setManualFrom(e.target.value)}
+                onChange={async e => {
+                  const val = e.target.value
+                  setManualFrom(val)
+                  if (val.length > 3) {
+                    try {
+                      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(val + ' Улаанбаатар')}&format=json&limit=1`)
+                      const data = await res.json()
+                      if (data[0]) {
+                        const lat = parseFloat(data[0].lat)
+                        const lng = parseFloat(data[0].lon)
+                        setLocation({ lat, lng })
+                        setAddress(val)
+                        if (mapInstanceRef.current && markerRef.current) {
+                          mapInstanceRef.current.setView([lat, lng], 16)
+                          markerRef.current.setLatLng([lat, lng])
+                        }
+                      }
+                    } catch {}
+                  }
+                }}
                 style={{width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'10px', padding:'10px 12px', color:'white', fontSize:'13px', outline:'none', marginTop:'8px', boxSizing:'border-box'}}
               />
             </div>
