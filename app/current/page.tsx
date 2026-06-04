@@ -149,6 +149,15 @@ export default function CurrentPage() {
           </div>
           <p style={{color: gpsError ? '#ff6b6b' : 'rgba(255,255,255,0.7)', fontSize:'13px', margin:'0 0 8px'}}>{address}</p>
           {gpsError && (
+            <div style={{background:'rgba(232,67,58,0.12)', border:'1px solid rgba(232,67,58,0.35)', borderRadius:'12px', padding:'12px 14px', display:'flex', gap:'10px', alignItems:'flex-start', marginBottom:'8px'}}>
+              <span style={{fontSize:'20px', flexShrink:0, marginTop:'1px'}}>⚠️</span>
+              <div>
+                <p style={{color:'white', fontWeight:'600', fontSize:'13px', margin:'0 0 4px'}}>Та заавал утасныхаа location-ийг асаана уу</p>
+                <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:0, lineHeight:'1.5'}}>Таны location ассанаар танд хамгийн ойр 3 жолооч холбогдоно</p>
+              </div>
+            </div>
+          )}
+          {gpsError && (
             <div>
               <div style={{background:'rgba(232,67,58,0.1)', border:'1px solid rgba(232,67,58,0.3)', borderRadius:'10px', padding:'8px 12px', marginTop:'6px', display:'flex', alignItems:'center', gap:'8px'}}>
                 <span style={{fontSize:'14px'}}>⚙️</span>
