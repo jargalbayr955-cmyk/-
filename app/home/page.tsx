@@ -253,7 +253,7 @@ export default function HomePage() {
           <span style={{fontSize:'24px', flexShrink:0}}>📍</span>
           <div style={{flex:1}}>
             <p style={{color:'white', fontWeight:'700', fontSize:'14px', margin:0}}>GPS зөвшөөрөл шаардлагатай</p>
-            <p style={{color:'rgba(255,255,255,0.75)', fontSize:'12px', margin:'3px 0 0'}}>Байршлаа тодорхойлохын тулд GPS-ийг асаана уу</p>
+            <p style={{color:'rgba(255,255,255,0.75)', fontSize:'12px', margin:'3px 0 0'}}>Утасны тохиргооноос байршлын зөвшөөрлийг асаана уу</p>
           </div>
           <button onClick={() => {
             // iOS Safari
