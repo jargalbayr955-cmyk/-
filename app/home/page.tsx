@@ -10,8 +10,19 @@ export default function HomePage() {
   const [tapCount, setTapCount] = useState(0)
   const tapTimer = useRef<any>(null)
 
+  const [gpsStatus, setGpsStatus] = useState<'idle'|'asking'|'granted'|'denied'>('idle')
+
   useEffect(() => {
     setTimeout(() => setVisible(true), 100)
+    // GPS зөвшөөрөл автоматаар асуух
+    if (navigator.geolocation) {
+      setGpsStatus('asking')
+      navigator.geolocation.getCurrentPosition(
+        () => setGpsStatus('granted'),
+        () => setGpsStatus('denied'),
+        { timeout: 10000 }
+      )
+    }
   }, [])
 
   const handleLogoPress = () => {
@@ -230,7 +241,36 @@ export default function HomePage() {
         ))}
       </div>
 
+      {/* GPS Banner */}
+      {gpsStatus === 'denied' && (
+        <div style={{
+          position:'fixed', bottom:'80px', left:'16px', right:'16px', zIndex:100,
+          background:'rgba(232,67,58,0.95)', borderRadius:'16px', padding:'14px 16px',
+          display:'flex', alignItems:'center', gap:'12px',
+          boxShadow:'0 8px 30px rgba(232,67,58,0.4)',
+          animation:'slideUp 0.3s ease'
+        }}>
+          <span style={{fontSize:'24px', flexShrink:0}}>📍</span>
+          <div style={{flex:1}}>
+            <p style={{color:'white', fontWeight:'700', fontSize:'14px', margin:0}}>GPS зөвшөөрөл шаардлагатай</p>
+            <p style={{color:'rgba(255,255,255,0.75)', fontSize:'12px', margin:'3px 0 0'}}>Байршлаа тодорхойлохын тулд GPS-ийг асаана уу</p>
+          </div>
+          <button onClick={() => {
+            navigator.geolocation.getCurrentPosition(
+              () => setGpsStatus('granted'),
+              () => setGpsStatus('denied')
+            )
+          }} style={{background:'white', border:'none', borderRadius:'10px', padding:'8px 12px', color:'#e8433a', fontSize:'12px', fontWeight:'800', cursor:'pointer', flexShrink:0}}>
+            Асаах
+          </button>
+        </div>
+      )}
+
       <style>{`
+        @keyframes slideUp {
+          from{transform:translateY(20px);opacity:0}
+          to{transform:translateY(0);opacity:1}
+        }
         @keyframes truckDrive {
           0% { transform: scale(1.3) translateX(-8%); filter: brightness(0.25) saturate(1.1) blur(3px); }
           60% { filter: brightness(0.4) saturate(1.1) blur(1px); }
