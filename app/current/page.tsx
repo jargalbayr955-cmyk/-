@@ -6,14 +6,13 @@ import { supabase } from '@/lib/supabase'
 export default function CurrentPage() {
   const [dest, setDest] = useState('')
   const [location, setLocation] = useState<{lat: number, lng: number} | null>(null)
-  const [address, setAddress] = useState('Байршил тогтоож байна...')
+  const [address, setAddress] = useState('GPS тогтоож байна...')
   const [carType, setCarType] = useState('')
   const [carMark, setCarMark] = useState('')
   const [extraAddress, setExtraAddress] = useState('')
   const [gpsError, setGpsError] = useState(false)
   const [manualFrom, setManualFrom] = useState('')
   const [errors, setErrors] = useState<{dest?:boolean, carType?:boolean, carMark?:boolean}>({})
-  const [mapReady, setMapReady] = useState(false)
   const mapRef = useRef<any>(null)
   const mapInstanceRef = useRef<any>(null)
   const markerRef = useRef<any>(null)
@@ -29,31 +28,8 @@ export default function CurrentPage() {
     }
   }
 
-  useEffect(() => {
-    const link = document.createElement('link')
-    link.rel = 'stylesheet'
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
-    document.head.appendChild(link)
-    setMapReady(true)
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        const lat = pos.coords.latitude
-        const lng = pos.coords.longitude
-        setLocation({ lat, lng })
-        const addr = await reverseGeocode(lat, lng)
-        setAddress(addr)
-      }, () => { setAddress('GPS ажиллахгүй байна'); setGpsError(true) }, { timeout: 8000, enableHighAccuracy: true })
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!mapReady || !location) return
-    // Map аль хэдийн байвал зөвхөн marker шинэчлэх
-    if (mapInstanceRef.current && markerRef.current) {
-      mapInstanceRef.current.setView([location.lat, location.lng], 16)
-      markerRef.current.setLatLng([location.lat, location.lng])
-      return
-    }
+  const initMap = (lat: number, lng: number) => {
+    if (!mapRef.current) return
     import('leaflet').then((L) => {
       const Leaflet = L.default
       delete (Leaflet.Icon.Default.prototype as any)._getIconUrl
@@ -62,9 +38,17 @@ export default function CurrentPage() {
         iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
         shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
       })
-      const map = Leaflet.map(mapRef.current!).setView([location.lat, location.lng], 16)
+
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.setView([lat, lng], 16)
+        if (markerRef.current) markerRef.current.setLatLng([lat, lng])
+        return
+      }
+
+      const map = Leaflet.map(mapRef.current).setView([lat, lng], 16)
       Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map)
-      const marker = Leaflet.marker([location.lat, location.lng], { draggable: true }).addTo(map)
+
+      const marker = Leaflet.marker([lat, lng], { draggable: true }).addTo(map)
       marker.on('dragend', async (e: any) => {
         const pos = e.target.getLatLng()
         setLocation({ lat: pos.lat, lng: pos.lng })
@@ -72,22 +56,50 @@ export default function CurrentPage() {
         const addr = await reverseGeocode(pos.lat, pos.lng)
         setAddress(addr)
       })
+
       markerRef.current = marker
       mapInstanceRef.current = map
     })
-  }, [mapReady, location])
+  }
+
+  useEffect(() => {
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+    document.head.appendChild(link)
+
+    const tryGPS = () => {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const lat = pos.coords.latitude
+          const lng = pos.coords.longitude
+          setLocation({ lat, lng })
+          setGpsError(false)
+          setAddress('Хаяг тогтоож байна...')
+          initMap(lat, lng)
+          const addr = await reverseGeocode(lat, lng)
+          setAddress(addr)
+        },
+        () => {
+          setAddress('GPS ажиллахгүй байна')
+          setGpsError(true)
+        },
+        { timeout: 8000, enableHighAccuracy: true }
+      )
+    }
+
+    tryGPS()
+    const interval = setInterval(tryGPS, 5000)
+    return () => clearInterval(interval)
+  }, [])
 
   const goToMyLocation = () => {
-    if (!navigator.geolocation) return
     navigator.geolocation.getCurrentPosition(async (pos) => {
       const lat = pos.coords.latitude
       const lng = pos.coords.longitude
       setLocation({ lat, lng })
-      setAddress('Хаяг тогтоож байна...')
-      if (mapInstanceRef.current && markerRef.current) {
-        mapInstanceRef.current.setView([lat, lng], 16)
-        markerRef.current.setLatLng([lat, lng])
-      }
+      setGpsError(false)
+      initMap(lat, lng)
       const addr = await reverseGeocode(lat, lng)
       setAddress(addr)
     })
@@ -98,20 +110,18 @@ export default function CurrentPage() {
     if (!dest) newErrors.dest = true
     if (!carType) newErrors.carType = true
     if (!carMark) newErrors.carMark = true
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors)
-      return
-    }
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return }
     setErrors({})
 
+    const fromAddr = gpsError ? (manualFrom || 'Гараар оруулаагүй') : (extraAddress ? `${address} (${extraAddress})` : address)
     localStorage.setItem('fromLat', location?.lat.toString() || '0')
     localStorage.setItem('fromLng', location?.lng.toString() || '0')
-    localStorage.setItem('fromAddress', address)
+    localStorage.setItem('fromAddress', fromAddr)
     localStorage.setItem('dest', dest)
 
     const user = JSON.parse(localStorage.getItem('user') || 'null')
     const { data: orderData } = await supabase.from('orders').insert({
-      from_address: gpsError ? (manualFrom || 'Гараар оруулаагүй') : (extraAddress ? `${address} (${extraAddress})` : address),
+      from_address: fromAddr,
       to_address: dest,
       from_lat: location?.lat || 0,
       from_lng: location?.lng || 0,
@@ -130,7 +140,7 @@ export default function CurrentPage() {
 
       {/* Map */}
       <div style={{position:'relative', height:'260px'}}>
-        <div ref={mapRef} style={{width:'100%', height:'260px'}}/>
+        <div ref={mapRef} style={{width:'100%', height:'260px', background:'#111'}}/>
         {!location && (
           <div style={{position:'absolute', inset:0, background:'rgba(10,10,15,0.85)', display:'flex', alignItems:'center', justifyContent:'center'}}>
             <p style={{color:'rgba(255,255,255,0.4)', fontSize:'14px'}}>GPS тогтоож байна...</p>
@@ -140,17 +150,19 @@ export default function CurrentPage() {
           <p style={{color:'rgba(255,255,255,0.5)', fontSize:'11px', margin:0}}>📍 Тэмдэгийг чирж байршлаа тохируул</p>
         </div>
         <button onClick={goToMyLocation} style={{position:'absolute', bottom:'55px', right:'12px', width:'42px', height:'42px', borderRadius:'50%', background:'#e8433a', border:'none', cursor:'pointer', zIndex:1000, boxShadow:'0 4px 15px rgba(232,67,58,0.5)', display:'flex', alignItems:'center', justifyContent:'center'}}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
-        </svg>
-      </button>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+          </svg>
+        </button>
         <div style={{position:'absolute', inset:0, background:'linear-gradient(to bottom, transparent 80%, rgba(10,10,15,1) 100%)', pointerEvents:'none'}}/>
         <button onClick={() => router.back()} style={{position:'absolute', top:'12px', left:'12px', background:'rgba(10,10,15,0.8)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'20px', padding:'7px 14px', color:'rgba(255,255,255,0.7)', fontSize:'13px', cursor:'pointer', fontWeight:'600', zIndex:1000}}>← Буцах</button>
       </div>
 
       {/* Form */}
       <div style={{padding:'16px', flex:1, overflowY:'auto'}}>
+        <h2 style={{color:'white', fontSize:'18px', fontWeight:'800', margin:'0 0 4px'}}>Хүрэх газраа оруулна уу</h2>
+        <p style={{color:'rgba(255,255,255,0.35)', fontSize:'13px', marginBottom:'16px'}}>Map дээрх тэмдэгийг чирж байршлаа тодруулна уу</p>
 
         {/* Байршил */}
         <div style={{background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'14px', padding:'12px 14px', marginBottom:'10px'}}>
@@ -159,26 +171,19 @@ export default function CurrentPage() {
             <span style={{color:'rgba(255,255,255,0.35)', fontSize:'11px', fontWeight:'700', letterSpacing:'1px'}}>ТАНЫ БАЙРШИЛ</span>
           </div>
           <p style={{color: gpsError ? '#ff6b6b' : 'rgba(255,255,255,0.7)', fontSize:'13px', margin:'0 0 8px'}}>{address}</p>
-          {gpsError && (
-            <div style={{background:'rgba(232,67,58,0.12)', border:'1px solid rgba(232,67,58,0.35)', borderRadius:'12px', padding:'12px 14px', display:'flex', gap:'10px', alignItems:'flex-start', marginBottom:'8px'}}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="#e8433a" style={{flexShrink:0, marginTop:'1px'}}>
-                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-              </svg>
-              <div>
-                <p style={{color:'white', fontWeight:'600', fontSize:'13px', margin:'0 0 4px'}}>
-                  Та заавал утасныхаа{' '}
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#e8433a" style={{display:'inline', verticalAlign:'middle'}}><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-                  {' '}location-ийг асаана уу
-                </p>
-                <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:0, lineHeight:'1.5'}}>Таны location ассанаар танд хамгийн ойр 3 жолооч холбогдоно</p>
-              </div>
-            </div>
-          )}
+
           {gpsError && (
             <div>
-              <div style={{background:'rgba(232,67,58,0.1)', border:'1px solid rgba(232,67,58,0.3)', borderRadius:'10px', padding:'8px 12px', marginTop:'6px', display:'flex', alignItems:'center', gap:'8px'}}>
-                <span style={{fontSize:'14px'}}>⚙️</span>
-                <p style={{color:'#ff6b6b', fontSize:'12px', margin:0}}>Тохиргоо → Хөтөч → Байршил → Зөвшөөрөх</p>
+              <div style={{background:'rgba(232,67,58,0.12)', border:'1px solid rgba(232,67,58,0.35)', borderRadius:'10px', padding:'10px 12px', display:'flex', gap:'8px', alignItems:'flex-start', marginBottom:'8px'}}>
+                <span style={{fontSize:'18px', flexShrink:0}}>⚠️</span>
+                <div>
+                  <p style={{color:'white', fontWeight:'600', fontSize:'13px', margin:'0 0 4px'}}>
+                    Та заавал утасныхаа{' '}
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="#e8433a" style={{display:'inline', verticalAlign:'middle'}}><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                    {' '}location-ийг асаана уу
+                  </p>
+                  <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:0, lineHeight:'1.5'}}>Таны location ассанаар танд хамгийн ойр 3 жолооч холбогдоно</p>
+                </div>
               </div>
               <input
                 type="text"
@@ -196,33 +201,33 @@ export default function CurrentPage() {
                         const lng = parseFloat(data[0].lon)
                         setLocation({ lat, lng })
                         setAddress(val)
-                        if (mapInstanceRef.current && markerRef.current) {
-                          mapInstanceRef.current.setView([lat, lng], 16)
-                          markerRef.current.setLatLng([lat, lng])
-                        }
+                        initMap(lat, lng)
                       }
                     } catch {}
                   }
                 }}
-                style={{width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'10px', padding:'10px 12px', color:'white', fontSize:'13px', outline:'none', marginTop:'8px', boxSizing:'border-box'}}
+                style={{width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'10px', padding:'10px 12px', color:'white', fontSize:'13px', outline:'none', boxSizing:'border-box' as const}}
               />
             </div>
           )}
-          <div style={{borderTop:'1px solid rgba(255,255,255,0.06)', paddingTop:'8px'}}>
-            <input
-              type="text"
-              placeholder="Нэмэлт байршил гараар бичиж болно"
-              value={extraAddress}
-              onChange={e => setExtraAddress(e.target.value)}
-              style={{width:'100%', background:'transparent', border:'none', color:'rgba(255,255,255,0.6)', fontSize:'13px', outline:'none'}}
-            />
-          </div>
+
+          {!gpsError && (
+            <div style={{borderTop:'1px solid rgba(255,255,255,0.06)', paddingTop:'8px'}}>
+              <input
+                type="text"
+                placeholder="Нэмэлт байршил гараар бичиж болно"
+                value={extraAddress}
+                onChange={e => setExtraAddress(e.target.value)}
+                style={{width:'100%', background:'transparent', border:'none', color:'rgba(255,255,255,0.6)', fontSize:'13px', outline:'none'}}
+              />
+            </div>
+          )}
         </div>
 
         {/* Хүрэх газар */}
         <div style={{background: errors.dest ? 'rgba(232,67,58,0.08)' : 'rgba(255,255,255,0.04)', border:`1px solid ${errors.dest ? 'rgba(232,67,58,0.5)' : 'rgba(255,255,255,0.08)'}`, borderRadius:'14px', padding:'12px 14px', marginBottom: errors.dest ? '4px' : '16px'}}>
           <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px'}}>
-            <div style={{width:'8px', height:'8px', borderRadius:'50%', background: errors.dest ? '#e8433a' : '#e8433a', flexShrink:0}}/>
+            <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#e8433a', flexShrink:0}}/>
             <span style={{color: errors.dest ? '#ff6b6b' : 'rgba(255,255,255,0.35)', fontSize:'11px', fontWeight:'700', letterSpacing:'1px'}}>ХҮРЭХ ГАЗАР</span>
           </div>
           <input type="text" placeholder="Хаяг бичнэ үү..." value={dest} onChange={e => { setDest(e.target.value); setErrors(p => ({...p, dest:false})) }}
@@ -231,8 +236,8 @@ export default function CurrentPage() {
         {errors.dest && <p style={{color:'#ff6b6b', fontSize:'12px', margin:'0 0 12px 4px'}}>⚠️ Хүрэх газраа бөглөнө үү</p>}
 
         {/* Машины төрөл */}
-        <p style={{color:'rgba(255,255,255,0.4)', fontSize:'11px', fontWeight:'700', letterSpacing:'1px', marginBottom:'10px'}}>
-          МАШИНЫ ТӨРӨЛ {errors.carType && <span style={{color:'#ff6b6b'}}>— Сонгоно уу</span>}
+        <p style={{color: errors.carType ? '#ff6b6b' : 'rgba(255,255,255,0.4)', fontSize:'11px', fontWeight:'700', letterSpacing:'1px', marginBottom:'10px'}}>
+          МАШИНЫ ТӨРӨЛ {errors.carType && '— Сонгоно уу'}
         </p>
         <div style={{display:'flex', flexDirection:'column', gap:'8px', marginBottom:'16px'}}>
           {[
@@ -241,9 +246,8 @@ export default function CurrentPage() {
           ].map(type => (
             <div key={type.id} onClick={() => { setCarType(type.id); setErrors(p => ({...p, carType:false})) }} style={{
               background: carType === type.id ? 'rgba(232,67,58,0.12)' : errors.carType ? 'rgba(232,67,58,0.05)' : 'rgba(255,255,255,0.04)',
-              border: `1px solid ${carType === type.id ? 'rgba(232,67,58,0.5)' : errors.carType ? 'rgba(232,67,58,0.3)' : 'rgba(255,255,255,0.07)'}`,
-              borderRadius:'14px', padding:'14px 16px',
-              display:'flex', alignItems:'center', gap:'12px', cursor:'pointer', transition:'all 0.2s'
+              border:`1px solid ${carType === type.id ? 'rgba(232,67,58,0.5)' : errors.carType ? 'rgba(232,67,58,0.3)' : 'rgba(255,255,255,0.07)'}`,
+              borderRadius:'14px', padding:'14px 16px', display:'flex', alignItems:'center', gap:'12px', cursor:'pointer', transition:'all 0.2s'
             }}>
               <span style={{fontSize:'24px'}}>{type.icon}</span>
               <div style={{flex:1}}>
@@ -267,13 +271,13 @@ export default function CurrentPage() {
         </div>
         {errors.carMark && <p style={{color:'#ff6b6b', fontSize:'12px', margin:'0 0 16px 4px'}}>⚠️ Машины маркаа бөглөнө үү</p>}
 
-        <button onClick={handleSearch} disabled={gpsError ? (!manualFrom || !dest || !carType) : (!location || !dest || !carType)} style={{
+        <button onClick={handleSearch} disabled={gpsError ? (!manualFrom || !dest || !carType || !carMark) : (!location || !dest || !carType || !carMark)} style={{
           width:'100%', borderRadius:'16px', padding:'17px',
-          background: (gpsError ? !manualFrom : !location) ? 'rgba(232,67,58,0.3)' : '#e8433a',
+          background: (gpsError ? (!manualFrom || !dest || !carType || !carMark) : (!location || !dest || !carType || !carMark)) ? 'rgba(232,67,58,0.3)' : '#e8433a',
           border:'none', color:'white', fontSize:'16px', fontWeight:'800',
-          cursor: (gpsError ? !manualFrom : !location) ? 'not-allowed' : 'pointer',
-          boxShadow: (gpsError ? !manualFrom : !location) ? 'none' : '0 6px 25px rgba(232,67,58,0.4)',
-          transition:'all 0.2s', letterSpacing:'0.3px'
+          cursor: (gpsError ? (!manualFrom || !dest || !carType || !carMark) : (!location || !dest || !carType || !carMark)) ? 'not-allowed' : 'pointer',
+          boxShadow: (gpsError ? (!manualFrom || !dest || !carType || !carMark) : (!location || !dest || !carType || !carMark)) ? 'none' : '0 6px 25px rgba(232,67,58,0.4)',
+          transition:'all 0.2s'
         }}>
           {!location && !gpsError ? 'Байршил тогтоож байна...' : !dest ? 'Хүрэх газар бөглөнө үү' : !carType ? 'Машины төрөл сонгоно уу' : gpsError && !manualFrom ? 'Байршил бөглөнө үү' : 'Машин хайх →'}
         </button>
