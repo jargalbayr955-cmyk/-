@@ -68,21 +68,32 @@ export default function CurrentPage() {
     link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
     document.head.appendChild(link)
 
+    let gpsSuccess = false
+
     const tryGPS = () => {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
           const lat = pos.coords.latitude
           const lng = pos.coords.longitude
-          setLocation({ lat, lng })
-          setGpsError(false)
-          setAddress('Хаяг тогтоож байна...')
-          initMap(lat, lng)
-          const addr = await reverseGeocode(lat, lng)
-          setAddress(addr)
+          // GPS анх удаа ирсэн үед л map үүсгэх
+          if (!gpsSuccess) {
+            gpsSuccess = true
+            setLocation({ lat, lng })
+            setGpsError(false)
+            setAddress('Хаяг тогтоож байна...')
+            initMap(lat, lng)
+            const addr = await reverseGeocode(lat, lng)
+            setAddress(addr)
+          } else {
+            // Аль хэдийн GPS байвал зөвхөн gpsError арилгах
+            setGpsError(false)
+          }
         },
         () => {
-          setAddress('GPS ажиллахгүй байна')
-          setGpsError(true)
+          if (!gpsSuccess) {
+            setAddress('GPS ажиллахгүй байна')
+            setGpsError(true)
+          }
         },
         { timeout: 8000, enableHighAccuracy: true }
       )
