@@ -25,7 +25,7 @@ export default function HomePage() {
   const handleLogoPress = () => {
     pressTimer.current = setTimeout(() => {
       router.push('/driver')
-    }, 5000)
+    }, 3000)
   }
 
   const handleLogoRelease = () => {
