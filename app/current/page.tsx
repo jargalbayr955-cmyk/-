@@ -121,7 +121,15 @@ export default function CurrentPage() {
     if (!dest) newErrors.dest = true
     if (!carType) newErrors.carType = true
     if (!carMark) newErrors.carMark = true
-    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return }
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
+      // Эхний алдаатай хэсэг рүү scroll хийх
+      setTimeout(() => {
+        const firstError = document.querySelector('[data-error="true"]')
+        if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 100)
+      return
+    }
     setErrors({})
 
     const fromAddr = gpsError ? (manualFrom || 'Гараар оруулаагүй') : (extraAddress ? `${address} (${extraAddress})` : address)
@@ -236,7 +244,7 @@ export default function CurrentPage() {
         </div>
 
         {/* Хүрэх газар */}
-        <div style={{background: errors.dest ? 'rgba(232,67,58,0.08)' : 'rgba(255,255,255,0.04)', border:`1px solid ${errors.dest ? 'rgba(232,67,58,0.5)' : 'rgba(255,255,255,0.08)'}`, borderRadius:'14px', padding:'12px 14px', marginBottom: errors.dest ? '4px' : '16px'}}>
+        <div data-error={errors.dest ? 'true' : 'false'} style={{background: errors.dest ? 'rgba(232,67,58,0.08)' : 'rgba(255,255,255,0.04)', border:`1px solid ${errors.dest ? 'rgba(232,67,58,0.5)' : 'rgba(255,255,255,0.08)'}`, borderRadius:'14px', padding:'12px 14px', marginBottom: errors.dest ? '4px' : '16px'}}>
           <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px'}}>
             <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#e8433a', flexShrink:0}}/>
             <span style={{color: errors.dest ? '#ff6b6b' : 'rgba(255,255,255,0.35)', fontSize:'11px', fontWeight:'700', letterSpacing:'1px'}}>ХҮРЭХ ГАЗАР</span>
@@ -273,7 +281,7 @@ export default function CurrentPage() {
         </div>
 
         {/* Машины марк */}
-        <div style={{background: errors.carMark ? 'rgba(232,67,58,0.08)' : 'rgba(255,255,255,0.04)', border:`1px solid ${errors.carMark ? 'rgba(232,67,58,0.5)' : 'rgba(255,255,255,0.08)'}`, borderRadius:'14px', padding:'12px 14px', marginBottom: errors.carMark ? '4px' : '20px'}}>
+        <div data-error={errors.carMark ? 'true' : 'false'} style={{background: errors.carMark ? 'rgba(232,67,58,0.08)' : 'rgba(255,255,255,0.04)', border:`1px solid ${errors.carMark ? 'rgba(232,67,58,0.5)' : 'rgba(255,255,255,0.08)'}`, borderRadius:'14px', padding:'12px 14px', marginBottom: errors.carMark ? '4px' : '20px'}}>
           <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px'}}>
             <span style={{color: errors.carMark ? '#ff6b6b' : 'rgba(255,255,255,0.35)', fontSize:'11px', fontWeight:'700', letterSpacing:'1px'}}>🚗 ТАНЫ МАШИНЫ МАРК, НЭР</span>
           </div>
