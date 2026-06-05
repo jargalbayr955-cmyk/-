@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import webpush from 'web-push'
+import * as webpush from 'web-push'
 
 webpush.setVapidDetails(
   'mailto:admin@achilt.mn',
