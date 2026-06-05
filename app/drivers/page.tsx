@@ -178,7 +178,7 @@ export default function DriversPage() {
                                         </div>
                                         <div style={{textAlign:'right'}}>
                                             <p style={{color:'white', fontWeight:'800', fontSize:'18px', margin:0}}>₮{o.price.toLocaleString()}</p>
-                                            {dist && <p style={{color:'rgba(59,130,246,0.8)', fontSize:'12px', margin:'3px 0 0'}}>📍 {dist} км</p>}
+                                            {dist && <p style={{color:'rgba(59,130,246,0.8)', fontSize:'12px', margin:'3px 0 0'}}>📍 Таниас {dist} км зайтай</p>}
                                         </div>
                                     </div>
                                     <button
