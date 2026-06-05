@@ -47,7 +47,13 @@ export default function CurrentPage() {
   }, [])
 
   useEffect(() => {
-    if (!mapReady || !location || mapInstanceRef.current) return
+    if (!mapReady || !location) return
+    // Map аль хэдийн байвал зөвхөн marker шинэчлэх
+    if (mapInstanceRef.current && markerRef.current) {
+      mapInstanceRef.current.setView([location.lat, location.lng], 16)
+      markerRef.current.setLatLng([location.lat, location.lng])
+      return
+    }
     import('leaflet').then((L) => {
       const Leaflet = L.default
       delete (Leaflet.Icon.Default.prototype as any)._getIconUrl
