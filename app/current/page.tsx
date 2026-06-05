@@ -290,15 +290,15 @@ export default function CurrentPage() {
         </div>
         {errors.carMark && <p style={{color:'#ff6b6b', fontSize:'12px', margin:'0 0 16px 4px'}}>⚠️ Машины маркаа бөглөнө үү</p>}
 
-        <button onClick={handleSearch} disabled={gpsError ? (!manualFrom || !dest || !carType || !carMark) : (!location || !dest || !carType || !carMark)} style={{
+        <button onClick={handleSearch} disabled={!location && !gpsError} style={{
           width:'100%', borderRadius:'16px', padding:'17px',
-          background: (gpsError ? (!manualFrom || !dest || !carType || !carMark) : (!location || !dest || !carType || !carMark)) ? 'rgba(232,67,58,0.3)' : '#e8433a',
+          background: (!location && !gpsError) ? 'rgba(232,67,58,0.3)' : '#e8433a',
           border:'none', color:'white', fontSize:'16px', fontWeight:'800',
-          cursor: (gpsError ? (!manualFrom || !dest || !carType || !carMark) : (!location || !dest || !carType || !carMark)) ? 'not-allowed' : 'pointer',
-          boxShadow: (gpsError ? (!manualFrom || !dest || !carType || !carMark) : (!location || !dest || !carType || !carMark)) ? 'none' : '0 6px 25px rgba(232,67,58,0.4)',
+          cursor: (!location && !gpsError) ? 'not-allowed' : 'pointer',
+          boxShadow:'0 6px 25px rgba(232,67,58,0.4)',
           transition:'all 0.2s'
         }}>
-          {!location && !gpsError ? 'Байршил тогтоож байна...' : !dest ? 'Хүрэх газар бөглөнө үү' : !carType ? 'Машины төрөл сонгоно уу' : gpsError && !manualFrom ? 'Байршил бөглөнө үү' : 'Машин хайх →'}
+          {!location && !gpsError ? 'Байршил тогтоож байна...' : 'Машин хайх →'}
         </button>
       </div>
 
