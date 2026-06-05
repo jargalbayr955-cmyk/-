@@ -113,6 +113,16 @@ export default function DriverPage() {
   }
 
   useEffect(() => {
+    if (!driver) {
+      // Нэвтрээгүй бол history-г цэвэрлэх
+      window.history.replaceState(null, '', '/driver')
+    } else {
+      // Нэвтэрсэн бол history-г driver хуудсаар солих
+      window.history.replaceState(null, '', '/driver')
+    }
+  }, [driver])
+
+  useEffect(() => {
     if (!driver) return
     // Жолооч нэвтэрсний дараа 10 секунд тутамд GPS шинэчлэх
     const interval = setInterval(() => {
