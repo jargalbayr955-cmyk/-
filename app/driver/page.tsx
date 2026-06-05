@@ -83,7 +83,8 @@ export default function DriverPage() {
   }
 
   useEffect(() => {
-    if (!driver || !acceptedOrder) return
+    if (!driver) return
+    // Жолооч нэвтэрсний дараа 10 секунд тутамд GPS шинэчлэх
     const interval = setInterval(() => {
       navigator.geolocation.getCurrentPosition(async (pos) => {
         await supabase.from('drivers').update({ lat: pos.coords.latitude, lng: pos.coords.longitude }).eq('id', driver.id)
@@ -93,7 +94,7 @@ export default function DriverPage() {
       })
     }, 10000)
     return () => clearInterval(interval)
-  }, [driver, acceptedOrder])
+  }, [driver])
 
   useEffect(() => {
     if (!acceptedOrder || !mapRef.current || mapInstanceRef.current) return
