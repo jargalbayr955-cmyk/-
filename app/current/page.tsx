@@ -150,7 +150,21 @@ export default function CurrentPage() {
       user_phone: user?.phone || ''
     }).select().single()
 
-    if (orderData) localStorage.setItem('current_order_id', orderData.id)
+    if (orderData) {
+      localStorage.setItem('current_order_id', orderData.id)
+      // Push notification явуулах
+      fetch('/api/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: orderData.id,
+          from_address: fromAddr,
+          to_address: dest,
+          car_type: carType,
+          car_mark: carMark
+        })
+      }).catch(() => {})
+    }
     router.push('/drivers')
   }
 

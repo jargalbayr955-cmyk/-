@@ -44,6 +44,25 @@ export default function DriverPage() {
     } else {
       setDriver(data[0])
       localStorage.setItem('driver_session', JSON.stringify(data[0]))
+
+    // Push notification subscription
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      try {
+        const reg = await navigator.serviceWorker.register('/sw.js')
+        const existing = await reg.pushManager.getSubscription()
+        const sub = existing || await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: 'BKFi4446X2u9MHYCdvzChXDMroFJIUqCXtC-hHge7jzUzqnWW7qEx8pkl_r7TDTEVnHzdUPgID3eKgSbWLNBwlY'
+        })
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ driver_id: data[0].id, subscription: sub.toJSON() })
+        })
+      } catch (e) {
+        console.log('Push subscription failed:', e)
+      }
+    }
     }
     setLoading(false)
   }
