@@ -249,7 +249,15 @@ export default function CurrentPage() {
             <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#e8433a', flexShrink:0}}/>
             <span style={{color: errors.dest ? '#ff6b6b' : 'rgba(255,255,255,0.35)', fontSize:'11px', fontWeight:'700', letterSpacing:'1px'}}>ХҮРЭХ ГАЗАР</span>
           </div>
-          <input type="text" placeholder="Хаяг бичнэ үү..." value={dest} onChange={e => { setDest(e.target.value); setErrors(p => ({...p, dest:false})) }}
+          <input type="text" placeholder="Хаяг бичнэ үү..." value={dest}
+            onChange={e => { setDest(e.target.value); setErrors(p => ({...p, dest:false})) }}
+            onBlur={() => {
+              if (dest) {
+                setTimeout(() => {
+                  document.getElementById('field-cartype')?.scrollIntoView({ behavior:'smooth', block:'center' })
+                }, 200)
+              }
+            }}
             style={{width:'100%', background:'transparent', border:'none', color:'white', fontSize:'15px', outline:'none', fontWeight:'600'}}/>
         </div>
         {errors.dest && <p style={{color:'#ff6b6b', fontSize:'12px', margin:'0 0 12px 4px'}}>⚠️ Хүрэх газраа бөглөнө үү</p>}
@@ -263,7 +271,13 @@ export default function CurrentPage() {
             {id:'butten', label:'Бүтэн ачигч', icon:'🚛', desc:'Тэвш дээрээ бүтэн ачих'},
             {id:'chiregch', label:'Чирэгч', icon:'🔧', desc:'Урд юмуу хойд дугуйнаас чирэх'},
           ].map(type => (
-            <div key={type.id} onClick={() => { setCarType(type.id); setErrors(p => ({...p, carType:false})) }} style={{
+            <div key={type.id} onClick={() => {
+                setCarType(type.id)
+                setErrors(p => ({...p, carType:false}))
+                setTimeout(() => {
+                  document.getElementById('field-carmark')?.scrollIntoView({ behavior:'smooth', block:'center' })
+                }, 200)
+              }} style={{
               background: carType === type.id ? 'rgba(232,67,58,0.12)' : errors.carType ? 'rgba(232,67,58,0.05)' : 'rgba(255,255,255,0.04)',
               border:`1px solid ${carType === type.id ? 'rgba(232,67,58,0.5)' : errors.carType ? 'rgba(232,67,58,0.3)' : 'rgba(255,255,255,0.07)'}`,
               borderRadius:'14px', padding:'14px 16px', display:'flex', alignItems:'center', gap:'12px', cursor:'pointer', transition:'all 0.2s'
@@ -285,21 +299,36 @@ export default function CurrentPage() {
           <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px'}}>
             <span style={{color: errors.carMark ? '#ff6b6b' : 'rgba(255,255,255,0.35)', fontSize:'11px', fontWeight:'700', letterSpacing:'1px'}}>🚗 ТАНЫ МАШИНЫ МАРК, НЭР</span>
           </div>
-          <input type="text" placeholder="Жишээ: Toyota Camry, Hyundai Sonata..." value={carMark} onChange={e => { setCarMark(e.target.value); setErrors(p => ({...p, carMark:false})) }}
+          <input type="text" placeholder="Жишээ: Toyota Camry, Hyundai Sonata..." value={carMark}
+            onChange={e => { setCarMark(e.target.value); setErrors(p => ({...p, carMark:false})) }}
+            onBlur={() => {
+              if (carMark) {
+                setTimeout(() => {
+                  document.getElementById('btn-search')?.scrollIntoView({ behavior:'smooth', block:'center' })
+                }, 200)
+              }
+            }}
             style={{width:'100%', background:'transparent', border:'none', color:'white', fontSize:'14px', outline:'none', fontWeight:'500'}}/>
         </div>
         {errors.carMark && <p style={{color:'#ff6b6b', fontSize:'12px', margin:'0 0 16px 4px'}}>⚠️ Машины маркаа бөглөнө үү</p>}
 
-        <button onClick={handleSearch} disabled={!location && !gpsError} style={{
-          width:'100%', borderRadius:'16px', padding:'17px',
-          background: (!location && !gpsError) ? 'rgba(232,67,58,0.3)' : '#e8433a',
-          border:'none', color:'white', fontSize:'16px', fontWeight:'800',
-          cursor: (!location && !gpsError) ? 'not-allowed' : 'pointer',
-          boxShadow:'0 6px 25px rgba(232,67,58,0.4)',
-          transition:'all 0.2s'
-        }}>
-          {!location && !gpsError ? 'Байршил тогтоож байна...' : 'Машин хайх →'}
-        </button>
+        {(() => {
+          const ready = (location || (gpsError && manualFrom)) && dest && carType && carMark
+          return (
+            <button id="btn-search" onClick={handleSearch} disabled={!location && !gpsError} style={{
+              width:'100%', borderRadius:'16px', padding:'17px',
+              background: ready ? '#e8433a' : 'rgba(232,67,58,0.3)',
+              border: ready ? 'none' : '1px solid rgba(232,67,58,0.3)',
+              color:'white', fontSize:'16px', fontWeight:'800',
+              cursor: (!location && !gpsError) ? 'not-allowed' : 'pointer',
+              boxShadow: ready ? '0 6px 25px rgba(232,67,58,0.5)' : 'none',
+              transition:'all 0.3s',
+              opacity: ready ? 1 : 0.6
+            }}>
+              {!location && !gpsError ? 'Байршил тогтоож байна...' : ready ? 'Машин хайх →' : 'Мэдээлэл бөглөнө үү'}
+            </button>
+          )
+        })()}
       </div>
 
       <style>{`input::placeholder{color:rgba(255,255,255,0.2);}input:focus{outline:none;}`}</style>
