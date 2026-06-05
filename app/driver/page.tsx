@@ -34,6 +34,15 @@ export default function DriverPage() {
   const lineRef = useRef<any>(null)
   const router = useRouter()
 
+  useEffect(() => {
+    const session = localStorage.getItem('driver_session')
+    if (session) {
+      try {
+        setDriver(JSON.parse(session))
+      } catch {}
+    }
+  }, [])
+
   const handleLogin = async () => {
     if (!phone || !pin) return setError('Дугаар болон PIN оруулна уу')
     setLoading(true)
