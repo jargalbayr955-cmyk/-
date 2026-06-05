@@ -37,6 +37,34 @@ export default function TrackingPage() {
   }, [])
 
   useEffect(() => {
+    let calledPhone = false
+
+    const handleVisibility = async () => {
+      if (document.visibilityState === 'visible' && (calledPhone || localStorage.getItem('phone_called') === '1')) {
+        localStorage.removeItem('phone_called')
+        // Залгаад буцаж ирсэн — захиалга дуусгах
+        const orderId = localStorage.getItem('current_order_id')
+        if (orderId) {
+          await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId)
+          localStorage.removeItem('current_order_id')
+          localStorage.removeItem('tracking_driver_id')
+        }
+        router.replace('/home')
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    // Утас дарахад calledPhone = true болгох
+    const handlePhoneClick = () => { calledPhone = true }
+    document.querySelectorAll('a[href^="tel:"]').forEach(el => el.addEventListener('click', handlePhoneClick))
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [])
+
+  useEffect(() => {
     const fromLat = parseFloat(localStorage.getItem('fromLat') || '0')
     const fromLng = parseFloat(localStorage.getItem('fromLng') || '0')
     const orderId = localStorage.getItem('current_order_id')
@@ -180,7 +208,10 @@ export default function TrackingPage() {
         {order?.driver_phone ? (
           <div>
 
-            <a href={'tel:' + order.driver_phone} style={{
+            <a href={'tel:' + order.driver_phone} onClick={() => {
+              // Утас дарсан гэдгийг тэмдэглэх
+              localStorage.setItem('phone_called', '1')
+            }} style={{
               display:'flex', alignItems:'center', justifyContent:'center', gap:'12px',
               borderRadius:'16px', padding:'16px',
               background:'#e8433a', color:'white', textDecoration:'none',
