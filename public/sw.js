@@ -17,7 +17,21 @@ self.addEventListener('push', function(event) {
 
 self.addEventListener('notificationclick', function(event) {
   event.notification.close()
-  if (event.action === 'open' || !event.action) {
-    event.waitUntil(clients.openWindow(event.notification.data.url || '/driver'))
-  }
+  if (event.action === 'close') return
+
+  const targetUrl = event.notification.data?.url || '/driver'
+  const fullUrl = self.location.origin + targetUrl
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+      // Аль хэдийн нээлттэй tab байвал тэр tab-г focus хийх
+      for (const client of clientList) {
+        if (client.url.includes('/driver') && 'focus' in client) {
+          return client.focus()
+        }
+      }
+      // Байхгүй бол шинэ tab нээх
+      return clients.openWindow(fullUrl)
+    })
+  )
 })
