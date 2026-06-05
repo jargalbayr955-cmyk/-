@@ -159,7 +159,11 @@ export default function CurrentPage() {
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
               </svg>
               <div>
-                <p style={{color:'white', fontWeight:'600', fontSize:'13px', margin:'0 0 4px'}}>Та заавал утасныхаа <svg width="14" height="14" viewBox="0 0 24 24" fill="#e8433a" style={{verticalAlign:'middle', marginRight:'1px'}}><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>location-ийг асаана уу</p>
+                <p style={{color:'white', fontWeight:'600', fontSize:'13px', margin:'0 0 4px'}}>
+                  Та заавал утасныхаа{' '}
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#e8433a" style={{display:'inline', verticalAlign:'middle'}}><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                  {' '}location-ийг асаана уу
+                </p>
                 <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:0, lineHeight:'1.5'}}>Таны location ассанаар танд хамгийн ойр 3 жолооч холбогдоно</p>
               </div>
             </div>
