@@ -15,7 +15,13 @@ const D = {
 export default function DriverPage() {
   const [phone, setPhone] = useState('')
   const [pin, setPin] = useState('')
-  const [driver, setDriver] = useState<any>(null)
+  const [driver, setDriver] = useState<any>(() => {
+    if (typeof window === 'undefined') return null
+    try {
+      const session = localStorage.getItem('driver_session')
+      return session ? JSON.parse(session) : null
+    } catch { return null }
+  })
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [locating, setLocating] = useState(false)
@@ -33,15 +39,6 @@ export default function DriverPage() {
   const userMarkerRef = useRef<any>(null)
   const lineRef = useRef<any>(null)
   const router = useRouter()
-
-  useEffect(() => {
-    const session = localStorage.getItem('driver_session')
-    if (session) {
-      try {
-        setDriver(JSON.parse(session))
-      } catch {}
-    }
-  }, [])
 
   const handleLogin = async () => {
     if (!phone || !pin) return setError('Дугаар болон PIN оруулна уу')
