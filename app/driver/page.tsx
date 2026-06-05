@@ -175,6 +175,9 @@ export default function DriverPage() {
   useEffect(() => {
     if (!driver) return
     fetchOrders()
+    fetchOrders()
+    const interval = setInterval(fetchOrders, 3000)
+
     const channel = supabase.channel('orders-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => { fetchOrders(); setNewOrderAlert(true); setTimeout(() => setNewOrderAlert(false), 3000) })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, async (payload: any) => {
@@ -182,7 +185,7 @@ export default function DriverPage() {
         fetchOrders()
       })
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    return () => { supabase.removeChannel(channel); clearInterval(interval) }
   }, [driver])
 
   // LOGIN
@@ -303,7 +306,10 @@ export default function DriverPage() {
                       <span style={{color:D.muted, fontSize:'12px'}}>{new Date(o.created_at).toLocaleTimeString('mn-MN', {hour:'2-digit', minute:'2-digit'})}</span>
                     </div>
                   </div>
-                  {o.car_type && <p style={{color:'rgba(255,200,0,0.7)', fontSize:'12px', margin:'0 0 10px', fontWeight:'600'}}>🚛 {o.car_type} {o.car_mark ? `· ${o.car_mark}` : ''}</p>}
+                  {o.car_type && <p style={{color:'rgba(255,200,0,0.7)', fontSize:'12px', margin:'0 0 10px', fontWeight:'600'}}>
+                      🚛 {o.car_type === 'butten' ? 'Бүтэн ачигч' : o.car_type === 'chiregch' ? 'Чирэгч' : o.car_type}
+                      {o.car_mark ? ` · ${o.car_mark}` : ''}
+                    </p>}
                   <div style={{background:'rgba(255,255,255,0.03)', borderRadius:'12px', padding:'12px', marginBottom:'12px'}}>
                     <div style={{display:'flex', alignItems:'flex-start', gap:'8px', marginBottom:'8px'}}>
                       <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#3b82f6', marginTop:'4px', flexShrink:0}}/>
