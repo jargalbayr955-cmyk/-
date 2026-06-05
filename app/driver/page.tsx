@@ -40,6 +40,41 @@ export default function DriverPage() {
   const lineRef = useRef<any>(null)
   const router = useRouter()
 
+  // Хаазны дуу тоглуулах
+  const playHorn = () => {
+    try {
+      const ctx = new ((window as any).AudioContext || (window as any).webkitAudioContext)()
+      const playNote = (freq: number, start: number, duration: number, gain: number) => {
+        const osc = ctx.createOscillator()
+        const gainNode = ctx.createGain()
+        osc.connect(gainNode)
+        gainNode.connect(ctx.destination)
+        osc.type = 'sawtooth'
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + start)
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.9, ctx.currentTime + start + duration)
+        gainNode.gain.setValueAtTime(0, ctx.currentTime + start)
+        gainNode.gain.linearRampToValueAtTime(gain, ctx.currentTime + start + 0.05)
+        gainNode.gain.linearRampToValueAtTime(gain * 0.8, ctx.currentTime + start + duration - 0.1)
+        gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + start + duration)
+        osc.start(ctx.currentTime + start)
+        osc.stop(ctx.currentTime + start + duration)
+      }
+      playNote(220, 0, 0.4, 0.6); playNote(260, 0, 0.4, 0.4); playNote(330, 0, 0.4, 0.3)
+      playNote(220, 0.5, 0.4, 0.6); playNote(260, 0.5, 0.4, 0.4); playNote(330, 0.5, 0.4, 0.3)
+      playNote(220, 1.0, 0.8, 0.7); playNote(260, 1.0, 0.8, 0.5); playNote(330, 1.0, 0.8, 0.4)
+    } catch(e) {}
+  }
+
+  // Service worker-аас horn message хүлээн авах
+  useEffect(() => {
+    if (!driver) return
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'PLAY_HORN') playHorn()
+    }
+    navigator.serviceWorker?.addEventListener('message', handleMessage)
+    return () => navigator.serviceWorker?.removeEventListener('message', handleMessage)
+  }, [driver])
+
   const handleLogin = async () => {
     if (!phone || !pin) return setError('Дугаар болон PIN оруулна уу')
     setLoading(true)
@@ -220,7 +255,7 @@ export default function DriverPage() {
     const interval = setInterval(fetchOrders, 3000)
 
     const channel = supabase.channel('orders-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => { fetchOrders(); setNewOrderAlert(true); setTimeout(() => setNewOrderAlert(false), 3000) })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => { fetchOrders(); setNewOrderAlert(true); setTimeout(() => setNewOrderAlert(false), 3000); playHorn() })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, async (payload: any) => {
         if (payload.new?.status === 'confirmed' && payload.new?.driver_phone === driver.phone) setAcceptedOrder(payload.new)
         fetchOrders()
