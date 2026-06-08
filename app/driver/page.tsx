@@ -32,6 +32,12 @@ export default function DriverPage() {
   const [sendingOffer, setSendingOffer] = useState<string | null>(null)
   const [newOrderAlert, setNewOrderAlert] = useState(false)
   const [acceptedOrder, setAcceptedOrder] = useState<any>(null)
+  const [paymentInfo, setPaymentInfo] = useState<{code:string, amount:number} | null>(null)
+  const [completing, setCompleting] = useState(false)
+
+  // Данс мэдээлэл - энд өөрийн банкны дансаа оруулна
+  const BANK_ACCOUNT = '5022 8888'  // ← Өөрийн дансаа оруулна уу
+  const BANK_NAME = 'Хаан банк'
   const prevOrderIds = useRef<string[]>([])
   const mapRef = useRef<any>(null)
   const mapInstanceRef = useRef<any>(null)
@@ -315,9 +321,56 @@ export default function DriverPage() {
               <div><p style={{color:D.muted, fontSize:'11px', margin:'0 0 2px', fontWeight:'600'}}>ХҮРГЭХ ГАЗАР</p><p style={{color:D.text, fontSize:'13px', margin:0, fontWeight:'500'}}>{acceptedOrder.to_address}</p></div>
             </div>
           </div>
-          <button onClick={() => setAcceptedOrder(null)} style={{width:'100%', borderRadius:'14px', padding:'13px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:D.muted, fontSize:'14px', cursor:'pointer'}}>
-            Захиалга дуусгах
-          </button>
+          {paymentInfo ? (
+            <div style={{background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'16px', padding:'16px'}}>
+              <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:'0 0 12px', textAlign:'center'}}>Төлбөрийн мэдээлэл</p>
+              <div style={{background:'rgba(232,67,58,0.1)', border:'1px solid rgba(232,67,58,0.3)', borderRadius:'12px', padding:'14px', marginBottom:'12px', textAlign:'center'}}>
+                <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:'0 0 4px'}}>Шилжүүлэх данс</p>
+                <p style={{color:'white', fontWeight:'800', fontSize:'18px', margin:'0 0 2px'}}>{BANK_NAME}</p>
+                <p style={{color:'#ff6b5b', fontWeight:'800', fontSize:'20px', margin:'0 0 8px', letterSpacing:'2px'}}>{BANK_ACCOUNT}</p>
+                <div style={{borderTop:'1px solid rgba(255,255,255,0.1)', paddingTop:'10px'}}>
+                  <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:'0 0 4px'}}>Гүйлгээний утга</p>
+                  <p style={{color:'#ffd700', fontWeight:'900', fontSize:'28px', margin:'0 0 4px', letterSpacing:'4px'}}>{paymentInfo.code}</p>
+                  <p style={{color:'rgba(255,255,255,0.4)', fontSize:'11px', margin:0}}>Яг энэ 6 оронтой кодыг гүйлгээний утгад бичнэ үү</p>
+                </div>
+              </div>
+              <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', textAlign:'center', margin:'0 0 12px'}}>
+                Мөнгө шилжүүлсний дараа автоматаар нээгдэнэ
+              </p>
+              <button onClick={() => { setPaymentInfo(null); setAcceptedOrder(null) }} style={{width:'100%', borderRadius:'12px', padding:'10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.3)', fontSize:'13px', cursor:'pointer'}}>
+                Буцах
+              </button>
+            </div>
+          ) : (
+            <button onClick={async () => {
+              setCompleting(true)
+              try {
+                const res = await fetch('/api/payment/complete', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    driver_id: driver.id,
+                    order_id: acceptedOrder?.id,
+                    amount: acceptedOrder?.price || driver.price || 10000
+                  })
+                })
+                const data = await res.json()
+                if (data.code) {
+                  setPaymentInfo({ code: data.code, amount: data.amount })
+                  // Захиалга completed болгох
+                  if (acceptedOrder?.id) {
+                    await supabase.from('orders').update({ status: 'completed' }).eq('id', acceptedOrder.id)
+                  }
+                  // Жолоочийг unavailable болгох
+                  await supabase.from('drivers').update({ available: false }).eq('id', driver.id)
+                  setDriver({ ...driver, available: false })
+                }
+              } catch(e) {}
+              setCompleting(false)
+            }} disabled={completing} style={{width:'100%', borderRadius:'14px', padding:'13px', background: completing ? 'rgba(232,67,58,0.4)' : D.red, border:'none', color:D.text, fontSize:'14px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 15px rgba(232,67,58,0.3)'}}>
+              {completing ? 'Боловсруулж байна...' : 'Захиалга дуусгах'}
+            </button>
+          )}
         </div>
         <style>{`@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.7)}}`}</style>
       </div>
