@@ -32,7 +32,13 @@ export default function DriverPage() {
   const [sendingOffer, setSendingOffer] = useState<string | null>(null)
   const [newOrderAlert, setNewOrderAlert] = useState(false)
   const [acceptedOrder, setAcceptedOrder] = useState<any>(null)
-  const [paymentInfo, setPaymentInfo] = useState<{code:string, amount:number} | null>(null)
+  const [paymentInfo, setPaymentInfo] = useState<{code:string, amount:number} | null>(() => {
+    if (typeof window === 'undefined') return null
+    try {
+      const saved = localStorage.getItem('payment_info')
+      return saved ? JSON.parse(saved) : null
+    } catch { return null }
+  })
   const [completing, setCompleting] = useState(false)
 
   // Данс мэдээлэл - энд өөрийн банкны дансаа оруулна
@@ -260,6 +266,19 @@ export default function DriverPage() {
     fetchOrders()
     const interval = setInterval(fetchOrders, 3000)
 
+    // Жолоочийн available өөрчлөгдөхийг сонсох
+    const driverChannel = supabase.channel('driver-status')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'drivers', filter: `id=eq.${driver.id}` }, (payload: any) => {
+        if (payload.new?.available === true) {
+          // Мөнгө орсон — payment info цэвэрлэх
+          setPaymentInfo(null)
+          setAcceptedOrder(null)
+          localStorage.removeItem('payment_info')
+          setDriver((d: any) => ({ ...d, available: true }))
+        }
+      })
+      .subscribe()
+
     const channel = supabase.channel('orders-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => { fetchOrders(); setNewOrderAlert(true); setTimeout(() => setNewOrderAlert(false), 3000); playHorn() })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, async (payload: any) => {
@@ -267,7 +286,7 @@ export default function DriverPage() {
         fetchOrders()
       })
       .subscribe()
-    return () => { supabase.removeChannel(channel); clearInterval(interval) }
+    return () => { supabase.removeChannel(channel); supabase.removeChannel(driverChannel); clearInterval(interval) }
   }, [driver])
 
   // LOGIN
@@ -337,7 +356,7 @@ export default function DriverPage() {
               <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', textAlign:'center', margin:'0 0 12px'}}>
                 Мөнгө шилжүүлсний дараа автоматаар нээгдэнэ
               </p>
-              <button onClick={() => { setPaymentInfo(null); setAcceptedOrder(null) }} style={{width:'100%', borderRadius:'12px', padding:'10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.3)', fontSize:'13px', cursor:'pointer'}}>
+              <button onClick={() => { setPaymentInfo(null); setAcceptedOrder(null); localStorage.removeItem('payment_info') }} style={{width:'100%', borderRadius:'12px', padding:'10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.3)', fontSize:'13px', cursor:'pointer'}}>
                 Буцах
               </button>
             </div>
@@ -356,7 +375,9 @@ export default function DriverPage() {
                 })
                 const data = await res.json()
                 if (data.code) {
-                  setPaymentInfo({ code: data.code, amount: data.amount })
+                  const pInfo = { code: data.code, amount: data.amount }
+                  setPaymentInfo(pInfo)
+                  localStorage.setItem('payment_info', JSON.stringify(pInfo))
                   // Захиалга completed болгох
                   if (acceptedOrder?.id) {
                     await supabase.from('orders').update({ status: 'completed' }).eq('id', acceptedOrder.id)
