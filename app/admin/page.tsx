@@ -100,9 +100,10 @@ function MapTab({ drivers }: { drivers: any[] }) {
 }
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<'drivers'|'history'|'map'>('drivers')
+  const [tab, setTab] = useState<'drivers'|'active'|'history'|'map'>('drivers')
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [orders, setOrders] = useState<Order[]>([])
+  const [activeOrders, setActiveOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({ phone: '' })
   const [adding, setAdding] = useState(false)
@@ -128,6 +129,16 @@ export default function AdminPage() {
     setLoading(false)
   }
 
+  const fetchActiveOrders = async () => {
+    const { data } = await supabase
+      .from('orders')
+      .select('*, offers(price)')
+      .in('status', ['confirmed', 'completed'])
+      .order('created_at', { ascending: false })
+      .limit(20)
+    if (data) setActiveOrders(data)
+  }
+
   const fetchOrders = async () => {
     const since = new Date(Date.now() - 24*60*60*1000).toISOString()
     const { data: ordersData } = await supabase
@@ -150,6 +161,7 @@ export default function AdminPage() {
     if (authed) {
       fetchDrivers()
       fetchOrders()
+      fetchActiveOrders()
       supabase.from('settings').select('value').eq('key', 'hero_url').single().then(({ data }) => {
         if (data?.value) setHeroUrl(data.value)
       })
@@ -266,6 +278,7 @@ export default function AdminPage() {
       <div style={{display:'flex', gap:'8px', padding:'16px 20px 0', borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
         {[
           {id:'drivers', label:'🚛 Жолооч'},
+          {id:'active', label:'⚡ Идэвхтэй'},
           {id:'history', label:'📋 Захиалгын түүх'},
           {id:'map', label:'🗺️ Газрын зураг'}
         ].map(t => (
@@ -362,6 +375,107 @@ export default function AdminPage() {
               </div>
             )}
           </>
+        )}
+
+        {/* ACTIVE ORDERS TAB */}
+        {tab === 'active' && (
+          <div>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'14px'}}>
+              <p style={{color:D.muted, fontSize:'12px', margin:0}}>⚡ Одоо явагдаж байгаа захиалгууд</p>
+              <button onClick={fetchActiveOrders} style={{borderRadius:'12px', padding:'7px 14px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:D.muted, fontSize:'13px', cursor:'pointer'}}>
+                ↺ Шинэчлэх
+              </button>
+            </div>
+            {activeOrders.filter(o => o.status === 'confirmed').length === 0 ? (
+              <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'40px', textAlign:'center'}}>
+                <p style={{color:D.muted, fontSize:'14px', margin:0}}>Одоогоор идэвхтэй захиалга байхгүй</p>
+              </div>
+            ) : (
+              <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                {activeOrders.filter(o => o.status === 'confirmed').map((o) => {
+                  const mins = Math.round((Date.now() - new Date(o.created_at).getTime()) / 60000)
+                  const price = o.final_price || (o.offers && o.offers.length > 0 ? o.offers[0].price : 0)
+                  return (
+                    <div key={o.id} style={{background:D.card, border:'1px solid rgba(232,67,58,0.2)', borderRadius:'16px', padding:'16px'}}>
+                      <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px'}}>
+                        <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                          <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#22c55e', animation:'pulse 1.5s infinite'}}/>
+                          <span style={{color:'#22c55e', fontSize:'12px', fontWeight:'700'}}>Явагдаж байна</span>
+                        </div>
+                        <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                          <span style={{color:'#3b82f6', fontSize:'13px', fontWeight:'600'}}>⏱ {mins} мин</span>
+                          {price > 0 && <span style={{color:'#e8433a', fontSize:'14px', fontWeight:'800'}}>₮{price.toLocaleString()}</span>}
+                        </div>
+                      </div>
+                      {/* Жолооч */}
+                      {o.driver_name && (
+                        <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px'}}>
+                          <div style={{width:'32px', height:'32px', borderRadius:'50%', background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.25)', display:'flex', alignItems:'center', justifyContent:'center', color:'#ff6b5b', fontSize:'13px', fontWeight:'800'}}>
+                            {o.driver_name?.charAt(0)}
+                          </div>
+                          <div>
+                            <p style={{color:'white', fontWeight:'700', fontSize:'13px', margin:0}}>{o.driver_name}</p>
+                            <p style={{color:D.muted, fontSize:'11px', margin:'1px 0 0'}}>{o.driver_phone}</p>
+                          </div>
+                        </div>
+                      )}
+                      {/* Маршрут */}
+                      <div style={{background:'rgba(255,255,255,0.03)', borderRadius:'10px', padding:'10px', marginBottom:'12px'}}>
+                        <div style={{display:'flex', gap:'8px', marginBottom:'6px'}}>
+                          <div style={{width:'7px', height:'7px', borderRadius:'50%', background:'#3b82f6', marginTop:'4px', flexShrink:0}}/>
+                          <p style={{color:'rgba(255,255,255,0.6)', fontSize:'12px', margin:0}}>{o.from_address || '-'}</p>
+                        </div>
+                        <div style={{display:'flex', gap:'8px'}}>
+                          <div style={{width:'7px', height:'7px', borderRadius:'50%', background:D.red, marginTop:'4px', flexShrink:0}}/>
+                          <p style={{color:'rgba(255,255,255,0.6)', fontSize:'12px', margin:0}}>{o.to_address || '-'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Төлбөр хүлээж байгаа захиалгууд */}
+            {activeOrders.filter(o => o.status === 'completed').length > 0 && (
+              <div style={{marginTop:'20px'}}>
+                <p style={{color:'rgba(255,200,0,0.7)', fontSize:'12px', fontWeight:'700', margin:'0 0 10px', letterSpacing:'1px'}}>💰 ТӨЛБӨР ХҮЛЭЭЖ БАЙГАА</p>
+                <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                  {activeOrders.filter(o => o.status === 'completed').map((o) => {
+                    const price = o.final_price || (o.offers && o.offers.length > 0 ? o.offers[0].price : 0)
+                    return (
+                      <div key={o.id} style={{background:D.card, border:'1px solid rgba(255,200,0,0.2)', borderRadius:'16px', padding:'16px'}}>
+                        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'10px'}}>
+                          <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                            <div style={{width:'32px', height:'32px', borderRadius:'50%', background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.25)', display:'flex', alignItems:'center', justifyContent:'center', color:'#ff6b5b', fontSize:'13px', fontWeight:'800'}}>
+                              {o.driver_name?.charAt(0)}
+                            </div>
+                            <div>
+                              <p style={{color:'white', fontWeight:'700', fontSize:'13px', margin:0}}>{o.driver_name}</p>
+                              <p style={{color:D.muted, fontSize:'11px', margin:'1px 0 0'}}>{o.driver_phone}</p>
+                            </div>
+                          </div>
+                          {price > 0 && <span style={{color:'#ffd700', fontSize:'16px', fontWeight:'900'}}>₮{price.toLocaleString()}</span>}
+                        </div>
+                        <div style={{background:'rgba(255,255,255,0.03)', borderRadius:'10px', padding:'8px 10px', marginBottom:'12px'}}>
+                          <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:'0 0 4px'}}>{o.from_address}</p>
+                          <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:0}}>→ {o.to_address}</p>
+                        </div>
+                        <button onClick={async () => {
+                          await supabase.from('drivers').update({ available: true }).eq('id', o.driver_id)
+                          await supabase.from('payment_codes').update({ used: true }).eq('driver_id', o.driver_id).eq('used', false)
+                          fetchActiveOrders()
+                          fetchDrivers()
+                        }} style={{width:'100%', borderRadius:'12px', padding:'12px', background:'rgba(34,197,94,0.15)', border:'1px solid rgba(34,197,94,0.3)', color:'#22c55e', fontSize:'14px', fontWeight:'700', cursor:'pointer'}}>
+                          ✅ Төлбөр зөвшөөрөх — Эрх нээх
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* MAP TAB */}
