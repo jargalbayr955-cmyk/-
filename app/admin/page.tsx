@@ -174,7 +174,12 @@ export default function AdminPage() {
 
   const toggleAvailable = async (id: string) => {
     const { data: d } = await supabase.from('drivers').select('available').eq('id', id).single()
-    await supabase.from('drivers').update({ available: !d?.available }).eq('id', id)
+    const newVal = !d?.available
+    await supabase.from('drivers').update({ available: newVal }).eq('id', id)
+    // Эрх нээхэд payment_codes бүгдийг used болгох
+    if (newVal === true) {
+      await supabase.from('payment_codes').update({ used: true }).eq('driver_id', id).eq('used', false)
+    }
     fetchDrivers()
   }
 
