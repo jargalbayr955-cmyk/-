@@ -58,13 +58,19 @@ export default function AdminPage() {
 
   const fetchOrders = async () => {
     const since = new Date(Date.now() - 24*60*60*1000).toISOString()
-    const { data } = await supabase
+    const { data: ordersData } = await supabase
       .from('orders')
-      .select('*')
+      .select('*, offers(price, driver_name)')
       .eq('status', 'completed')
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(50)
+
+    // Offer-с үнэ авах
+    const data = ordersData?.map((o: any) => ({
+      ...o,
+      final_price: o.final_price || (o.offers && o.offers.length > 0 ? o.offers[0].price : 0)
+    }))
     if (data) setOrders(data)
   }
 
