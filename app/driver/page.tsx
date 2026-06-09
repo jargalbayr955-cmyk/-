@@ -278,11 +278,10 @@ export default function DriverPage() {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'drivers', filter: `id=eq.${driver.id}` }, (payload: any) => {
         if (payload.new?.available === true) {
           // Мөнгө орсон — payment info цэвэрлэх
-          setPaymentInfo(null)
-          setAcceptedOrder(null)
           localStorage.removeItem('payment_info')
           localStorage.removeItem('accepted_order')
-          setDriver((d: any) => ({ ...d, available: true }))
+          // Page reload хийж бүх state цэвэрлэх
+          window.location.reload()
         }
       })
       .subscribe()
