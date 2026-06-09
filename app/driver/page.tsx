@@ -326,6 +326,7 @@ export default function DriverPage() {
 
   // ACCEPTED ORDER MAP эсвэл PAYMENT SCREEN
   if (acceptedOrder || paymentInfo) {
+    const safeOrder = acceptedOrder || {}
     return (
       <div style={{minHeight:'100vh', background:D.bg, display:'flex', flexDirection:'column'}}>
         <div style={{padding:'14px 20px', background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
@@ -343,11 +344,11 @@ export default function DriverPage() {
           <div style={{background:D.card, border:D.cardBorder, borderRadius:'14px', padding:'14px', marginBottom:'12px'}}>
             <div style={{display:'flex', alignItems:'flex-start', gap:'10px', marginBottom:'8px'}}>
               <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#3b82f6', marginTop:'4px', flexShrink:0}}/>
-              <div><p style={{color:D.muted, fontSize:'11px', margin:'0 0 2px', fontWeight:'600'}}>АВАХ ГАЗАР</p><p style={{color:D.text, fontSize:'13px', margin:0, fontWeight:'500'}}>{acceptedOrder.from_address}</p></div>
+              <div><p style={{color:D.muted, fontSize:'11px', margin:'0 0 2px', fontWeight:'600'}}>АВАХ ГАЗАР</p><p style={{color:D.text, fontSize:'13px', margin:0, fontWeight:'500'}}>{(safeOrder as any).from_address || '-'}</p></div>
             </div>
             <div style={{display:'flex', alignItems:'flex-start', gap:'10px'}}>
               <div style={{width:'8px', height:'8px', borderRadius:'50%', background:D.red, marginTop:'4px', flexShrink:0}}/>
-              <div><p style={{color:D.muted, fontSize:'11px', margin:'0 0 2px', fontWeight:'600'}}>ХҮРГЭХ ГАЗАР</p><p style={{color:D.text, fontSize:'13px', margin:0, fontWeight:'500'}}>{acceptedOrder.to_address}</p></div>
+              <div><p style={{color:D.muted, fontSize:'11px', margin:'0 0 2px', fontWeight:'600'}}>ХҮРГЭХ ГАЗАР</p><p style={{color:D.text, fontSize:'13px', margin:0, fontWeight:'500'}}>{(safeOrder as any).to_address || '-'}</p></div>
             </div>
           </div>
           {paymentInfo ? (
