@@ -344,7 +344,7 @@ export default function DriverPage() {
         .select('*')
         .eq('status', 'confirmed')
         .eq('driver_id', driver.id)
-        .single()
+        .maybeSingle()
       if (data) {
         setAcceptedOrder(data)
         localStorage.setItem('accepted_order', JSON.stringify(data))
