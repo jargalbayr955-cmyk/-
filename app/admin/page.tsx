@@ -11,6 +11,21 @@ type Driver = {
   available: boolean
 }
 
+type Order = {
+  id: string
+  created_at: string
+  completed_at: string
+  from_address: string
+  to_address: string
+  driver_name: string
+  driver_phone: string
+  car_type: string
+  car_mark: string
+  status: string
+  final_price: number
+  duration_minutes: number
+}
+
 const ADMIN_PASSWORD = 'achilt2024'
 const D = {
   bg: '#060608',
@@ -23,7 +38,9 @@ const D = {
 }
 
 export default function AdminPage() {
+  const [tab, setTab] = useState<'drivers'|'history'>('drivers')
   const [drivers, setDrivers] = useState<Driver[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({ name: '', phone: '', car_type: '', price: '', pin: '' })
   const [adding, setAdding] = useState(false)
@@ -39,9 +56,20 @@ export default function AdminPage() {
     setLoading(false)
   }
 
+  const fetchOrders = async () => {
+    const { data } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(50)
+    if (data) setOrders(data)
+  }
+
   useEffect(() => {
     if (authed) {
       fetchDrivers()
+      fetchOrders()
       supabase.from('settings').select('value').eq('key', 'hero_url').single().then(({ data }) => {
         if (data?.value) setHeroUrl(data.value)
       })
@@ -83,6 +111,28 @@ export default function AdminPage() {
     fetchDrivers()
   }
 
+  const formatDuration = (mins: number) => {
+    if (!mins) return '-'
+    if (mins < 60) return `${mins} мин`
+    return `${Math.floor(mins/60)}ц ${mins%60}мин`
+  }
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '-'
+    const d = new Date(dateStr)
+    return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`
+  }
+
+  const carLabel = (type: string) => {
+    if (type === 'butten') return 'Бүтэн ачигч'
+    if (type === 'chiregch') return 'Чирэгч'
+    return type || '-'
+  }
+
+  // Нийт статистик
+  const totalRevenue = orders.reduce((sum, o) => sum + (o.final_price || 0), 0)
+  const totalOrders = orders.length
+
   if (!authed) {
     return (
       <div style={{minHeight:'100vh', background:D.bg, display:'flex', alignItems:'center', justifyContent:'center', padding:'16px'}}>
@@ -105,82 +155,185 @@ export default function AdminPage() {
 
   return (
     <div style={{minHeight:'100vh', background:D.bg, paddingBottom:'40px'}}>
+      {/* Header */}
       <div style={{padding:'16px 20px', background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
         <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
           <span style={{fontSize:'24px'}}>🚛</span>
           <h1 style={{color:D.text, fontSize:'18px', fontWeight:'800', margin:0}}>Admin Panel</h1>
         </div>
-        <button onClick={() => setShowForm(!showForm)}
-          style={{borderRadius:'20px', padding:'8px 16px', background:D.red, border:'none', color:D.text, fontSize:'13px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 15px rgba(232,67,58,0.35)'}}>
-          + Жолооч нэмэх
-        </button>
+        {tab === 'drivers' && (
+          <button onClick={() => setShowForm(!showForm)}
+            style={{borderRadius:'20px', padding:'8px 16px', background:D.red, border:'none', color:D.text, fontSize:'13px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 15px rgba(232,67,58,0.35)'}}>
+            + Жолооч нэмэх
+          </button>
+        )}
       </div>
 
-      <div style={{padding:'16px', maxWidth:'600px', margin:'0 auto'}}>
+      {/* Tabs */}
+      <div style={{display:'flex', gap:'8px', padding:'16px 20px 0', borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
+        {[
+          {id:'drivers', label:'🚛 Жолооч'},
+          {id:'history', label:'📋 Захиалгын түүх'}
+        ].map(t => (
+          <button key={t.id} onClick={() => setTab(t.id as any)} style={{
+            borderRadius:'20px', padding:'8px 18px', fontSize:'13px', fontWeight:'700', cursor:'pointer',
+            background: tab === t.id ? D.red : 'rgba(255,255,255,0.05)',
+            border: tab === t.id ? 'none' : '1px solid rgba(255,255,255,0.08)',
+            color: tab === t.id ? 'white' : D.muted,
+            boxShadow: tab === t.id ? '0 4px 15px rgba(232,67,58,0.3)' : 'none'
+          }}>{t.label}</button>
+        ))}
+      </div>
 
-        {/* Hero URL */}
-        <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'16px', marginBottom:'16px'}}>
-          <p style={{color:D.text, fontWeight:'700', fontSize:'14px', margin:'0 0 12px'}}>🖼️ Нүүр хуудасны зураг</p>
-          <input type="text" placeholder="Зургийн URL..." value={heroUrl} onChange={e => setHeroUrl(e.target.value)} style={{...D.input}}/>
-          {heroUrl && <img src={heroUrl} alt="preview" style={{width:'100%', height:'120px', objectFit:'cover', borderRadius:'10px', marginBottom:'10px'}}/>}
-          <button onClick={saveHeroUrl} style={{width:'100%', borderRadius:'12px', padding:'12px', background:D.red, border:'none', color:D.text, fontSize:'14px', fontWeight:'700', cursor:'pointer'}}>
-            {heroSaved ? '✅ Хадгалагдлаа!' : 'Хадгалах'}
-          </button>
-        </div>
+      <div style={{padding:'16px', maxWidth:'700px', margin:'0 auto'}}>
 
-        {/* Add form */}
-        {showForm && (
-          <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'16px', marginBottom:'16px'}}>
-            <p style={{color:D.text, fontWeight:'700', fontSize:'14px', margin:'0 0 14px'}}>Шинэ жолооч</p>
-            <input type="text" placeholder="Нэр" value={form.name} onChange={e => setForm({...form, name: e.target.value})} style={D.input}/>
-            <input type="tel" placeholder="Утас" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} style={D.input}/>
-            <select value={form.car_type} onChange={e => setForm({...form, car_type: e.target.value})}
-              style={{...D.input, appearance:'none' as any}}>
-              <option value="" style={{background:'#1a1a1a'}}>Машины төрөл сонгоно уу</option>
-              <option value="butten" style={{background:'#1a1a1a'}}>Бүтэн ачигч</option>
-              <option value="chiregch" style={{background:'#1a1a1a'}}>Чирэгч</option>
-            </select>
-            <input type="number" placeholder="Үнэ" value={form.price} onChange={e => setForm({...form, price: e.target.value})} style={D.input}/>
-            <input type="password" placeholder="4 оронтой PIN" maxLength={4} value={form.pin} onChange={e => setForm({...form, pin: e.target.value})} style={D.input}/>
-            <div style={{display:'flex', gap:'10px'}}>
-              <button onClick={handleAdd} disabled={adding} style={{flex:1, borderRadius:'12px', padding:'12px', background: adding ? 'rgba(232,67,58,0.4)' : D.red, border:'none', color:D.text, fontSize:'14px', fontWeight:'700', cursor:'pointer'}}>
-                {adding ? 'Нэмж байна...' : 'Нэмэх'}
-              </button>
-              <button onClick={() => setShowForm(false)} style={{flex:1, borderRadius:'12px', padding:'12px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:D.muted, fontSize:'14px', cursor:'pointer'}}>
-                Болих
+        {/* DRIVERS TAB */}
+        {tab === 'drivers' && (
+          <>
+            {/* Hero URL */}
+            <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'16px', marginBottom:'16px'}}>
+              <p style={{color:D.text, fontWeight:'700', fontSize:'14px', margin:'0 0 12px'}}>🖼️ Нүүр хуудасны зураг</p>
+              <input type="text" placeholder="Зургийн URL..." value={heroUrl} onChange={e => setHeroUrl(e.target.value)} style={{...D.input}}/>
+              {heroUrl && <img src={heroUrl} alt="preview" style={{width:'100%', height:'120px', objectFit:'cover', borderRadius:'10px', marginBottom:'10px'}}/>}
+              <button onClick={saveHeroUrl} style={{width:'100%', borderRadius:'12px', padding:'12px', background:D.red, border:'none', color:D.text, fontSize:'14px', fontWeight:'700', cursor:'pointer'}}>
+                {heroSaved ? '✅ Хадгалагдлаа!' : 'Хадгалах'}
               </button>
             </div>
-          </div>
-        )}
 
-        <p style={{color:D.muted, fontSize:'12px', margin:'0 0 12px'}}>{drivers.length} жолооч бүртгэлтэй</p>
-
-        {loading ? (
-          <p style={{color:D.muted, textAlign:'center', padding:'40px 0'}}>Ачааллаж байна...</p>
-        ) : (
-          <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
-            {drivers.map((d) => (
-              <div key={d.id} style={{background:D.card, border:D.border, borderRadius:'16px', padding:'14px 16px'}}>
-                <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
-                  <div style={{width:'42px', height:'42px', borderRadius:'50%', background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.3)', display:'flex', alignItems:'center', justifyContent:'center', color:'#ff6b5b', fontSize:'16px', fontWeight:'800', flexShrink:0}}>
-                    {d.name.charAt(0)}
-                  </div>
-                  <div style={{flex:1}}>
-                    <p style={{color:D.text, fontWeight:'700', fontSize:'14px', margin:0}}>{d.name}</p>
-                    <p style={{color:D.muted, fontSize:'12px', margin:'3px 0 0'}}>{d.phone} · {d.car_type} · ₮{d.price.toLocaleString()}</p>
-                  </div>
-                  <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-                    <button onClick={() => toggleAvailable(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border: d.available ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.1)', background: d.available ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)', color: d.available ? '#22c55e' : D.muted}}>
-                      {d.available ? 'Идэвхтэй' : 'Идэвхгүй'}
-                    </button>
-                    <button onClick={() => deleteDriver(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', background:'rgba(232,67,58,0.1)', border:'1px solid rgba(232,67,58,0.2)', color:'#ff6b5b'}}>
-                      Устгах
-                    </button>
-                  </div>
+            {/* Add form */}
+            {showForm && (
+              <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'16px', marginBottom:'16px'}}>
+                <p style={{color:D.text, fontWeight:'700', fontSize:'14px', margin:'0 0 14px'}}>Шинэ жолооч</p>
+                <input type="text" placeholder="Нэр" value={form.name} onChange={e => setForm({...form, name: e.target.value})} style={D.input}/>
+                <input type="tel" placeholder="Утас" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} style={D.input}/>
+                <select value={form.car_type} onChange={e => setForm({...form, car_type: e.target.value})}
+                  style={{...D.input, appearance:'none' as any}}>
+                  <option value="" style={{background:'#1a1a1a'}}>Машины төрөл сонгоно уу</option>
+                  <option value="butten" style={{background:'#1a1a1a'}}>Бүтэн ачигч</option>
+                  <option value="chiregch" style={{background:'#1a1a1a'}}>Чирэгч</option>
+                </select>
+                <input type="number" placeholder="Үнэ" value={form.price} onChange={e => setForm({...form, price: e.target.value})} style={D.input}/>
+                <input type="password" placeholder="4 оронтой PIN" maxLength={4} value={form.pin} onChange={e => setForm({...form, pin: e.target.value})} style={D.input}/>
+                <div style={{display:'flex', gap:'10px'}}>
+                  <button onClick={handleAdd} disabled={adding} style={{flex:1, borderRadius:'12px', padding:'12px', background: adding ? 'rgba(232,67,58,0.4)' : D.red, border:'none', color:D.text, fontSize:'14px', fontWeight:'700', cursor:'pointer'}}>
+                    {adding ? 'Нэмж байна...' : 'Нэмэх'}
+                  </button>
+                  <button onClick={() => setShowForm(false)} style={{flex:1, borderRadius:'12px', padding:'12px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:D.muted, fontSize:'14px', cursor:'pointer'}}>
+                    Болих
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
+            )}
+
+            <p style={{color:D.muted, fontSize:'12px', margin:'0 0 12px'}}>{drivers.length} жолооч бүртгэлтэй</p>
+
+            {loading ? (
+              <p style={{color:D.muted, textAlign:'center', padding:'40px 0'}}>Ачааллаж байна...</p>
+            ) : (
+              <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                {drivers.map((d) => (
+                  <div key={d.id} style={{background:D.card, border:D.border, borderRadius:'16px', padding:'14px 16px'}}>
+                    <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                      <div style={{width:'42px', height:'42px', borderRadius:'50%', background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.3)', display:'flex', alignItems:'center', justifyContent:'center', color:'#ff6b5b', fontSize:'16px', fontWeight:'800', flexShrink:0}}>
+                        {d.name.charAt(0)}
+                      </div>
+                      <div style={{flex:1}}>
+                        <p style={{color:D.text, fontWeight:'700', fontSize:'14px', margin:0}}>{d.name}</p>
+                        <p style={{color:D.muted, fontSize:'12px', margin:'3px 0 0'}}>{d.phone} · {carLabel(d.car_type)} · ₮{d.price?.toLocaleString()}</p>
+                      </div>
+                      <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                        <button onClick={() => toggleAvailable(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border: d.available ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.1)', background: d.available ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)', color: d.available ? '#22c55e' : D.muted}}>
+                          {d.available ? 'Идэвхтэй' : 'Идэвхгүй'}
+                        </button>
+                        <button onClick={() => deleteDriver(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', background:'rgba(232,67,58,0.1)', border:'1px solid rgba(232,67,58,0.2)', color:'#ff6b5b'}}>
+                          Устгах
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* HISTORY TAB */}
+        {tab === 'history' && (
+          <>
+            {/* Статистик */}
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'16px'}}>
+              <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'16px', textAlign:'center'}}>
+                <p style={{color:D.muted, fontSize:'12px', margin:'0 0 6px'}}>Нийт захиалга</p>
+                <p style={{color:'white', fontWeight:'800', fontSize:'28px', margin:0}}>{totalOrders}</p>
+              </div>
+              <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'16px', textAlign:'center'}}>
+                <p style={{color:D.muted, fontSize:'12px', margin:'0 0 6px'}}>Нийт орлого</p>
+                <p style={{color:'#e8433a', fontWeight:'800', fontSize:'24px', margin:0}}>₮{totalRevenue.toLocaleString()}</p>
+              </div>
+            </div>
+
+            <button onClick={fetchOrders} style={{width:'100%', borderRadius:'12px', padding:'10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:D.muted, fontSize:'13px', cursor:'pointer', marginBottom:'14px'}}>
+              ↺ Шинэчлэх
+            </button>
+
+            {orders.length === 0 ? (
+              <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'40px', textAlign:'center'}}>
+                <p style={{color:D.muted, fontSize:'14px', margin:0}}>Дууссан захиалга байхгүй</p>
+              </div>
+            ) : (
+              <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                {orders.map((o) => (
+                  <div key={o.id} style={{background:D.card, border:D.border, borderRadius:'16px', padding:'14px 16px'}}>
+                    <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'10px'}}>
+                      <span style={{color:D.muted, fontSize:'12px'}}>{formatDate(o.created_at)}</span>
+                      <span style={{color:'#22c55e', fontSize:'12px', fontWeight:'700', background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,0.2)', borderRadius:'10px', padding:'3px 10px'}}>✅ Дууссан</span>
+                    </div>
+
+                    {/* Жолооч */}
+                    {o.driver_name && (
+                      <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px'}}>
+                        <div style={{width:'32px', height:'32px', borderRadius:'50%', background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.25)', display:'flex', alignItems:'center', justifyContent:'center', color:'#ff6b5b', fontSize:'13px', fontWeight:'800'}}>
+                          {o.driver_name?.charAt(0)}
+                        </div>
+                        <div>
+                          <p style={{color:'white', fontWeight:'700', fontSize:'13px', margin:0}}>{o.driver_name}</p>
+                          <p style={{color:D.muted, fontSize:'11px', margin:'1px 0 0'}}>{carLabel(o.car_type)}{o.car_mark ? ` · ${o.car_mark}` : ''}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Маршрут */}
+                    <div style={{background:'rgba(255,255,255,0.03)', borderRadius:'10px', padding:'10px', marginBottom:'10px'}}>
+                      <div style={{display:'flex', gap:'8px', marginBottom:'6px'}}>
+                        <div style={{width:'7px', height:'7px', borderRadius:'50%', background:'#3b82f6', marginTop:'4px', flexShrink:0}}/>
+                        <p style={{color:'rgba(255,255,255,0.6)', fontSize:'12px', margin:0}}>{o.from_address || '-'}</p>
+                      </div>
+                      <div style={{display:'flex', gap:'8px'}}>
+                        <div style={{width:'7px', height:'7px', borderRadius:'50%', background:D.red, marginTop:'4px', flexShrink:0}}/>
+                        <p style={{color:'rgba(255,255,255,0.6)', fontSize:'12px', margin:0}}>{o.to_address || '-'}</p>
+                      </div>
+                    </div>
+
+                    {/* Статистик */}
+                    <div style={{display:'flex', gap:'8px'}}>
+                      {o.duration_minutes ? (
+                        <div style={{flex:1, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.2)', borderRadius:'10px', padding:'8px', textAlign:'center'}}>
+                          <p style={{color:'rgba(255,255,255,0.4)', fontSize:'10px', margin:'0 0 2px'}}>Хугацаа</p>
+                          <p style={{color:'#3b82f6', fontWeight:'700', fontSize:'13px', margin:0}}>{formatDuration(o.duration_minutes)}</p>
+                        </div>
+                      ) : null}
+                      {o.final_price ? (
+                        <div style={{flex:1, background:'rgba(232,67,58,0.08)', border:'1px solid rgba(232,67,58,0.2)', borderRadius:'10px', padding:'8px', textAlign:'center'}}>
+                          <p style={{color:'rgba(255,255,255,0.4)', fontSize:'10px', margin:'0 0 2px'}}>Төлбөр</p>
+                          <p style={{color:D.red, fontWeight:'700', fontSize:'13px', margin:0}}>₮{o.final_price?.toLocaleString()}</p>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
       <style>{`input::placeholder{color:rgba(255,255,255,0.25);}select option{background:#1a1a1a;color:white;}`}</style>
