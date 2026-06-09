@@ -46,7 +46,7 @@ export default function CurrentPage() {
       }
 
       const map = Leaflet.map(mapRef.current).setView([lat, lng], 16)
-      Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map)
+      Leaflet.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}', { attribution: '© Mapbox © OpenStreetMap', tileSize: 512, zoomOffset: -1 }).addTo(map)
 
       const marker = Leaflet.marker([lat, lng], { draggable: true }).addTo(map)
       marker.on('dragend', async (e: any) => {

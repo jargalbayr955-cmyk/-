@@ -58,7 +58,7 @@ function MapTab({ drivers }: { drivers: any[] }) {
       delete (Leaflet.Icon.Default.prototype as any)._getIconUrl
       if (!mapInstanceRef.current) {
         const map = Leaflet.map(mapRef.current!).setView([47.9, 106.9], 12)
-        Leaflet.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB' }).addTo(map)
+        Leaflet.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}', { attribution: '© Mapbox © OpenStreetMap', tileSize: 512, zoomOffset: -1 }).addTo(map)
         mapInstanceRef.current = map
       }
       // Markers цэвэрлэх
