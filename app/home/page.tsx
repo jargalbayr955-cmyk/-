@@ -178,7 +178,7 @@ export default function HomePage() {
         </div>
 
         {/* Яаралтай */}
-        <div style={{
+        <div onClick={() => router.push('/current')} style={{
           background:'rgba(232,67,58,0.08)',
           border:'1px solid rgba(232,67,58,0.18)',
           borderRadius:'20px', padding:'18px 20px',

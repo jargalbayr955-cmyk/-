@@ -37,10 +37,8 @@ export default function TrackingPage() {
   }, [])
 
   useEffect(() => {
-    let calledPhone = false
-
     const handleVisibility = async () => {
-      if (document.visibilityState === 'visible' && (calledPhone || localStorage.getItem('phone_called') === '1')) {
+      if (document.visibilityState === 'visible' && localStorage.getItem('phone_called') === '1') {
         localStorage.removeItem('phone_called')
         // Залгаад буцаж ирсэн — захиалга дуусгах
         const orderId = localStorage.getItem('current_order_id')
@@ -54,11 +52,6 @@ export default function TrackingPage() {
     }
 
     document.addEventListener('visibilitychange', handleVisibility)
-
-    // Утас дарахад calledPhone = true болгох
-    const handlePhoneClick = () => { calledPhone = true }
-    document.querySelectorAll('a[href^="tel:"]').forEach(el => el.addEventListener('click', handlePhoneClick))
-
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility)
     }

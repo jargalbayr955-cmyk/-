@@ -30,7 +30,6 @@ export default function DriverPage() {
   const [completing, setCompleting] = useState(false)
   const [notifStatus, setNotifStatus] = useState<'default'|'granted'|'denied'>('default')
   const [mounted, setMounted] = useState(false)
-  const [restoring, setRestoring] = useState(true)
 
   // Данс мэдээлэл - энд өөрийн банкны дансаа оруулна
   const BANK_ACCOUNT = '5022 8888'  // ← Өөрийн дансаа оруулна уу
@@ -139,7 +138,7 @@ export default function DriverPage() {
   }
 
   const fetchOrders = async () => {
-    const query = supabase
+    let queryBuilder = supabase
       .from('orders')
       .select('id, created_at, from_address, to_address, from_lat, from_lng, status, car_type, car_mark')
       .eq('status', 'pending')
@@ -148,10 +147,10 @@ export default function DriverPage() {
 
     // car_type байвал шүүх
     if (driver?.car_type) {
-      query.eq('car_type', driver.car_type)
+      queryBuilder = queryBuilder.eq('car_type', driver.car_type)
     }
 
-    const { data } = await query
+    const { data } = await queryBuilder
     if (data) {
       const newIds = data.map((o: any) => o.id)
       const hasNew = newIds.some((id: string) => !prevOrderIds.current.includes(id))
@@ -207,7 +206,7 @@ export default function DriverPage() {
         setNotifStatus(Notification.permission as any)
       }
     }
-    restore().finally(() => setRestoring(false))
+    restore()
   }, [])
 
   // Browser буцах товч блоклох
@@ -361,8 +360,8 @@ export default function DriverPage() {
     return () => { supabase.removeChannel(channel); supabase.removeChannel(driverChannel); clearInterval(interval) }
   }, [driver])
 
-  // Mounted болохоос өмнө эсвэл session сэргээж байх үед хоосон screen
-  if (!mounted || restoring) {
+  // Mounted болохоос өмнө хоосон screen
+  if (!mounted) {
     return <div style={{minHeight:'100vh', background:'#060608'}}/>
   }
 

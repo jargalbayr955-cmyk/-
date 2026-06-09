@@ -9,7 +9,10 @@ const supabase = createClient(
 export async function POST(req: NextRequest) {
   const body = await req.json()
   const smsText = body.sms || body.message || body.text || ''
-  const codeMatch = smsText.match(/\b(\d{6})\b/)
+  // Khan Bank SMS: "Utga:123456" эсвэл зүгээр 6 оронтой тоо
+  const utga = smsText.match(/[Uu]tga[:\s]*(\d{6})/)
+  const plain = smsText.match(/\b(\d{6})\b/)
+  const codeMatch = utga || plain
   if (!codeMatch) return NextResponse.json({ error: 'Code not found' }, { status: 400 })
 
   const code = codeMatch[1]

@@ -255,23 +255,23 @@ export default function AdminPage() {
   return (
     <div style={{minHeight:'100vh', background:D.bg, paddingBottom:'40px'}}>
       {/* Header */}
-      <div style={{padding:'16px 20px', background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-        <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+      <div style={{padding:'16px 20px', background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', gap:'12px'}}>
+        <div style={{display:'flex', alignItems:'center', gap:'10px', flex:1}}>
           <span style={{fontSize:'24px'}}>🚛</span>
           <h1 style={{color:D.text, fontSize:'18px', fontWeight:'800', margin:0}}>Admin Panel</h1>
         </div>
-        <button onClick={() => {
-            setAuthed(false)
-            localStorage.removeItem('admin_session')
-          }} style={{borderRadius:'20px', padding:'7px 14px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:'13px', fontWeight:'600', cursor:'pointer'}}>
-          Гарах
-        </button>
         {tab === 'drivers' && (
           <button onClick={() => setShowForm(!showForm)}
             style={{borderRadius:'20px', padding:'8px 16px', background:D.red, border:'none', color:D.text, fontSize:'13px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 15px rgba(232,67,58,0.35)'}}>
             + Жолооч нэмэх
           </button>
         )}
+        <button onClick={() => {
+            setAuthed(false)
+            localStorage.removeItem('admin_session')
+          }} style={{borderRadius:'20px', padding:'7px 14px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:'13px', fontWeight:'600', cursor:'pointer'}}>
+          Гарах
+        </button>
       </div>
 
       {/* Tabs */}

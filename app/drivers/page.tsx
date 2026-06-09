@@ -174,7 +174,7 @@ export default function DriversPage() {
                                         </div>
                                         <div style={{flex:1}}>
                                             <p style={{color:'white', fontWeight:'700', fontSize:'15px', margin:0}}>{o.driver_name}</p>
-                                            <p style={{color:'rgba(255,255,255,0.4)', fontSize:'12px', margin:'3px 0 0'}}>🚛 {o.car_type}</p>
+                                            <p style={{color:'rgba(255,255,255,0.4)', fontSize:'12px', margin:'3px 0 0'}}>🚛 {o.car_type === 'butten' ? 'Бүтэн ачигч' : o.car_type === 'chiregch' ? 'Чирэгч' : o.car_type}</p>
                                         </div>
                                         <div style={{textAlign:'right'}}>
                                             <p style={{color:'white', fontWeight:'800', fontSize:'18px', margin:0}}>₮{o.price.toLocaleString()}</p>
