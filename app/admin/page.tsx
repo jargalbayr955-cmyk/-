@@ -104,7 +104,7 @@ export default function AdminPage() {
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState({ name: '', phone: '', car_type: '', price: '', pin: '' })
+  const [form, setForm] = useState({ phone: '' })
   const [adding, setAdding] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [password, setPassword] = useState('')
@@ -163,10 +163,10 @@ export default function AdminPage() {
   }
 
   const handleAdd = async () => {
-    if (!form.name || !form.phone || !form.car_type || !form.price || !form.pin) return
+    if (!form.phone) return
     setAdding(true)
-    await supabase.from('drivers').insert({ name: form.name, phone: form.phone, car_type: form.car_type, price: parseInt(form.price), pin: form.pin, rating: 5.0, available: true })
-    setForm({ name: '', phone: '', car_type: '', price: '', pin: '' })
+    await supabase.from('drivers').insert({ phone: form.phone, pin: '0000', name: 'Шинэ жолооч', available: false })
+    setForm({ phone: '' })
     setShowForm(false)
     fetchDrivers()
     setAdding(false)
@@ -292,17 +292,9 @@ export default function AdminPage() {
             {/* Add form */}
             {showForm && (
               <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'16px', marginBottom:'16px'}}>
-                <p style={{color:D.text, fontWeight:'700', fontSize:'14px', margin:'0 0 14px'}}>Шинэ жолооч</p>
-                <input type="text" placeholder="Нэр" value={form.name} onChange={e => setForm({...form, name: e.target.value})} style={D.input}/>
-                <input type="tel" placeholder="Утас" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} style={D.input}/>
-                <select value={form.car_type} onChange={e => setForm({...form, car_type: e.target.value})}
-                  style={{...D.input, appearance:'none' as any}}>
-                  <option value="" style={{background:'#1a1a1a'}}>Машины төрөл сонгоно уу</option>
-                  <option value="butten" style={{background:'#1a1a1a'}}>Бүтэн ачигч</option>
-                  <option value="chiregch" style={{background:'#1a1a1a'}}>Чирэгч</option>
-                </select>
-                <input type="number" placeholder="Үнэ" value={form.price} onChange={e => setForm({...form, price: e.target.value})} style={D.input}/>
-                <input type="password" placeholder="4 оронтой PIN" maxLength={4} value={form.pin} onChange={e => setForm({...form, pin: e.target.value})} style={D.input}/>
+                <p style={{color:D.text, fontWeight:'700', fontSize:'14px', margin:'0 0 6px'}}>Шинэ жолооч нэмэх</p>
+                <p style={{color:D.muted, fontSize:'12px', margin:'0 0 14px'}}>Анхны PIN: 0000 — жолооч өөрөө солино</p>
+                <input type="tel" placeholder="Утасны дугаар" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} style={D.input}/>
                 <div style={{display:'flex', gap:'10px'}}>
                   <button onClick={handleAdd} disabled={adding} style={{flex:1, borderRadius:'12px', padding:'12px', background: adding ? 'rgba(232,67,58,0.4)' : D.red, border:'none', color:D.text, fontSize:'14px', fontWeight:'700', cursor:'pointer'}}>
                     {adding ? 'Нэмж байна...' : 'Нэмэх'}
