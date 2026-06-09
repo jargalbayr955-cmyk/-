@@ -367,9 +367,7 @@ export default function DriverPage() {
               <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', textAlign:'center', margin:'0 0 12px'}}>
                 Мөнгө шилжүүлсний дараа автоматаар нээгдэнэ
               </p>
-              <button onClick={() => { setPaymentInfo(null); setAcceptedOrder(null); localStorage.removeItem('payment_info'); localStorage.removeItem('accepted_order') }} style={{width:'100%', borderRadius:'12px', padding:'10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.3)', fontSize:'13px', cursor:'pointer'}}>
-                Буцах
-              </button>
+
             </div>
           ) : (
             <button onClick={async () => {
