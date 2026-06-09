@@ -91,19 +91,10 @@ export default function AdminPage() {
     setTimeout(() => setHeroSaved(false), 2000)
   }
 
-  const callApi = async (body: object) => {
-    const res = await fetch('/api/admin/drivers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: ADMIN_PASSWORD, ...body })
-    })
-    return res.json()
-  }
-
   const handleAdd = async () => {
     if (!form.name || !form.phone || !form.car_type || !form.price || !form.pin) return
     setAdding(true)
-    await callApi({ action: 'add', driver: { name: form.name, phone: form.phone, car_type: form.car_type, price: parseInt(form.price), pin: form.pin, rating: 5.0, available: true } })
+    await supabase.from('drivers').insert({ name: form.name, phone: form.phone, car_type: form.car_type, price: parseInt(form.price), pin: form.pin, rating: 5.0, available: true })
     setForm({ name: '', phone: '', car_type: '', price: '', pin: '' })
     setShowForm(false)
     fetchDrivers()
@@ -111,12 +102,14 @@ export default function AdminPage() {
   }
 
   const toggleAvailable = async (id: string) => {
-    await callApi({ action: 'toggle', id })
+    const { data: d } = await supabase.from('drivers').select('available').eq('id', id).single()
+    await supabase.from('drivers').update({ available: !d?.available }).eq('id', id)
     fetchDrivers()
   }
 
   const deleteDriver = async (id: string) => {
-    await callApi({ action: 'delete', id })
+    if (!confirm('Устгах уу?')) return
+    await supabase.from('drivers').delete().eq('id', id)
     fetchDrivers()
   }
 
