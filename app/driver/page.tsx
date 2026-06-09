@@ -29,6 +29,7 @@ export default function DriverPage() {
   const [paymentInfo, setPaymentInfo] = useState<{code:string, amount:number} | null>(null)
   const [completing, setCompleting] = useState(false)
   const [notifStatus, setNotifStatus] = useState<'default'|'granted'|'denied'>('default')
+  const [mounted, setMounted] = useState(false)
 
   // Данс мэдээлэл - энд өөрийн банкны дансаа оруулна
   const BANK_ACCOUNT = '5022 8888'  // ← Өөрийн дансаа оруулна уу
@@ -170,15 +171,9 @@ export default function DriverPage() {
     )
   }
 
-  // Notification status шалгах
+  // Mounted + session сэргээх
   useEffect(() => {
-    if ('Notification' in window) {
-      setNotifStatus(Notification.permission as any)
-    }
-  }, [])
-
-  // localStorage-аас session сэргээх
-  useEffect(() => {
+    setMounted(true)
     try {
       const session = localStorage.getItem('driver_session')
       if (session) setDriver(JSON.parse(session))
@@ -187,6 +182,9 @@ export default function DriverPage() {
       const pInfo = localStorage.getItem('payment_info')
       if (pInfo) setPaymentInfo(JSON.parse(pInfo))
     } catch {}
+    if ('Notification' in window) {
+      setNotifStatus(Notification.permission as any)
+    }
   }, [])
 
   // Browser буцах товч блоклох
@@ -324,6 +322,11 @@ export default function DriverPage() {
       .subscribe()
     return () => { supabase.removeChannel(channel); supabase.removeChannel(driverChannel); clearInterval(interval) }
   }, [driver])
+
+  // Mounted болохоос өмнө хоосон screen
+  if (!mounted) {
+    return <div style={{minHeight:'100vh', background:'#060608'}}/>
+  }
 
   // LOGIN
   if (!driver) {
