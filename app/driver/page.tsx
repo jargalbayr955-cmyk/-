@@ -31,7 +31,13 @@ export default function DriverPage() {
   const [sentOffers, setSentOffers] = useState<{[key: string]: boolean}>({})
   const [sendingOffer, setSendingOffer] = useState<string | null>(null)
   const [newOrderAlert, setNewOrderAlert] = useState(false)
-  const [acceptedOrder, setAcceptedOrder] = useState<any>(null)
+  const [acceptedOrder, setAcceptedOrder] = useState<any>(() => {
+    if (typeof window === 'undefined') return null
+    try {
+      const saved = localStorage.getItem('accepted_order')
+      return saved ? JSON.parse(saved) : null
+    } catch { return null }
+  })
   const [paymentInfo, setPaymentInfo] = useState<{code:string, amount:number} | null>(() => {
     if (typeof window === 'undefined') return null
     try {
@@ -274,6 +280,7 @@ export default function DriverPage() {
           setPaymentInfo(null)
           setAcceptedOrder(null)
           localStorage.removeItem('payment_info')
+          localStorage.removeItem('accepted_order')
           setDriver((d: any) => ({ ...d, available: true }))
         }
       })
@@ -282,7 +289,10 @@ export default function DriverPage() {
     const channel = supabase.channel('orders-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => { fetchOrders(); setNewOrderAlert(true); setTimeout(() => setNewOrderAlert(false), 3000); playHorn() })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, async (payload: any) => {
-        if (payload.new?.status === 'confirmed' && payload.new?.driver_phone === driver.phone) setAcceptedOrder(payload.new)
+        if (payload.new?.status === 'confirmed' && payload.new?.driver_phone === driver.phone) {
+          setAcceptedOrder(payload.new)
+          localStorage.setItem('accepted_order', JSON.stringify(payload.new))
+        }
         fetchOrders()
       })
       .subscribe()
@@ -356,7 +366,7 @@ export default function DriverPage() {
               <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', textAlign:'center', margin:'0 0 12px'}}>
                 Мөнгө шилжүүлсний дараа автоматаар нээгдэнэ
               </p>
-              <button onClick={() => { setPaymentInfo(null); setAcceptedOrder(null); localStorage.removeItem('payment_info') }} style={{width:'100%', borderRadius:'12px', padding:'10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.3)', fontSize:'13px', cursor:'pointer'}}>
+              <button onClick={() => { setPaymentInfo(null); setAcceptedOrder(null); localStorage.removeItem('payment_info'); localStorage.removeItem('accepted_order') }} style={{width:'100%', borderRadius:'12px', padding:'10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.3)', fontSize:'13px', cursor:'pointer'}}>
                 Буцах
               </button>
             </div>
