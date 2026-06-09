@@ -35,6 +35,7 @@ export default function DriverPage() {
   const BANK_ACCOUNT = '5022 8888'  // ← Өөрийн дансаа оруулна уу
   const BANK_NAME = 'Хаан банк'
   const prevOrderIds = useRef<string[]>([])
+  const driverRef = useRef<any>(null)
   const mapRef = useRef<any>(null)
   const mapInstanceRef = useRef<any>(null)
   const driverMarkerRef = useRef<any>(null)
@@ -146,8 +147,8 @@ export default function DriverPage() {
       .limit(20)
 
     // car_type байвал шүүх
-    if (driver?.car_type) {
-      queryBuilder = queryBuilder.eq('car_type', driver.car_type)
+    if (driverRef.current?.car_type) {
+      queryBuilder = queryBuilder.eq('car_type', driverRef.current.car_type)
     }
 
     const { data } = await queryBuilder
@@ -185,6 +186,11 @@ export default function DriverPage() {
       () => { setLocMsg('Байршил тогтоох боломжгүй'); setLocating(false) }
     )
   }
+
+  // driverRef-г driver state-тай sync хийх
+  useEffect(() => {
+    driverRef.current = driver
+  }, [driver])
 
   // Mounted + session сэргээх
   useEffect(() => {
