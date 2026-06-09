@@ -387,9 +387,19 @@ export default function DriverPage() {
                   const pInfo = { code: data.code, amount: data.amount }
                   setPaymentInfo(pInfo)
                   localStorage.setItem('payment_info', JSON.stringify(pInfo))
-                  // Захиалга completed болгох
+                  // Захиалга completed болгох + статистик хадгалах
                   if (acceptedOrder?.id) {
-                    await supabase.from('orders').update({ status: 'completed' }).eq('id', acceptedOrder.id)
+                    const createdAt = new Date(acceptedOrder.created_at)
+                    const now = new Date()
+                    const durationMins = Math.round((now.getTime() - createdAt.getTime()) / 60000)
+                    await supabase.from('orders').update({
+                      status: 'completed',
+                      completed_at: now.toISOString(),
+                      duration_minutes: durationMins,
+                      final_price: driver.price || 10000,
+                      driver_name: driver.name,
+                      driver_phone: driver.phone
+                    }).eq('id', acceptedOrder.id)
                   }
                   // Жолоочийг unavailable болгох
                   await supabase.from('drivers').update({ available: false }).eq('id', driver.id)
