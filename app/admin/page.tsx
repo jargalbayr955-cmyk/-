@@ -109,9 +109,18 @@ export default function AdminPage() {
   const [showForm, setShowForm] = useState(false)
   const [password, setPassword] = useState('')
   const [authed, setAuthed] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [heroUrl, setHeroUrl] = useState('')
   const [search, setSearch] = useState('')
   const [heroSaved, setHeroSaved] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+    try {
+      const adminSession = localStorage.getItem('admin_session')
+      if (adminSession === 'true') setAuthed(true)
+    } catch {}
+  }, [])
 
   const fetchDrivers = async () => {
     const { data } = await supabase.from('drivers').select().order('created_at', { ascending: false })
@@ -197,6 +206,8 @@ export default function AdminPage() {
   const totalRevenue = orders.reduce((sum, o) => sum + (o.final_price || 0), 0)
   const totalOrders = orders.length
 
+  if (!mounted) return <div style={{minHeight:'100vh', background:'#060608'}}/>
+
   if (!authed) {
     return (
       <div style={{minHeight:'100vh', background:D.bg, display:'flex', alignItems:'center', justifyContent:'center', padding:'16px'}}>
@@ -207,7 +218,14 @@ export default function AdminPage() {
           </div>
           <input type="password" placeholder="Нууц үг" value={password} onChange={e => setPassword(e.target.value)}
             style={{...D.input, marginBottom:'14px'}}/>
-          <button onClick={() => password === ADMIN_PASSWORD ? setAuthed(true) : alert('Буруу нууц үг')}
+          <button onClick={() => {
+            if (password === ADMIN_PASSWORD) {
+              setAuthed(true)
+              localStorage.setItem('admin_session', 'true')
+            } else {
+              alert('Буруу нууц үг')
+            }
+          }}
             style={{width:'100%', borderRadius:'14px', padding:'14px', background:D.red, border:'none', color:D.text, fontSize:'15px', fontWeight:'800', cursor:'pointer', boxShadow:'0 4px 20px rgba(232,67,58,0.4)'}}>
             Нэвтрэх →
           </button>
@@ -225,6 +243,12 @@ export default function AdminPage() {
           <span style={{fontSize:'24px'}}>🚛</span>
           <h1 style={{color:D.text, fontSize:'18px', fontWeight:'800', margin:0}}>Admin Panel</h1>
         </div>
+        <button onClick={() => {
+            setAuthed(false)
+            localStorage.removeItem('admin_session')
+          }} style={{borderRadius:'20px', padding:'7px 14px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:'13px', fontWeight:'600', cursor:'pointer'}}>
+          Гарах
+        </button>
         {tab === 'drivers' && (
           <button onClick={() => setShowForm(!showForm)}
             style={{borderRadius:'20px', padding:'8px 16px', background:D.red, border:'none', color:D.text, fontSize:'13px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 15px rgba(232,67,58,0.35)'}}>
