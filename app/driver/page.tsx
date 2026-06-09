@@ -30,6 +30,7 @@ export default function DriverPage() {
   const [completing, setCompleting] = useState(false)
   const [notifStatus, setNotifStatus] = useState<'default'|'granted'|'denied'>('default')
   const [mounted, setMounted] = useState(false)
+  const [restoring, setRestoring] = useState(true)
 
   // Данс мэдээлэл - энд өөрийн банкны дансаа оруулна
   const BANK_ACCOUNT = '5022 8888'  // ← Өөрийн дансаа оруулна уу
@@ -206,7 +207,7 @@ export default function DriverPage() {
         setNotifStatus(Notification.permission as any)
       }
     }
-    restore()
+    restore().finally(() => setRestoring(false))
   }, [])
 
   // Browser буцах товч блоклох
@@ -360,8 +361,8 @@ export default function DriverPage() {
     return () => { supabase.removeChannel(channel); supabase.removeChannel(driverChannel); clearInterval(interval) }
   }, [driver])
 
-  // Mounted болохоос өмнө хоосон screen
-  if (!mounted) {
+  // Mounted болохоос өмнө эсвэл session сэргээж байх үед хоосон screen
+  if (!mounted || restoring) {
     return <div style={{minHeight:'100vh', background:'#060608'}}/>
   }
 
