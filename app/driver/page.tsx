@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
@@ -22,6 +22,7 @@ export default function DriverPage() {
   const [error, setError] = useState('')
   const [locMsg, setLocMsg] = useState('')
   const [offerPrices, setOfferPrices] = useState<{[key: string]: string}>({})
+  const offerPricesRef = useRef<{[key: string]: string}>({})
   const [sentOffers, setSentOffers] = useState<{[key: string]: boolean}>({})
   const [sendingOffer, setSendingOffer] = useState<string | null>(null)
   const [newOrderAlert, setNewOrderAlert] = useState(false)
@@ -138,7 +139,7 @@ export default function DriverPage() {
     setLoading(false)
   }
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     let queryBuilder = supabase
       .from('orders')
       .select('id, created_at, from_address, to_address, from_lat, from_lng, status, car_type, car_mark')
@@ -170,7 +171,7 @@ export default function DriverPage() {
         setOrders(data)
       }
     }
-  }
+  }, []) // eslint-disable-line
 
   const updateLocation = () => {
     if (!driver) return
@@ -298,7 +299,7 @@ export default function DriverPage() {
   }
 
   const sendOffer = async (order: any) => {
-    const price = offerPrices[order.id]
+    const price = offerPricesRef.current[order.id]
     if (!price) return alert('Үнэ оруулна уу')
     setSendingOffer(order.id)
     const getPos = (): Promise<{lat: number, lng: number} | null> => new Promise((resolve) => {
@@ -583,7 +584,11 @@ export default function DriverPage() {
                     </div>
                   ) : (
                     <div style={{display:'flex', gap:'8px'}}>
-                      <input type="number" placeholder="Үнэ оруулна уу (₮)" value={offerPrices[o.id] || ''} onChange={e => setOfferPrices({...offerPrices, [o.id]: e.target.value})}
+                      <input type="number" placeholder="Үнэ оруулна уу (₮)" value={offerPrices[o.id] || ''} onChange={e => {
+                          const updated = {...offerPricesRef.current, [o.id]: e.target.value}
+                          offerPricesRef.current = updated
+                          setOfferPrices(updated)
+                        }}
                         style={{flex:1, borderRadius:'12px', padding:'12px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:D.text, fontSize:'14px', outline:'none'}}/>
                       <button onClick={() => sendOffer(o)} disabled={sendingOffer === o.id}
                         style={{borderRadius:'12px', padding:'12px 16px', background: sendingOffer === o.id ? 'rgba(232,67,58,0.4)' : D.red, border:'none', color:D.text, fontSize:'14px', fontWeight:'700', cursor:'pointer'}}>
