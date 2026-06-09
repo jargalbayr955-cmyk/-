@@ -380,7 +380,7 @@ export default function DriverPage() {
                   body: JSON.stringify({
                     driver_id: driver.id,
                     order_id: acceptedOrder?.id,
-                    amount: acceptedOrder?.price || driver.price || 10000
+                    amount: driver.price || 10000
                   })
                 })
                 const data = await res.json()
