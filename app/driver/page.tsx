@@ -330,12 +330,27 @@ export default function DriverPage() {
       })
       .subscribe()
 
+    const checkConfirmedOrder = async () => {
+      const { data } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('status', 'confirmed')
+        .eq('driver_id', driver.id)
+        .single()
+      if (data) {
+        setAcceptedOrder(data)
+        localStorage.setItem('accepted_order', JSON.stringify(data))
+      }
+    }
+
+    checkConfirmedOrder()
+
     const channel = supabase.channel('orders-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => { fetchOrders(); setNewOrderAlert(true); setTimeout(() => setNewOrderAlert(false), 3000); playHorn() })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, async (payload: any) => {
         const newDriverPhone = (payload.new?.driver_phone || '').replace('+976', '').replace('+', '')
-          const myPhone = (driver.phone || '').replace('+976', '').replace('+', '')
-          if (payload.new?.status === 'confirmed' && (payload.new?.driver_id === driver.id || newDriverPhone === myPhone)) {
+        const myPhone = (driver.phone || '').replace('+976', '').replace('+', '')
+        if (payload.new?.status === 'confirmed' && (payload.new?.driver_id === driver.id || newDriverPhone === myPhone)) {
           setAcceptedOrder(payload.new)
           localStorage.setItem('accepted_order', JSON.stringify(payload.new))
         }
