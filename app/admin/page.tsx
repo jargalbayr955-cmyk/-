@@ -57,10 +57,12 @@ export default function AdminPage() {
   }
 
   const fetchOrders = async () => {
+    const since = new Date(Date.now() - 24*60*60*1000).toISOString()
     const { data } = await supabase
       .from('orders')
       .select('*')
       .eq('status', 'completed')
+      .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(50)
     if (data) setOrders(data)
@@ -272,9 +274,12 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <button onClick={fetchOrders} style={{width:'100%', borderRadius:'12px', padding:'10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:D.muted, fontSize:'13px', cursor:'pointer', marginBottom:'14px'}}>
-              ↺ Шинэчлэх
-            </button>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'14px'}}>
+              <p style={{color:D.muted, fontSize:'12px', margin:0}}>⏰ Сүүлийн 24 цагийн захиалга</p>
+              <button onClick={fetchOrders} style={{borderRadius:'12px', padding:'7px 14px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:D.muted, fontSize:'13px', cursor:'pointer'}}>
+                ↺ Шинэчлэх
+              </button>
+            </div>
 
             {orders.length === 0 ? (
               <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'40px', textAlign:'center'}}>
@@ -295,10 +300,13 @@ export default function AdminPage() {
                         <div style={{width:'32px', height:'32px', borderRadius:'50%', background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.25)', display:'flex', alignItems:'center', justifyContent:'center', color:'#ff6b5b', fontSize:'13px', fontWeight:'800'}}>
                           {o.driver_name?.charAt(0)}
                         </div>
-                        <div>
+                        <div style={{flex:1}}>
                           <p style={{color:'white', fontWeight:'700', fontSize:'13px', margin:0}}>{o.driver_name}</p>
                           <p style={{color:D.muted, fontSize:'11px', margin:'1px 0 0'}}>{carLabel(o.car_type)}{o.car_mark ? ` · ${o.car_mark}` : ''}</p>
                         </div>
+                        {o.final_price ? (
+                          <p style={{color:'#e8433a', fontWeight:'800', fontSize:'15px', margin:0}}>₮{o.final_price?.toLocaleString()}</p>
+                        ) : null}
                       </div>
                     )}
 
