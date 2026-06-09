@@ -174,17 +174,32 @@ export default function DriverPage() {
   // Mounted + session сэргээх
   useEffect(() => {
     setMounted(true)
-    try {
-      const session = localStorage.getItem('driver_session')
-      if (session) setDriver(JSON.parse(session))
-      const saved = localStorage.getItem('accepted_order')
-      if (saved) setAcceptedOrder(JSON.parse(saved))
-      const pInfo = localStorage.getItem('payment_info')
-      if (pInfo) setPaymentInfo(JSON.parse(pInfo))
-    } catch {}
-    if ('Notification' in window) {
-      setNotifStatus(Notification.permission as any)
+    const restore = async () => {
+      try {
+        const session = localStorage.getItem('driver_session')
+        if (session) {
+          const parsed = JSON.parse(session)
+          // Supabase-д жолооч байгаа эсэхийг шалгах
+          const { data } = await supabase.from('drivers').select('id').eq('id', parsed.id).single()
+          if (data) {
+            setDriver(parsed)
+            const saved = localStorage.getItem('accepted_order')
+            if (saved) setAcceptedOrder(JSON.parse(saved))
+            const pInfo = localStorage.getItem('payment_info')
+            if (pInfo) setPaymentInfo(JSON.parse(pInfo))
+          } else {
+            // Жолооч устгагдсан — session цэвэрлэх
+            localStorage.removeItem('driver_session')
+            localStorage.removeItem('accepted_order')
+            localStorage.removeItem('payment_info')
+          }
+        }
+      } catch {}
+      if ('Notification' in window) {
+        setNotifStatus(Notification.permission as any)
+      }
     }
+    restore()
   }, [])
 
   // Browser буцах товч блоклох
