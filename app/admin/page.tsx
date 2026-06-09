@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 
 type Driver = {
@@ -37,8 +37,70 @@ const D = {
   input: {background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'white', borderRadius:'12px', padding:'12px 14px', fontSize:'14px', outline:'none', width:'100%', boxSizing:'border-box' as const, marginBottom:'10px'},
 }
 
+function MapTab({ drivers }: { drivers: any[] }) {
+  const mapRef = React.useRef<any>(null)
+  const mapInstanceRef = React.useRef<any>(null)
+  const markersRef = React.useRef<any[]>([])
+  const [mapReady, setMapReady] = React.useState(false)
+
+  React.useEffect(() => {
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+    document.head.appendChild(link)
+    setMapReady(true)
+  }, [])
+
+  React.useEffect(() => {
+    if (!mapReady || !mapRef.current) return
+    import('leaflet').then((L) => {
+      const Leaflet = L.default
+      delete (Leaflet.Icon.Default.prototype as any)._getIconUrl
+      if (!mapInstanceRef.current) {
+        const map = Leaflet.map(mapRef.current!).setView([47.9, 106.9], 12)
+        Leaflet.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB' }).addTo(map)
+        mapInstanceRef.current = map
+      }
+      // Markers цэвэрлэх
+      markersRef.current.forEach(m => m.remove())
+      markersRef.current = []
+      // Идэвхтэй жолоочдыг map дээр харуулах
+      drivers.filter(d => d.available && d.lat && d.lng).forEach(d => {
+        const icon = Leaflet.divIcon({
+          html: `<div style="background:#e8433a;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.5)">${d.name.charAt(0)}</div>`,
+          iconSize: [36, 36], iconAnchor: [18, 18], className: ''
+        })
+        const marker = Leaflet.marker([d.lat, d.lng], { icon })
+          .addTo(mapInstanceRef.current!)
+          .bindPopup(`<b>${d.name}</b><br>${d.phone}<br>${d.car_type === 'butten' ? 'Бүтэн ачигч' : 'Чирэгч'}`)
+        markersRef.current.push(marker)
+      })
+    })
+  }, [mapReady, drivers])
+
+  const activeDrivers = drivers.filter(d => d.available && d.lat && d.lng)
+
+  return (
+    <div>
+      <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px'}}>
+        <p style={{color:'rgba(255,255,255,0.5)', fontSize:'13px', margin:0}}>
+          {activeDrivers.length} идэвхтэй жолооч байршил илгээсэн
+        </p>
+        <div style={{display:'flex', gap:'8px'}}>
+          {activeDrivers.map(d => (
+            <div key={d.id} style={{background:'rgba(232,67,58,0.12)', border:'1px solid rgba(232,67,58,0.3)', borderRadius:'20px', padding:'4px 12px', fontSize:'12px', color:'#ff6b5b', fontWeight:'700'}}>
+              {d.name}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div ref={mapRef} style={{width:'100%', height:'500px', borderRadius:'16px', overflow:'hidden', border:'1px solid rgba(255,255,255,0.08)'}}/>
+    </div>
+  )
+}
+
 export default function AdminPage() {
-  const [tab, setTab] = useState<'drivers'|'history'>('drivers')
+  const [tab, setTab] = useState<'drivers'|'history'|'map'>('drivers')
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -175,7 +237,8 @@ export default function AdminPage() {
       <div style={{display:'flex', gap:'8px', padding:'16px 20px 0', borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
         {[
           {id:'drivers', label:'🚛 Жолооч'},
-          {id:'history', label:'📋 Захиалгын түүх'}
+          {id:'history', label:'📋 Захиалгын түүх'},
+          {id:'map', label:'🗺️ Газрын зураг'}
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id as any)} style={{
             borderRadius:'20px', padding:'8px 18px', fontSize:'13px', fontWeight:'700', cursor:'pointer',
@@ -278,6 +341,11 @@ export default function AdminPage() {
               </div>
             )}
           </>
+        )}
+
+        {/* MAP TAB */}
+        {tab === 'map' && (
+          <MapTab drivers={drivers} />
         )}
 
         {/* HISTORY TAB */}
