@@ -28,6 +28,7 @@ export default function DriverPage() {
   const [acceptedOrder, setAcceptedOrder] = useState<any>(null)
   const [paymentInfo, setPaymentInfo] = useState<{code:string, amount:number} | null>(null)
   const [completing, setCompleting] = useState(false)
+  const [notifStatus, setNotifStatus] = useState<'default'|'granted'|'denied'>('default')
 
   // Данс мэдээлэл - энд өөрийн банкны дансаа оруулна
   const BANK_ACCOUNT = '5022 8888'  // ← Өөрийн дансаа оруулна уу
@@ -74,6 +75,28 @@ export default function DriverPage() {
     navigator.serviceWorker?.addEventListener('message', handleMessage)
     return () => navigator.serviceWorker?.removeEventListener('message', handleMessage)
   }, [driver])
+
+  const subscribeNotification = async () => {
+    if (!driver) return
+    try {
+      const permission = await Notification.requestPermission()
+      setNotifStatus(permission as any)
+      if (permission === 'granted') {
+        const reg = await navigator.serviceWorker.register('/sw.js')
+        await navigator.serviceWorker.ready
+        const existing = await reg.pushManager.getSubscription()
+        const sub = existing || await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: 'BKFi4446X2u9MHYCdvzChXDMroFJIUqCXtC-hHge7jzUzqnWW7qEx8pkl_r7TDTEVnHzdUPgID3eKgSbWLNBwlY'
+        })
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ driver_id: driver.id, subscription: sub.toJSON() })
+        })
+      }
+    } catch(e) { console.log('Push error:', e) }
+  }
 
   const handleLogin = async () => {
     if (!phone || !pin) return setError('Дугаар болон PIN оруулна уу')
@@ -146,6 +169,13 @@ export default function DriverPage() {
       () => { setLocMsg('Байршил тогтоох боломжгүй'); setLocating(false) }
     )
   }
+
+  // Notification status шалгах
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotifStatus(Notification.permission as any)
+    }
+  }, [])
 
   // localStorage-аас session сэргээх
   useEffect(() => {
@@ -431,6 +461,14 @@ export default function DriverPage() {
         <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
           <button onClick={toggleAvailable} style={{borderRadius:'20px', padding:'7px 14px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border: driver.available ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.1)', background: driver.available ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)', color: driver.available ? '#22c55e' : D.muted}}>
             {driver.available ? '🟢 Ажиллаж байна' : '⚫ Амарч байна'}
+          </button>
+          <button onClick={subscribeNotification} style={{
+            borderRadius:'20px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer',
+            background: notifStatus === 'granted' ? 'rgba(34,197,94,0.12)' : 'rgba(232,67,58,0.12)',
+            border: notifStatus === 'granted' ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(232,67,58,0.3)',
+            color: notifStatus === 'granted' ? '#22c55e' : '#ff6b5b'
+          }}>
+            {notifStatus === 'granted' ? '🔔 Асаалттай' : '🔕 Мэдэгдэл авах'}
           </button>
           <button onClick={() => router.push('/driver/profile')} style={{width:'36px', height:'36px', borderRadius:'50%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:D.muted, fontSize:'16px', cursor:'pointer'}}>👤</button>
         </div>
