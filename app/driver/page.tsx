@@ -240,7 +240,8 @@ export default function DriverPage() {
     const interval = setInterval(() => {
       navigator.geolocation.getCurrentPosition(async (pos) => {
         await supabase.from('drivers').update({ lat: pos.coords.latitude, lng: pos.coords.longitude }).eq('id', driver.id)
-        setDriver((d: any) => ({ ...d, lat: pos.coords.latitude, lng: pos.coords.longitude }))
+        // setDriver дуудахгүй — re-render болохгүй, зөвхөн ref шинэчлэх
+        driverRef.current = { ...driverRef.current, lat: pos.coords.latitude, lng: pos.coords.longitude }
         if (driverMarkerRef.current) driverMarkerRef.current.setLatLng([pos.coords.latitude, pos.coords.longitude])
         if (lineRef.current && acceptedOrder?.from_lat) lineRef.current.setLatLngs([[pos.coords.latitude, pos.coords.longitude], [acceptedOrder.from_lat, acceptedOrder.from_lng]])
       })
