@@ -138,12 +138,19 @@ export default function DriverPage() {
   }
 
   const fetchOrders = async () => {
-    const { data } = await supabase
+    const query = supabase
       .from('orders')
       .select('id, created_at, from_address, to_address, from_lat, from_lng, status, car_type, car_mark')
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
       .limit(20)
+
+    // car_type байвал шүүх
+    if (driver?.car_type) {
+      query.eq('car_type', driver.car_type)
+    }
+
+    const { data } = await query
     if (data) {
       const newIds = data.map((o: any) => o.id)
       const hasNew = newIds.some((id: string) => !prevOrderIds.current.includes(id))

@@ -18,8 +18,22 @@ export async function POST(req: NextRequest) {
 
   const carLabel = car_type === 'butten' ? 'Бүтэн ачигч' : car_type === 'chiregch' ? 'Чирэгч' : car_type
 
-  // Бүх жолоочийн subscription авах
-  const { data: subs } = await supabase.from('push_subscriptions').select('*')
+  // Тухайн car_type-тай жолоочдын subscription авах
+  const { data: drivers } = await supabase
+    .from('drivers')
+    .select('id')
+    .eq('car_type', car_type)
+    .eq('available', true)
+
+  if (!drivers || drivers.length === 0) return NextResponse.json({ sent: 0 })
+
+  const driverIds = drivers.map((d: any) => d.id)
+
+  const { data: subs } = await supabase
+    .from('push_subscriptions')
+    .select('*')
+    .in('driver_id', driverIds)
+
   if (!subs || subs.length === 0) return NextResponse.json({ sent: 0 })
 
   const payload = JSON.stringify({
