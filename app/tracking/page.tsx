@@ -103,7 +103,7 @@ export default function TrackingPage() {
         shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
       })
       const map = Leaflet.map(mapRef.current!).setView([userLat, userLng], 14)
-      Leaflet.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}@2x?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}', { attribution: '© Mapbox © OpenStreetMap', tileSize: 512, zoomOffset: -1, crossOrigin: true }).addTo(map)
+      Leaflet.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}@2x?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}`, { attribution: '© Mapbox © OpenStreetMap', tileSize: 512, zoomOffset: -1, crossOrigin: true }).addTo(map)
       const userIcon = Leaflet.divIcon({
         html: '<div style="background:#3b82f6;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5)"></div>',
         iconSize: [16, 16], iconAnchor: [8, 8], className: ''

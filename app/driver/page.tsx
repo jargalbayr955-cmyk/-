@@ -262,7 +262,7 @@ export default function DriverPage() {
         const drvLat = driver?.lat || userLat
         const drvLng = driver?.lng || userLng
         const map = Leaflet.map(mapRef.current!).setView([userLat || 47.9, userLng || 106.9], 13)
-        Leaflet.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}@2x?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}', { attribution: '© Mapbox © OpenStreetMap', tileSize: 512, zoomOffset: -1, crossOrigin: true }).addTo(map)
+        Leaflet.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}@2x?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}`, { attribution: '© Mapbox © OpenStreetMap', tileSize: 512, zoomOffset: -1, crossOrigin: true }).addTo(map)
         const userIcon = Leaflet.divIcon({ html: '<div style="background:#3b82f6;width:16px;height:16px;border-radius:50%;border:3px solid white"></div>', iconSize: [16,16], iconAnchor: [8,8], className: '' })
         userMarkerRef.current = Leaflet.marker([userLat, userLng], { icon: userIcon }).addTo(map).bindPopup('Хэрэглэгч')
         const truckIcon = Leaflet.divIcon({ html: '<div style="font-size:26px">🚛</div>', iconSize: [32,32], iconAnchor: [16,16], className: '' })
