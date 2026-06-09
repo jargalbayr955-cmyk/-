@@ -154,12 +154,20 @@ export default function DriverPage() {
     if (data) {
       const newIds = data.map((o: any) => o.id)
       const hasNew = newIds.some((id: string) => !prevOrderIds.current.includes(id))
+      const hasRemoved = prevOrderIds.current.some((id: string) => !newIds.includes(id))
       if (hasNew && prevOrderIds.current.length > 0) {
         setNewOrderAlert(true)
         setTimeout(() => setNewOrderAlert(false), 3000)
+        playHorn()
       }
-      prevOrderIds.current = newIds
-      setOrders(data)
+      // Зөвхөн өөрчлөлт байвал л orders шинэчлэх — input-г тасалдуулахгүй
+      if (hasNew || hasRemoved) {
+        prevOrderIds.current = newIds
+        setOrders(data)
+      } else if (prevOrderIds.current.length === 0 && newIds.length > 0) {
+        prevOrderIds.current = newIds
+        setOrders(data)
+      }
     }
   }
 
@@ -346,7 +354,7 @@ export default function DriverPage() {
     checkConfirmedOrder()
 
     const channel = supabase.channel('orders-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => { fetchOrders(); setNewOrderAlert(true); setTimeout(() => setNewOrderAlert(false), 3000); playHorn() })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => { fetchOrders() })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, async (payload: any) => {
         const newDriverPhone = (payload.new?.driver_phone || '').replace('+976', '').replace('+', '')
         const myPhone = (driver.phone || '').replace('+976', '').replace('+', '')
