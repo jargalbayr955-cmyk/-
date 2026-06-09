@@ -48,6 +48,7 @@ export default function AdminPage() {
   const [password, setPassword] = useState('')
   const [authed, setAuthed] = useState(false)
   const [heroUrl, setHeroUrl] = useState('')
+  const [search, setSearch] = useState('')
   const [heroSaved, setHeroSaved] = useState(false)
 
   const fetchDrivers = async () => {
@@ -233,13 +234,28 @@ export default function AdminPage() {
               </div>
             )}
 
+            {/* Хайлт */}
+            <div style={{position:'relative', marginBottom:'12px'}}>
+              <input
+                type="text"
+                placeholder="Нэр эсвэл дугаараар хайх..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{...D.input, marginBottom:0, paddingLeft:'36px'}}
+              />
+              <span style={{position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)', color:D.muted, fontSize:'14px'}}>🔍</span>
+            </div>
             <p style={{color:D.muted, fontSize:'12px', margin:'0 0 12px'}}>{drivers.length} жолооч бүртгэлтэй</p>
 
             {loading ? (
               <p style={{color:D.muted, textAlign:'center', padding:'40px 0'}}>Ачааллаж байна...</p>
             ) : (
               <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
-                {drivers.map((d) => (
+                {drivers.filter(d =>
+                !search ||
+                d.name?.toLowerCase().includes(search.toLowerCase()) ||
+                d.phone?.includes(search)
+              ).map((d) => (
                   <div key={d.id} style={{background:D.card, border:D.border, borderRadius:'16px', padding:'14px 16px'}}>
                     <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
                       <div style={{width:'42px', height:'42px', borderRadius:'50%', background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.3)', display:'flex', alignItems:'center', justifyContent:'center', color:'#ff6b5b', fontSize:'16px', fontWeight:'800', flexShrink:0}}>
@@ -250,9 +266,15 @@ export default function AdminPage() {
                         <p style={{color:D.muted, fontSize:'12px', margin:'3px 0 0'}}>{d.phone} · {carLabel(d.car_type)} · ₮{d.price?.toLocaleString()}</p>
                       </div>
                       <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-                        <button onClick={() => toggleAvailable(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border: d.available ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.1)', background: d.available ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)', color: d.available ? '#22c55e' : D.muted}}>
-                          {d.available ? 'Идэвхтэй' : 'Идэвхгүй'}
-                        </button>
+                        {!d.available ? (
+                          <button onClick={() => toggleAvailable(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border:'1px solid rgba(232,67,58,0.4)', background:'rgba(232,67,58,0.12)', color:'#ff6b5b'}}>
+                            🔓 Эрх нээх
+                          </button>
+                        ) : (
+                          <button onClick={() => toggleAvailable(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border:'1px solid rgba(34,197,94,0.3)', background:'rgba(34,197,94,0.12)', color:'#22c55e'}}>
+                            ✅ Идэвхтэй
+                          </button>
+                        )}
                         <button onClick={() => deleteDriver(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', background:'rgba(232,67,58,0.1)', border:'1px solid rgba(232,67,58,0.2)', color:'#ff6b5b'}}>
                           Устгах
                         </button>
