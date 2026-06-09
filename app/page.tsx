@@ -7,6 +7,13 @@ export default function IndexPage() {
 
   useEffect(() => {
     try {
+      // Жолооч нэвтэрсэн бол /driver руу
+      const driver = localStorage.getItem('driver_session')
+      if (driver && driver !== 'null' && driver !== 'undefined') {
+        router.replace('/driver')
+        return
+      }
+      // Хэрэглэгч нэвтэрсэн бол /home руу
       const user = localStorage.getItem('user')
       if (user && user !== 'null' && user !== 'undefined') {
         router.replace('/home')
