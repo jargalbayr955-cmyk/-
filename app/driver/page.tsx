@@ -165,15 +165,16 @@ export default function DriverPage() {
     )
   }
 
+  // Browser буцах товч блоклох
   useEffect(() => {
-    if (!driver) {
-      // Нэвтрээгүй бол history-г цэвэрлэх
-      window.history.replaceState(null, '', '/driver')
-    } else {
-      // Нэвтэрсэн бол history-г driver хуудсаар солих
-      window.history.replaceState(null, '', '/driver')
+    const handlePopState = (e: PopStateEvent) => {
+      // Буцах товч дарахад driver хуудас дээр л үлдэх
+      window.history.pushState(null, '', '/driver')
     }
-  }, [driver])
+    window.history.pushState(null, '', '/driver')
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
 
   useEffect(() => {
     if (!driver) return
@@ -324,8 +325,8 @@ export default function DriverPage() {
     )
   }
 
-  // ACCEPTED ORDER MAP
-  if (acceptedOrder) {
+  // ACCEPTED ORDER MAP эсвэл PAYMENT SCREEN
+  if (acceptedOrder || paymentInfo) {
     return (
       <div style={{minHeight:'100vh', background:D.bg, display:'flex', flexDirection:'column'}}>
         <div style={{padding:'14px 20px', background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
