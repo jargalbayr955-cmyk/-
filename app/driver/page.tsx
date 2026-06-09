@@ -15,13 +15,7 @@ const D = {
 export default function DriverPage() {
   const [phone, setPhone] = useState('')
   const [pin, setPin] = useState('')
-  const [driver, setDriver] = useState<any>(() => {
-    if (typeof window === 'undefined') return null
-    try {
-      const session = localStorage.getItem('driver_session')
-      return session ? JSON.parse(session) : null
-    } catch { return null }
-  })
+  const [driver, setDriver] = useState<any>(null)
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [locating, setLocating] = useState(false)
@@ -31,20 +25,8 @@ export default function DriverPage() {
   const [sentOffers, setSentOffers] = useState<{[key: string]: boolean}>({})
   const [sendingOffer, setSendingOffer] = useState<string | null>(null)
   const [newOrderAlert, setNewOrderAlert] = useState(false)
-  const [acceptedOrder, setAcceptedOrder] = useState<any>(() => {
-    if (typeof window === 'undefined') return null
-    try {
-      const saved = localStorage.getItem('accepted_order')
-      return saved ? JSON.parse(saved) : null
-    } catch { return null }
-  })
-  const [paymentInfo, setPaymentInfo] = useState<{code:string, amount:number} | null>(() => {
-    if (typeof window === 'undefined') return null
-    try {
-      const saved = localStorage.getItem('payment_info')
-      return saved ? JSON.parse(saved) : null
-    } catch { return null }
-  })
+  const [acceptedOrder, setAcceptedOrder] = useState<any>(null)
+  const [paymentInfo, setPaymentInfo] = useState<{code:string, amount:number} | null>(null)
   const [completing, setCompleting] = useState(false)
 
   // Данс мэдээлэл - энд өөрийн банкны дансаа оруулна
@@ -164,6 +146,18 @@ export default function DriverPage() {
       () => { setLocMsg('Байршил тогтоох боломжгүй'); setLocating(false) }
     )
   }
+
+  // localStorage-аас session сэргээх
+  useEffect(() => {
+    try {
+      const session = localStorage.getItem('driver_session')
+      if (session) setDriver(JSON.parse(session))
+      const saved = localStorage.getItem('accepted_order')
+      if (saved) setAcceptedOrder(JSON.parse(saved))
+      const pInfo = localStorage.getItem('payment_info')
+      if (pInfo) setPaymentInfo(JSON.parse(pInfo))
+    } catch {}
+  }, [])
 
   // Browser буцах товч блоклох
   useEffect(() => {
