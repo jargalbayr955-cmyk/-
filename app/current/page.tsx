@@ -1,7 +1,6 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 
 export default function CurrentPage() {
   const [dest, setDest] = useState('')
@@ -18,17 +17,30 @@ export default function CurrentPage() {
   const markerRef = useRef<any>(null)
   const router = useRouter()
 
-  const reverseGeocode = async (lat: number, lng: number) => {
+  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+    const fallback = `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+    if (token) {
+      try {
+        const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?limit=1&language=mn&access_token=${token}`)
+        if (res.ok) {
+          const data = await res.json()
+          const label = data?.features?.[0]?.place_name
+          if (label) return String(label)
+        }
+      } catch {}
+    }
     try {
       const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+      if (!res.ok) return fallback
       const data = await res.json()
-      return data.display_name?.split(',').slice(0, 3).join(',') || `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+      return data.display_name?.split(',').slice(0, 3).join(',') || fallback
     } catch {
-      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+      return fallback
     }
-  }
+  }, [])
 
-  const initMap = (lat: number, lng: number) => {
+  const initMap = useCallback((lat: number, lng: number) => {
     if (!mapRef.current) return
     import('leaflet').then((L) => {
       const Leaflet = L.default
@@ -65,7 +77,7 @@ export default function CurrentPage() {
       markerRef.current = marker
       mapInstanceRef.current = map
     })
-  }
+  }, [reverseGeocode])
 
   useEffect(() => {
     const link = document.createElement('link')
@@ -107,7 +119,7 @@ export default function CurrentPage() {
     tryGPS()
     const interval = setInterval(tryGPS, 5000)
     return () => clearInterval(interval)
-  }, [])
+  }, [initMap, reverseGeocode])
 
   const goToMyLocation = () => {
     navigator.geolocation.getCurrentPosition(async (pos) => {
@@ -143,33 +155,17 @@ export default function CurrentPage() {
     localStorage.setItem('fromAddress', fromAddr)
     localStorage.setItem('dest', dest)
 
-    const user = JSON.parse(localStorage.getItem('user') || 'null')
-    const { data: orderData } = await supabase.from('orders').insert({
-      from_address: fromAddr,
-      to_address: dest,
-      from_lat: location?.lat || 0,
-      from_lng: location?.lng || 0,
-      car_type: carType,
-      car_mark: carMark,
-      status: 'pending',
-      user_phone: user?.phone || ''
-    }).select().single()
-
-    if (orderData) {
-      localStorage.setItem('current_order_id', orderData.id)
-      // Push notification явуулах
-      fetch('/api/push/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          order_id: orderData.id,
-          from_address: fromAddr,
-          to_address: dest,
-          car_type: carType,
-          car_mark: carMark
-        })
-      }).catch(() => {})
+    const res = await fetch('/api/order/create', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ from_address:fromAddr, to_address:dest, from_lat:location?.lat || 0, from_lng:location?.lng || 0, car_type:carType, car_mark:carMark })
+    })
+    const body = await res.json().catch(()=>({}))
+    if (!res.ok || !body.order?.id) {
+      alert(body.error || 'Захиалга үүсгэхэд алдаа гарлаа')
+      if (res.status === 401) router.push('/login')
+      return
     }
+    localStorage.setItem('current_order_id', body.order.id)
     router.push('/drivers')
   }
 

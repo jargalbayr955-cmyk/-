@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req)
-  if (!allowRequest(`admin-login:${ip}`, 6, 10 * 60_000)) {
+  if (!(await allowRequest(`admin-login:${ip}`, 6, 10 * 60_000))) {
     return NextResponse.json({ error: 'Too many attempts' }, { status: 429 })
   }
   const { password } = await req.json().catch(() => ({}))
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     path: '/',
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: 60 * 60 * 4,
   })
   return res
 }

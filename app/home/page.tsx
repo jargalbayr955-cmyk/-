@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation'
 export default function HomePage() {
   const router = useRouter()
   const [visible, setVisible] = useState(false)
+  const [heroUrl, setHeroUrl] = useState('https://i.ibb.co/5WrSCdV3/Jun-4-2026-12-21-53-AM.png')
 
   const pressTimer = useRef<any>(null)
-  const [tapCount, setTapCount] = useState(0)
+  const [, setTapCount] = useState(0)
   const tapTimer = useRef<any>(null)
 
   useEffect(() => {
@@ -20,6 +21,10 @@ export default function HomePage() {
         { timeout: 10000, enableHighAccuracy: true }
       )
     }
+    fetch('/api/customer/ui-settings', { cache: 'no-store' })
+      .then(async r => r.ok ? r.json() : null)
+      .then(body => { if (body?.hero_url) setHeroUrl(body.hero_url) })
+      .catch(() => {})
   }, [])
 
   const handleLogoPress = () => {
@@ -52,7 +57,7 @@ export default function HomePage() {
       <div style={{position:'relative', height:'42vh', overflow:'hidden'}}>
         <div style={{
           position:'absolute', inset:'-20px',
-          backgroundImage:'url(https://i.ibb.co/5WrSCdV3/Jun-4-2026-12-21-53-AM.png)',
+          backgroundImage:`url(${heroUrl})`,
           backgroundSize:'cover', backgroundPosition:'center 30%',
           animation:'truckDrive 1.2s cubic-bezier(0.25,0.46,0.45,0.94) forwards',
           filter:'brightness(0.45) saturate(1.1)'

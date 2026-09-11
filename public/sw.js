@@ -20,6 +20,7 @@ self.addEventListener('push', function(event) {
       return clients.matchAll({ type: 'window' }).then(clientList => {
         clientList.forEach(client => {
           client.postMessage({ type: 'PLAY_HORN' })
+          client.postMessage({ type: 'NEW_ORDER' })
         })
       })
     })

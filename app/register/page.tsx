@@ -1,15 +1,19 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 
 export default function RegisterPage() {
   const [phone, setPhone] = useState('')
+  const [pin, setPin] = useState('')
+  const [confirmPin, setConfirmPin] = useState('')
+  const [otp, setOtp] = useState('')
+  const [otpSent, setOtpSent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [phase, setPhase] = useState<'driving'|'stopping'|'dust'|'done'>('driving')
   const [visible, setVisible] = useState(false)
   const router = useRouter()
+  const otpMode = process.env.NEXT_PUBLIC_CUSTOMER_AUTH_MODE !== 'pin'
 
   useEffect(() => {
     setTimeout(() => setPhase('stopping'), 1000)
@@ -18,25 +22,26 @@ export default function RegisterPage() {
   }, [])
 
   const handleRegister = async () => {
-    if (!phone || phone.length < 8) return setError('Зөв утасны дугаар оруулна уу')
-    setLoading(true)
-    setError('')
-    const fullPhone = '+976' + phone
-    // Аль хэдийн бүртгэлтэй бол шууд нэвтрүүлэх
-    const { data: existing } = await supabase.from('users').select().eq('phone', fullPhone).single()
-    if (existing) {
-      localStorage.setItem('user', JSON.stringify(existing))
-      router.push('/home')
-      return
-    }
-    const { data, error: err } = await supabase.from('users').insert({ phone: fullPhone }).select().single()
-    if (err) {
-      setError('Алдаа гарлаа. Дахин оролдоно уу.')
-      setLoading(false)
-    } else {
-      localStorage.setItem('user', JSON.stringify(data))
-      router.push('/home')
-    }
+    if (!phone || phone.length !== 8) return setError('Зөв 8 оронтой утасны дугаар оруулна уу')
+    if (!otpMode && (!/^\d{4,8}$/.test(pin) || pin !== confirmPin)) return setError('PIN 4-8 оронтой, хоёр удаа ижил байна')
+    if (otpMode && otpSent && !/^\d{6}$/.test(otp)) return setError('SMS-ээр ирсэн 6 оронтой кодыг оруулна уу')
+    setLoading(true); setError('')
+    try {
+      if (otpMode && !otpSent) {
+        const res = await fetch('/api/customer/otp/request', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ phone }) })
+        const body = await res.json().catch(()=>({}))
+        if (!res.ok) setError(body.error || 'SMS код илгээхэд алдаа гарлаа')
+        else setOtpSent(true)
+      } else {
+        const endpoint = otpMode ? '/api/customer/otp/verify' : '/api/customer/register'
+        const payload = otpMode ? { phone, token: otp } : { phone, pin }
+        const res = await fetch(endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
+        const body = await res.json().catch(()=>({}))
+        if (!res.ok) setError(body.error || 'Бүртгэхэд алдаа гарлаа')
+        else { localStorage.setItem('user', JSON.stringify(body.user)); router.push('/home') }
+      }
+    } catch { setError('Сүлжээний алдаа') }
+    setLoading(false)
   }
 
   const truckX = phase === 'driving' ? '-120%' : phase === 'stopping' ? '5%' : '0%'
@@ -105,13 +110,22 @@ export default function RegisterPage() {
           <input type="tel" placeholder="8 оронтой дугаар" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g,'').slice(0,8))}
             style={{flex:1, borderRadius:'14px', padding:'14px 16px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'white', fontSize:'16px', outline:'none', fontWeight:'700', letterSpacing:'2px'}}/>
         </div>
+        {otpMode ? (
+          otpSent ? <input type="text" inputMode="numeric" autoComplete="one-time-code" placeholder="SMS код (6 орон)" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g,'').slice(0,6))}
+            style={{width:'100%', boxSizing:'border-box', borderRadius:'14px', padding:'14px 16px', marginBottom:'14px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'white', fontSize:'16px', outline:'none', fontWeight:'700', letterSpacing:'4px'}}/> : null
+        ) : <>
+          <input type="password" inputMode="numeric" placeholder="PIN код (4-8 орон)" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g,'').slice(0,8))}
+            style={{width:'100%', boxSizing:'border-box', borderRadius:'14px', padding:'14px 16px', marginBottom:'10px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'white', fontSize:'16px', outline:'none', fontWeight:'700', letterSpacing:'3px'}}/>
+          <input type="password" inputMode="numeric" placeholder="PIN дахин оруулах" value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\D/g,'').slice(0,8))}
+            style={{width:'100%', boxSizing:'border-box', borderRadius:'14px', padding:'14px 16px', marginBottom:'14px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'white', fontSize:'16px', outline:'none', fontWeight:'700', letterSpacing:'3px'}}/>
+        </>}
         {error && (
           <div style={{background:'rgba(232,67,58,0.1)', border:'1px solid rgba(232,67,58,0.25)', borderRadius:'12px', padding:'10px 14px', marginBottom:'14px'}}>
             <p style={{color:'#ff6b6b', fontSize:'13px', margin:0}}>⚠️ {error}</p>
           </div>
         )}
         <button onClick={handleRegister} disabled={loading} style={{width:'100%', borderRadius:'16px', padding:'17px', background: loading ? 'rgba(232,67,58,0.4)' : '#e8433a', border:'none', color:'white', fontSize:'17px', fontWeight:'800', cursor: loading ? 'not-allowed' : 'pointer', letterSpacing:'0.5px', transition:'all 0.2s', boxShadow: loading ? 'none' : '0 6px 30px rgba(232,67,58,0.4)'}}>
-          {loading ? 'Бүртгэж байна...' : 'Бүртгүүлэх →'}
+          {loading ? 'Түр хүлээнэ үү...' : otpMode ? (otpSent ? 'Код баталгаажуулах →' : 'SMS код авах →') : 'Бүртгүүлэх →'}
         </button>
         <p style={{textAlign:'center', fontSize:'13px', marginTop:'1.5rem', color:'rgba(255,255,255,0.3)'}}>
           Бүртгэлтэй юу? <span onClick={() => router.push('/login')} style={{color:'#e8433a', cursor:'pointer', fontWeight:'700'}}>Нэвтрэх</span>

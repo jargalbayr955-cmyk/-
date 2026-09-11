@@ -1,14 +1,19 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
 
 type Driver = {
   id: string
   name: string
   phone: string
   car_type: string
-  price: number
+  car_number?: string | null
+  photo_url?: string | null
+  price: number | null
   available: boolean
+  active: boolean
+  lat?: number | null
+  lng?: number | null
+  location_updated_at?: string | null
 }
 
 type Order = {
@@ -116,65 +121,60 @@ export default function AdminPage() {
   const [authed, setAuthed] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [heroUrl, setHeroUrl] = useState('')
+  const [bankName, setBankName] = useState('')
+  const [bankAccount, setBankAccount] = useState('')
   const [search, setSearch] = useState('')
   const [heroSaved, setHeroSaved] = useState(false)
+  const [bankSaved, setBankSaved] = useState(false)
+  const [nowMs, setNowMs] = useState(0)
 
   useEffect(() => {
     setMounted(true)
+    setNowMs(Date.now())
+    const clock = setInterval(() => setNowMs(Date.now()), 60_000)
     fetch('/api/admin/session', { cache: 'no-store' })
       .then(r => { if (r.ok) setAuthed(true) })
       .catch(() => {})
+    return () => clearInterval(clock)
   }, [])
 
-  const fetchDrivers = async () => {
-    const { data } = await supabase.from('drivers').select().order('created_at', { ascending: false })
-    if (data) setDrivers(data)
+  const fetchDashboard = async () => {
+    const res = await fetch('/api/admin/dashboard', { cache:'no-store' })
+    if (!res.ok) { setLoading(false); return }
+    const body = await res.json()
+    setDrivers(body.drivers || [])
+    setActiveOrders(body.activeOrders || [])
+    setOrders(body.orders || [])
+    setHeroUrl(body.heroUrl || '')
+    setBankName(body.bankName || '')
+    setBankAccount(body.bankAccount || '')
     setLoading(false)
   }
-
-  const fetchActiveOrders = async () => {
-    const { data } = await supabase
-      .from('orders')
-      .select('*, offers(price)')
-      .in('status', ['confirmed', 'completed'])
-      .order('created_at', { ascending: false })
-      .limit(20)
-    if (data) setActiveOrders(data)
-  }
-
-  const fetchOrders = async () => {
-    const since = new Date(Date.now() - 24*60*60*1000).toISOString()
-    const { data: ordersData } = await supabase
-      .from('orders')
-      .select('*, offers(price, driver_name)')
-      .eq('status', 'completed')
-      .gte('created_at', since)
-      .order('created_at', { ascending: false })
-      .limit(50)
-
-    // Offer-с үнэ авах
-    const data = ordersData?.map((o: any) => ({
-      ...o,
-      final_price: o.final_price || (o.offers && o.offers.length > 0 ? o.offers[0].price : 0)
-    }))
-    if (data) setOrders(data)
-  }
+  const fetchDrivers = fetchDashboard
+  const fetchActiveOrders = fetchDashboard
+  const fetchOrders = fetchDashboard
 
   useEffect(() => {
     if (authed) {
-      fetchDrivers()
-      fetchOrders()
-      fetchActiveOrders()
-      supabase.from('settings').select('value').eq('key', 'hero_url').single().then(({ data }) => {
-        if (data?.value) setHeroUrl(data.value)
-      })
+      fetchDashboard()
     }
   }, [authed])
 
   const saveHeroUrl = async () => {
-    await supabase.from('settings').upsert({ key: 'hero_url', value: heroUrl })
+    const res = await fetch('/api/admin/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:'hero_url',value:heroUrl}) })
+    if (!res.ok) return alert('Хадгалахад алдаа гарлаа')
     setHeroSaved(true)
     setTimeout(() => setHeroSaved(false), 2000)
+  }
+
+  const saveBankSettings = async () => {
+    const results = await Promise.all([
+      fetch('/api/admin/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:'bank_name',value:bankName}) }),
+      fetch('/api/admin/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:'bank_account',value:bankAccount}) }),
+    ])
+    if (results.some(r => !r.ok)) return alert('Дансны мэдээлэл хадгалахад алдаа гарлаа')
+    setBankSaved(true)
+    setTimeout(() => setBankSaved(false), 2000)
   }
 
   const handleAdd = async () => {
@@ -182,16 +182,18 @@ export default function AdminPage() {
     setAdding(true)
     const res = await fetch('/api/admin/drivers', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'add', driver: { phone: form.phone, pin: '0000', name: 'Шинэ жолооч' } })
+      body: JSON.stringify({ action: 'add', driver: { phone: form.phone, name: 'Шинэ жолооч' } })
     })
-    if (!res.ok) { setAdding(false); alert('Жолооч нэмэхэд алдаа гарлаа'); return }
+    const body = await res.json().catch(()=>({}))
+    if (!res.ok) { setAdding(false); alert(body.error || 'Жолооч нэмэхэд алдаа гарлаа'); return }
+    if (body.pin) alert(`Жолоочийн түр PIN: ${body.pin}\nЖолоочид аюулгүй сувгаар дамжуулна уу.`)
     setForm({ phone: '' })
     setShowForm(false)
     fetchDrivers()
     setAdding(false)
   }
 
-  const toggleAvailable = async (id: string) => {
+  const toggleDriverActive = async (id: string) => {
     const res = await fetch('/api/admin/drivers', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'toggle', id })
     })
@@ -199,8 +201,15 @@ export default function AdminPage() {
     fetchDrivers()
   }
 
+  const resetDriverPin = async (id: string) => {
+    const res = await fetch('/api/admin/drivers', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'reset_pin',id}) })
+    const body = await res.json().catch(()=>({}))
+    if (!res.ok) return alert(body.error || 'PIN шинэчлэхэд алдаа гарлаа')
+    alert(`Шинэ түр PIN: ${body.pin}\nЖолоочид аюулгүй сувгаар дамжуулна уу.`)
+  }
+
   const deleteDriver = async (id: string) => {
-    if (!confirm('Устгах уу?')) return
+    if (!confirm('Жолоочийг идэвхгүй болгож жагсаалтаас хасах уу? Өмнөх захиалгын түүх хадгалагдана.')) return
     const res = await fetch('/api/admin/drivers', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', id })
     })
@@ -313,11 +322,20 @@ export default function AdminPage() {
               </button>
             </div>
 
+            <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'16px', marginBottom:'16px'}}>
+              <p style={{color:D.text, fontWeight:'700', fontSize:'14px', margin:'0 0 12px'}}>🏦 Төлбөр хүлээн авах данс</p>
+              <input type="text" placeholder="Банкны нэр" value={bankName} onChange={e => setBankName(e.target.value)} style={{...D.input}}/>
+              <input type="text" placeholder="Дансны дугаар" value={bankAccount} onChange={e => setBankAccount(e.target.value)} style={{...D.input}}/>
+              <button onClick={saveBankSettings} style={{width:'100%', borderRadius:'12px', padding:'12px', background:D.red, border:'none', color:D.text, fontSize:'14px', fontWeight:'700', cursor:'pointer'}}>
+                {bankSaved ? '✅ Хадгалагдлаа!' : 'Данс хадгалах'}
+              </button>
+            </div>
+
             {/* Add form */}
             {showForm && (
               <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'16px', marginBottom:'16px'}}>
                 <p style={{color:D.text, fontWeight:'700', fontSize:'14px', margin:'0 0 6px'}}>Шинэ жолооч нэмэх</p>
-                <p style={{color:D.muted, fontSize:'12px', margin:'0 0 14px'}}>Анхны PIN: 0000 — жолооч өөрөө солино</p>
+                <p style={{color:D.muted, fontSize:'12px', margin:'0 0 14px'}}>Нэмсний дараа 6 оронтой түр PIN нэг удаа харагдана. Жолооч нэвтэрсний дараа PIN-ээ сольж болно.</p>
                 <input type="tel" placeholder="Утасны дугаар" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} style={D.input}/>
                 <div style={{display:'flex', gap:'10px'}}>
                   <button onClick={handleAdd} disabled={adding} style={{flex:1, borderRadius:'12px', padding:'12px', background: adding ? 'rgba(232,67,58,0.4)' : D.red, border:'none', color:D.text, fontSize:'14px', fontWeight:'700', cursor:'pointer'}}>
@@ -362,17 +380,20 @@ export default function AdminPage() {
                         <p style={{color:D.muted, fontSize:'12px', margin:'3px 0 0'}}>{d.phone} · {carLabel(d.car_type)} · ₮{d.price?.toLocaleString()}</p>
                       </div>
                       <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-                        {!d.available ? (
-                          <button onClick={() => toggleAvailable(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border:'1px solid rgba(232,67,58,0.4)', background:'rgba(232,67,58,0.12)', color:'#ff6b5b'}}>
+                        {!d.active ? (
+                          <button onClick={() => toggleDriverActive(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border:'1px solid rgba(232,67,58,0.4)', background:'rgba(232,67,58,0.12)', color:'#ff6b5b'}}>
                             🔓 Эрх нээх
                           </button>
                         ) : (
-                          <button onClick={() => toggleAvailable(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border:'1px solid rgba(34,197,94,0.3)', background:'rgba(34,197,94,0.12)', color:'#22c55e'}}>
-                            ✅ Идэвхтэй
+                          <button onClick={() => toggleDriverActive(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border:'1px solid rgba(34,197,94,0.3)', background:'rgba(34,197,94,0.12)', color:'#22c55e'}}>
+                            ✅ Эрхтэй
                           </button>
                         )}
+                        <button onClick={() => resetDriverPin(d.id)} style={{borderRadius:'10px', padding:'6px 10px', fontSize:'12px', fontWeight:'700', cursor:'pointer', background:'rgba(59,130,246,0.1)', border:'1px solid rgba(59,130,246,0.25)', color:'#60a5fa'}}>
+                          PIN
+                        </button>
                         <button onClick={() => deleteDriver(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', background:'rgba(232,67,58,0.1)', border:'1px solid rgba(232,67,58,0.2)', color:'#ff6b5b'}}>
-                          Устгах
+                          Хасах
                         </button>
                       </div>
                     </div>
@@ -399,7 +420,7 @@ export default function AdminPage() {
             ) : (
               <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
                 {activeOrders.filter(o => o.status === 'confirmed').map((o) => {
-                  const mins = Math.round((Date.now() - new Date(o.created_at).getTime()) / 60000)
+                  const mins = Math.round(((nowMs || new Date(o.created_at).getTime()) - new Date(o.created_at).getTime()) / 60000)
                   const price = o.final_price || (o.offers && o.offers.length > 0 ? o.offers[0].price : 0)
                   return (
                     <div key={o.id} style={{background:D.card, border:'1px solid rgba(232,67,58,0.2)', borderRadius:'16px', padding:'16px'}}>
@@ -468,10 +489,9 @@ export default function AdminPage() {
                           <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:0}}>→ {o.to_address}</p>
                         </div>
                         <button onClick={async () => {
-                          await supabase.from('drivers').update({ available: true }).eq('id', o.driver_id)
-                          await supabase.from('payment_codes').update({ used: true }).eq('driver_id', o.driver_id).eq('used', false)
-                          fetchActiveOrders()
-                          fetchDrivers()
+                          const res = await fetch('/api/admin/drivers', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'release_payment',order_id:o.id})})
+                          if (!res.ok) alert('Эрх нээхэд алдаа гарлаа')
+                          await fetchDashboard()
                         }} style={{width:'100%', borderRadius:'12px', padding:'12px', background:'rgba(34,197,94,0.15)', border:'1px solid rgba(34,197,94,0.3)', color:'#22c55e', fontSize:'14px', fontWeight:'700', cursor:'pointer'}}>
                           ✅ Төлбөр зөвшөөрөх — Эрх нээх
                         </button>

@@ -1,7 +1,6 @@
 'use client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 
 type DriverSlot = {
   invite_id: string
@@ -80,38 +79,17 @@ export default function DriversPage() {
       }
       setSlots(Array.isArray(body.slots) ? body.slots : [])
       setLoading(false)
-      if (Number(body.new_invites) > 0) {
-        fetch('/api/push/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ order_id: orderId }),
-        }).catch(() => {})
-      }
     } catch {}
   }, [orderId, router])
 
   useEffect(() => {
     if (!orderId) return
     fetchSlots()
-    // 10s fallback also performs the 60-second slot rotation; realtime handles instant offers.
-    const interval = setInterval(fetchSlots, 10_000)
-    const offerChannel = supabase.channel(`customer-offers-${orderId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'offers', filter: `order_id=eq.${orderId}` }, fetchSlots)
-      .subscribe()
-    const orderChannel = supabase.channel(`customer-order-${orderId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` }, (payload: any) => {
-        if (payload.new?.status !== 'pending' && payload.new?.driver_id) {
-          localStorage.setItem('tracking_driver_id', payload.new.driver_id)
-          router.replace('/tracking')
-        }
-      })
-      .subscribe()
-    return () => {
-      clearInterval(interval)
-      supabase.removeChannel(offerChannel)
-      supabase.removeChannel(orderChannel)
-    }
-  }, [orderId, fetchSlots, router])
+    // Sensitive tables are not exposed to anonymous Realtime in V5.
+    // Poll only while this screen is active; server-side indexes keep this cheap.
+    const interval = setInterval(() => { if (document.visibilityState === 'visible') fetchSlots() }, 5_000)
+    return () => clearInterval(interval)
+  }, [orderId, fetchSlots])
 
   useEffect(() => {
     if (!mapRef.current || userLat == null || userLng == null || mapInstanceRef.current) return
@@ -134,10 +112,11 @@ export default function DriversPage() {
       userMarkerRef.current = Leaflet.marker([userLat, userLng], { icon: userIcon }).addTo(map).bindTooltip('Таны байршил')
       mapInstanceRef.current = map
     })
+    const markerStore = driverMarkersRef.current
     return () => {
       if (mapInstanceRef.current) mapInstanceRef.current.remove()
       mapInstanceRef.current = null
-      driverMarkersRef.current.clear()
+      markerStore.clear()
     }
   }, [userLat, userLng])
 

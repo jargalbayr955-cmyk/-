@@ -1,7 +1,6 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 
 export default function ManualPage() {
   const [from, setFrom] = useState('')
@@ -9,6 +8,7 @@ export default function ManualPage() {
   const [carType, setCarType] = useState('')
   const [carMark, setCarMark] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const [errors, setErrors] = useState<{from?:boolean, to?:boolean, carType?:boolean, carMark?:boolean}>({})
   const router = useRouter()
 
@@ -31,33 +31,42 @@ export default function ManualPage() {
     localStorage.setItem('fromLat', '0')
     localStorage.setItem('fromLng', '0')
 
-    const user = JSON.parse(localStorage.getItem('user') || '{}')
-    const { data: orderData } = await supabase.from('orders').insert({
-      from_address: from,
-      to_address: to,
-      car_type: carType,
-      car_mark: carMark,
-      from_lat: 0,
-      from_lng: 0,
-      status: 'pending',
-      user_phone: user.phone || ''
-    }).select().single()
-
-    if (orderData) {
-      localStorage.setItem('current_order_id', orderData.id)
-      fetch('/api/push/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          order_id: orderData.id,
-          from_address: from,
-          to_address: to,
-          car_type: carType,
-          car_mark: carMark
-        })
-      }).catch(() => {})
+    let pickup: {lat:number,lng:number} | null = null
+    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+    if (token) {
+      try {
+        const q = encodeURIComponent(from)
+        const r = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${q}.json?country=mn&limit=1&access_token=${token}`)
+        const j = await r.json()
+        const c = j?.features?.[0]?.center
+        if (Array.isArray(c) && c.length >= 2) pickup = {lng:Number(c[0]),lat:Number(c[1])}
+      } catch {}
     }
-
+    if (!pickup) {
+      const pos = await new Promise<GeolocationPosition | null>((resolve) => {
+        if (!navigator.geolocation) return resolve(null)
+        navigator.geolocation.getCurrentPosition(resolve, () => resolve(null), { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 })
+      })
+      if (pos) pickup = {lat:pos.coords.latitude,lng:pos.coords.longitude}
+    }
+    if (!pickup) {
+      setLoading(false)
+      setError('Авах газрын байршлыг тогтоож чадсангүй. Mapbox тохиргоо эсвэл GPS зөвшөөрлөө шалгана уу.')
+      return
+    }
+    const res = await fetch('/api/order/create', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ from_address:from, to_address:to, car_type:carType, car_mark:carMark, from_lat:pickup.lat, from_lng:pickup.lng })
+    })
+    const body = await res.json().catch(()=>({}))
+    if (!res.ok || !body.order?.id) {
+      setLoading(false)
+      setError(body.error || 'Захиалга үүсгэхэд алдаа гарлаа')
+      return
+    }
+    localStorage.setItem('fromLat', String(pickup.lat))
+    localStorage.setItem('fromLng', String(pickup.lng))
+    localStorage.setItem('current_order_id', body.order.id)
     setLoading(false)
     router.push('/drivers')
   }
@@ -145,6 +154,7 @@ export default function ManualPage() {
         </div>
         {errors.carMark && <p style={{color:'#ff6b6b', fontSize:'12px', margin:'0 0 20px 4px'}}>⚠️ Машины маркаа бөглөнө үү</p>}
 
+        {error && <p style={{color:'#ff6b6b',fontSize:'13px',margin:'0 0 12px 4px'}}>⚠️ {error}</p>}
         <button onClick={handleSearch} disabled={loading} style={{
           width:'100%', borderRadius:'16px', padding:'17px',
           background: loading ? 'rgba(232,67,58,0.4)' : D.red,

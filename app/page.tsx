@@ -4,28 +4,23 @@ import { useRouter } from 'next/navigation'
 
 export default function IndexPage() {
   const router = useRouter()
-
   useEffect(() => {
-    try {
-      // Жолооч нэвтэрсэн бол /driver руу
-      const driver = localStorage.getItem('driver_session')
-      if (driver && driver !== 'null' && driver !== 'undefined') {
-        router.replace('/driver')
-        return
-      }
-      // Хэрэглэгч нэвтэрсэн бол /home руу
-      const user = localStorage.getItem('user')
-      if (user && user !== 'null' && user !== 'undefined') {
-        router.replace('/home')
-      } else {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [driverRes, customerRes] = await Promise.all([
+          fetch('/api/driver/session', { cache:'no-store' }),
+          fetch('/api/customer/session', { cache:'no-store' }),
+        ])
+        if (cancelled) return
+        if (driverRes.ok) return router.replace('/driver')
+        if (customerRes.ok) return router.replace('/home')
+        localStorage.removeItem('driver_session')
+        localStorage.removeItem('user')
         router.replace('/register')
-      }
-    } catch {
-      router.replace('/register')
-    }
-  }, [])
-
-  return (
-    <div style={{minHeight:'100vh', background:'#0a0a0f'}}/>
-  )
+      } catch { if (!cancelled) router.replace('/register') }
+    })()
+    return () => { cancelled = true }
+  }, [router])
+  return <div style={{minHeight:'100vh', background:'#0a0a0f'}}/>
 }

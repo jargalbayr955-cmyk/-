@@ -1,7 +1,6 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 
 export default function TrackingPage() {
   const [order, setOrder] = useState<any>(null)
@@ -11,12 +10,16 @@ export default function TrackingPage() {
   const [userLng, setUserLng] = useState<number | null>(null)
   const [distance, setDistance] = useState<string | null>(null)
   const [etaMinutes, setEtaMinutes] = useState<number | null>(null)
+  const [driverLocationUpdatedAt, setDriverLocationUpdatedAt] = useState<string | null>(null)
+  const [nowMs, setNowMs] = useState(0)
   const [mapReady, setMapReady] = useState(false)
   const mapRef = useRef<any>(null)
   const mapInstanceRef = useRef<any>(null)
   const driverMarkerRef = useRef<any>(null)
   const userMarkerRef = useRef<any>(null)
   const lineRef = useRef<any>(null)
+  const markerAnimationRef = useRef<number | null>(null)
+  const hasFitRouteRef = useRef(false)
   const router = useRouter()
 
   const calcDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
@@ -57,51 +60,26 @@ export default function TrackingPage() {
     const fromLat = parseFloat(localStorage.getItem('fromLat') || '0')
     const fromLng = parseFloat(localStorage.getItem('fromLng') || '0')
     const orderId = localStorage.getItem('current_order_id')
-    let trackedDriverId = localStorage.getItem('tracking_driver_id')
-
     if (fromLat && fromLng) { setUserLat(fromLat); setUserLng(fromLng) }
     if (!orderId) return
 
+    let stopped = false
     const fetchTracking = async () => {
-      const { data: ord } = await supabase
-        .from('orders')
-        .select('id, driver_name, driver_phone, driver_id, from_address, to_address, status')
-        .eq('id', orderId).single()
-      if (ord) {
-        setOrder(ord)
-        if (ord.driver_id) trackedDriverId = ord.driver_id
-      }
-      if (trackedDriverId) {
-        const { data: drv } = await supabase.from('drivers').select('lat, lng').eq('id', trackedDriverId).single()
-        if (drv?.lat && drv?.lng) { setDriverLat(drv.lat); setDriverLng(drv.lng) }
-      }
+      try {
+        const res = await fetch('/api/order/tracking', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({order_id:orderId}), cache:'no-store' })
+        if (!res.ok || stopped) return
+        const body = await res.json()
+        if (body.order) {
+          setOrder(body.order)
+          if (body.order.from_lat && body.order.from_lng) { setUserLat(Number(body.order.from_lat)); setUserLng(Number(body.order.from_lng)) }
+        }
+        const lat = Number(body.driver?.lat), lng = Number(body.driver?.lng)
+        if (Number.isFinite(lat) && Number.isFinite(lng)) { setDriverLat(lat); setDriverLng(lng); setDriverLocationUpdatedAt(body.driver?.location_updated_at || null) }
+      } catch {}
     }
-
     fetchTracking()
-    const orderChannel = supabase.channel(`tracking-order-${orderId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` }, (payload:any) => {
-        setOrder(payload.new)
-        if (payload.new?.driver_id) trackedDriverId = payload.new.driver_id
-      }).subscribe()
-
-    // Slow fallback only. Realtime is the primary update path.
-    const interval = setInterval(fetchTracking, 60000)
-    // Driver id can become known after initial render; subscribe after first fetch and refresh once.
-    const subTimer = setTimeout(() => {
-      if (!trackedDriverId) return
-      const driverChannel = supabase.channel(`tracking-driver-${trackedDriverId}`)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'drivers', filter: `id=eq.${trackedDriverId}` }, (payload:any) => {
-          const lat = Number(payload.new?.lat), lng = Number(payload.new?.lng)
-          if (Number.isFinite(lat) && Number.isFinite(lng)) { setDriverLat(lat); setDriverLng(lng) }
-        }).subscribe()
-      ;(window as any).__achiltDriverTrackingChannel = driverChannel
-    }, 1200)
-
-    return () => {
-      clearInterval(interval); clearTimeout(subTimer); supabase.removeChannel(orderChannel)
-      const ch = (window as any).__achiltDriverTrackingChannel
-      if (ch) { supabase.removeChannel(ch); delete (window as any).__achiltDriverTrackingChannel }
-    }
+    const interval = setInterval(fetchTracking, 5000)
+    return () => { stopped = true; clearInterval(interval) }
   }, [])
 
   useEffect(() => {
@@ -139,8 +117,21 @@ export default function TrackingPage() {
         html: '<div style="font-size:30px;line-height:1;filter:drop-shadow(0 3px 4px rgba(0,0,0,.7))">🚛</div>',
         iconSize: [34, 34], iconAnchor: [17, 17], className: ''
       })
-      if (driverMarkerRef.current) driverMarkerRef.current.setLatLng([driverLat, driverLng])
-      else driverMarkerRef.current = Leaflet.marker([driverLat, driverLng], { icon: truckIcon }).addTo(mapInstanceRef.current).bindPopup('Жолооч')
+      if (driverMarkerRef.current) {
+        if (markerAnimationRef.current) cancelAnimationFrame(markerAnimationRef.current)
+        const start = driverMarkerRef.current.getLatLng()
+        const started = performance.now()
+        const duration = 1800
+        const animate = (now: number) => {
+          const t = Math.min(1, (now - started) / duration)
+          const eased = 1 - Math.pow(1 - t, 3)
+          const lat = start.lat + (driverLat - start.lat) * eased
+          const lng = start.lng + (driverLng - start.lng) * eased
+          driverMarkerRef.current?.setLatLng([lat, lng])
+          if (t < 1) markerAnimationRef.current = requestAnimationFrame(animate)
+        }
+        markerAnimationRef.current = requestAnimationFrame(animate)
+      } else driverMarkerRef.current = Leaflet.marker([driverLat, driverLng], { icon: truckIcon }).addTo(mapInstanceRef.current).bindPopup('Жолооч')
 
       let points:any[] = [[userLat, userLng], [driverLat, driverLng]]
       const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
@@ -162,11 +153,27 @@ export default function TrackingPage() {
       if (cancelled) return
       if (lineRef.current) lineRef.current.setLatLngs(points)
       else lineRef.current = Leaflet.polyline(points, { color: '#e8433a', weight: 5, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(mapInstanceRef.current)
-      const bounds = Leaflet.latLngBounds(points)
-      mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 })
+      if (!hasFitRouteRef.current) {
+        const bounds = Leaflet.latLngBounds(points)
+        mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 })
+        hasFitRouteRef.current = true
+      }
     })
     return () => { cancelled = true }
   }, [driverLat, driverLng, userLat, userLng])
+
+  useEffect(() => () => {
+    if (markerAnimationRef.current) cancelAnimationFrame(markerAnimationRef.current)
+  }, [])
+
+  useEffect(() => {
+    setNowMs(Date.now())
+    const timer = window.setInterval(() => setNowMs(Date.now()), 30000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const locationAgeSeconds = driverLocationUpdatedAt && nowMs ? Math.max(0, Math.round((nowMs - new Date(driverLocationUpdatedAt).getTime()) / 1000)) : null
+  const locationStale = locationAgeSeconds != null && locationAgeSeconds > 120
 
   return (
     <div style={{minHeight:'100vh', background:'#060608', display:'flex', flexDirection:'column'}}>
@@ -197,7 +204,7 @@ export default function TrackingPage() {
               <div style={{flex:1}}>
                 <p style={{color:'white', fontWeight:'800', fontSize:'17px', margin:0, letterSpacing:'-0.3px'}}>{order.driver_name}</p>
                 <p style={{color:'rgba(255,255,255,0.4)', fontSize:'13px', margin:'3px 0 0'}}>
-                  {distance ? `📍 ${distance} км зайтай${etaMinutes ? ` · ~${etaMinutes} мин` : ''} · ` : ''}Таны байршил руу явж байна
+                  {locationStale ? '⚠️ Жолоочийн GPS 2 минутаас удаан шинэчлэгдээгүй' : `${distance ? `📍 ${distance} км зайтай${etaMinutes ? ` · ~${etaMinutes} мин` : ''} · ` : ''}Таны байршил руу явж байна`}
                 </p>
               </div>
               {distance && (

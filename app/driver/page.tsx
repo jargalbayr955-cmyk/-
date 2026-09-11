@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 
 const D = {
   bg: '#060608',
@@ -22,7 +21,7 @@ export default function DriverPage() {
   const [error, setError] = useState('')
   const [locMsg, setLocMsg] = useState('')
   const offerPricesRef = useRef<{[key: string]: string}>({})
-  const sentOffersRef = useRef<{[key: string]: boolean}>({})
+  const [sentOffers, setSentOffers] = useState<Record<string, boolean>>({})
   const [sendingOffer, setSendingOffer] = useState<string | null>(null)
   const [newOrderAlert, setNewOrderAlert] = useState(false)
   const [acceptedOrder, setAcceptedOrder] = useState<any>(null)
@@ -31,11 +30,10 @@ export default function DriverPage() {
   const [notifStatus, setNotifStatus] = useState<'default'|'granted'|'denied'>('default')
   const [mounted, setMounted] = useState(false)
 
-  // Данс мэдээлэл - энд өөрийн банкны дансаа оруулна
-  const BANK_ACCOUNT = '5022 8888'  // ← Өөрийн дансаа оруулна уу
-  const BANK_NAME = 'Хаан банк'
+  const [bankInfo, setBankInfo] = useState({ bank_name: '', bank_account: '' })
   const prevOrderIds = useRef<string[]>([])
   const driverRef = useRef<any>(null)
+  const acceptedOrderRef = useRef<any>(null)
   const mapRef = useRef<any>(null)
   const mapInstanceRef = useRef<any>(null)
   const driverMarkerRef = useRef<any>(null)
@@ -65,7 +63,7 @@ export default function DriverPage() {
       playNote(220, 0, 0.4, 0.6); playNote(260, 0, 0.4, 0.4); playNote(330, 0, 0.4, 0.3)
       playNote(220, 0.5, 0.4, 0.6); playNote(260, 0.5, 0.4, 0.4); playNote(330, 0.5, 0.4, 0.3)
       playNote(220, 1.0, 0.8, 0.7); playNote(260, 1.0, 0.8, 0.5); playNote(330, 1.0, 0.8, 0.4)
-    } catch(e) {}
+    } catch {}
   }
 
   // Service worker-аас horn message хүлээн авах
@@ -73,6 +71,7 @@ export default function DriverPage() {
     if (!driver) return
     const handleMessage = (e: MessageEvent) => {
       if (e.data?.type === 'PLAY_HORN') playHorn()
+      if (e.data?.type === 'NEW_ORDER') window.dispatchEvent(new Event('achilt-new-order'))
     }
     navigator.serviceWorker?.addEventListener('message', handleMessage)
     return () => navigator.serviceWorker?.removeEventListener('message', handleMessage)
@@ -142,6 +141,18 @@ export default function DriverPage() {
       if (!res.ok) return
       const body = await res.json()
       const data = Array.isArray(body.orders) ? body.orders : []
+      if (body.active === false) {
+        setDriver(null); localStorage.removeItem('driver_session'); localStorage.removeItem('accepted_order'); localStorage.removeItem('payment_info'); return
+      }
+      if (body.acceptedOrder) {
+        setAcceptedOrder(body.acceptedOrder)
+        localStorage.setItem('accepted_order', JSON.stringify(body.acceptedOrder))
+      } else if (body.available === true) {
+        setAcceptedOrder(null); setPaymentInfo(null); localStorage.removeItem('accepted_order'); localStorage.removeItem('payment_info')
+      }
+      if (driverRef.current && typeof body.available === 'boolean') {
+        setDriver((d:any) => d ? ({...d, available: body.available}) : d)
+      }
       const newIds = data.map((o: any) => o.id)
       const hasNew = newIds.some((id: string) => !prevOrderIds.current.includes(id))
       const hasRemoved = prevOrderIds.current.some((id: string) => !newIds.includes(id))
@@ -155,7 +166,7 @@ export default function DriverPage() {
         setOrders(data)
       }
     } catch {}
-  }, []) // eslint-disable-line
+  }, [])
 
   const updateLocation = () => {
     if (!driver) return
@@ -180,6 +191,19 @@ export default function DriverPage() {
   useEffect(() => {
     driverRef.current = driver
   }, [driver])
+
+  useEffect(() => {
+    acceptedOrderRef.current = acceptedOrder
+  }, [acceptedOrder])
+
+
+  useEffect(() => {
+    if (!driver?.id) return
+    fetch('/api/driver/payment-settings', { cache: 'no-store' })
+      .then(async r => r.ok ? r.json() : null)
+      .then(body => { if (body) setBankInfo({ bank_name: body.bank_name || '', bank_account: body.bank_account || '' }) })
+      .catch(() => {})
+  }, [driver?.id])
 
   // Mounted + session сэргээх
   useEffect(() => {
@@ -210,7 +234,7 @@ export default function DriverPage() {
 
   // Browser буцах товч блоклох
   useEffect(() => {
-    const handlePopState = (e: PopStateEvent) => {
+    const handlePopState = () => {
       // Буцах товч дарахад driver хуудас дээр л үлдэх
       window.history.pushState(null, '', '/driver')
     }
@@ -220,10 +244,10 @@ export default function DriverPage() {
   }, [])
 
   useEffect(() => {
-    if (!driver || !navigator.geolocation) return
+    if (!driver?.id || !navigator.geolocation) return
     let lastSentAt = 0
-    let lastLat = Number(driver.lat) || 0
-    let lastLng = Number(driver.lng) || 0
+    let lastLat = Number(driverRef.current?.lat) || 0
+    let lastLng = Number(driverRef.current?.lng) || 0
     const distanceMeters = (aLat:number,aLng:number,bLat:number,bLng:number) => {
       const R = 6371000, p1=aLat*Math.PI/180, p2=bLat*Math.PI/180
       const dp=(bLat-aLat)*Math.PI/180, dl=(bLng-aLng)*Math.PI/180
@@ -237,20 +261,25 @@ export default function DriverPage() {
       lastSentAt = now; lastLat = lat; lastLng = lng
       driverRef.current = { ...driverRef.current, lat, lng }
       if (driverMarkerRef.current) driverMarkerRef.current.setLatLng([lat, lng])
-      if (lineRef.current && acceptedOrder?.from_lat) lineRef.current.setLatLngs([[lat, lng], [acceptedOrder.from_lat, acceptedOrder.from_lng]])
+      const activeOrder = acceptedOrderRef.current
+      if (lineRef.current && activeOrder?.from_lat) lineRef.current.setLatLngs([[lat, lng], [activeOrder.from_lat, activeOrder.from_lng]])
       await fetch('/api/driver/location', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lat, lng }) }).catch(()=>{})
     }, () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 })
     return () => navigator.geolocation.clearWatch(watchId)
-  }, [driver?.id, acceptedOrder?.id])
+  }, [driver?.id])
 
   useEffect(() => {
-    if (!acceptedOrder || !mapRef.current || mapInstanceRef.current) return
+    if (!acceptedOrder?.id || !mapRef.current || mapInstanceRef.current) return
+    const order = acceptedOrderRef.current
+    if (!order) return
     const link = document.createElement('link')
     link.rel = 'stylesheet'
     link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
     document.head.appendChild(link)
-    setTimeout(() => {
+    let cancelled = false
+    const timer = setTimeout(() => {
       import('leaflet').then((L) => {
+        if (cancelled) return
         const Leaflet = L.default
         delete (Leaflet.Icon.Default.prototype as any)._getIconUrl
         Leaflet.Icon.Default.mergeOptions({
@@ -258,10 +287,10 @@ export default function DriverPage() {
           iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
           shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
         })
-        const userLat = acceptedOrder.from_lat
-        const userLng = acceptedOrder.from_lng
-        const drvLat = driver?.lat || userLat
-        const drvLng = driver?.lng || userLng
+        const userLat = order.from_lat
+        const userLng = order.from_lng
+        const drvLat = driverRef.current?.lat || userLat
+        const drvLng = driverRef.current?.lng || userLng
         const map = Leaflet.map(mapRef.current!).setView([userLat || 47.9, userLng || 106.9], 13)
         ;(() => {
           const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
@@ -279,7 +308,8 @@ export default function DriverPage() {
         mapInstanceRef.current = map
       })
     }, 300)
-  }, [acceptedOrder])
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [acceptedOrder?.id])
 
   useEffect(() => {
     if (!acceptedOrder && mapInstanceRef.current) {
@@ -313,7 +343,7 @@ export default function DriverPage() {
     })
     if (!res.ok) { const body = await res.json().catch(()=>({})); alert(body.error || 'Санал илгээхэд алдаа гарлаа'); setSendingOffer(null); return }
     if (pos) setDriver({ ...driver, lat: pos.lat, lng: pos.lng })
-    sentOffersRef.current[order.id] = true
+    setSentOffers(prev => ({ ...prev, [order.id]: true }))
     setSendingOffer(null)
   }
 
@@ -327,53 +357,23 @@ export default function DriverPage() {
   }
 
   useEffect(() => {
-    if (!driver) return
+    if (!driver?.id) return
     fetchOrders()
-    // 60-second server fallback keeps driver invitations current without exposing driver_invites directly.
-    const interval = setInterval(fetchOrders, 60000)
-
-    // Жолоочийн available өөрчлөгдөхийг сонсох
-    const driverChannel = supabase.channel('driver-status')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'drivers', filter: `id=eq.${driver.id}` }, (payload: any) => {
-        if (payload.new?.available === true) {
-          // Мөнгө орсон — payment info цэвэрлэх
-          localStorage.removeItem('payment_info')
-          localStorage.removeItem('accepted_order')
-          // Page reload хийж бүх state цэвэрлэх
-          window.location.reload()
-        }
-      })
-      .subscribe()
-
-    const checkConfirmedOrder = async () => {
-      const { data } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('status', 'confirmed')
-        .eq('driver_id', driver.id)
-        .maybeSingle()
-      if (data) {
-        setAcceptedOrder(data)
-        localStorage.setItem('accepted_order', JSON.stringify(data))
-      }
+    // Push handles immediate delivery. This is only a low-frequency fallback if push is unavailable.
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchOrders()
+    }, 15_000)
+    const onPushRefresh = () => fetchOrders()
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchOrders() }
+    window.addEventListener('achilt-new-order', onPushRefresh)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('achilt-new-order', onPushRefresh)
+      document.removeEventListener('visibilitychange', onVisible)
     }
+  }, [driver?.id, fetchOrders])
 
-    checkConfirmedOrder()
-
-
-    const channel = supabase.channel(`orders-realtime-${driver.id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, async (payload: any) => {
-        const newDriverPhone = (payload.new?.driver_phone || '').replace('+976', '').replace('+', '')
-        const myPhone = (driver.phone || '').replace('+976', '').replace('+', '')
-        if (payload.new?.status === 'confirmed' && (payload.new?.driver_id === driver.id || newDriverPhone === myPhone)) {
-          setAcceptedOrder(payload.new)
-          localStorage.setItem('accepted_order', JSON.stringify(payload.new))
-        }
-        fetchOrders()
-      })
-      .subscribe()
-    return () => { supabase.removeChannel(channel); supabase.removeChannel(driverChannel); clearInterval(interval) }
-  }, [driver])
 
   // Mounted болохоос өмнө хоосон screen
   if (!mounted) {
@@ -437,8 +437,8 @@ export default function DriverPage() {
               <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:'0 0 12px', textAlign:'center'}}>Төлбөрийн мэдээлэл</p>
               <div style={{background:'rgba(232,67,58,0.1)', border:'1px solid rgba(232,67,58,0.3)', borderRadius:'12px', padding:'14px', marginBottom:'12px', textAlign:'center'}}>
                 <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:'0 0 4px'}}>Шилжүүлэх данс</p>
-                <p style={{color:'white', fontWeight:'800', fontSize:'18px', margin:'0 0 2px'}}>{BANK_NAME}</p>
-                <p style={{color:'#ff6b5b', fontWeight:'800', fontSize:'20px', margin:'0 0 8px', letterSpacing:'2px'}}>{BANK_ACCOUNT}</p>
+                <p style={{color:'white', fontWeight:'800', fontSize:'18px', margin:'0 0 2px'}}>{bankInfo.bank_name || 'Банк тохируулаагүй'}</p>
+                <p style={{color:'#ff6b5b', fontWeight:'800', fontSize:'20px', margin:'0 0 8px', letterSpacing:'2px'}}>{bankInfo.bank_account || 'Админаас данс тохируулна уу'}</p>
                 <div style={{borderTop:'1px solid rgba(255,255,255,0.1)', paddingTop:'10px'}}>
                   <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:'0 0 4px'}}>Гүйлгээний утга</p>
                   <p style={{color:'#ffd700', fontWeight:'900', fontSize:'28px', margin:'0 0 4px', letterSpacing:'4px'}}>{paymentInfo.code}</p>
@@ -467,7 +467,7 @@ export default function DriverPage() {
                   // Server transaction marks the order completed and driver unavailable atomically.
                   setDriver({ ...driver, available: false })
                 }
-              } catch(e) {}
+              } catch {}
               setCompleting(false)
             }} disabled={completing} style={{width:'100%', borderRadius:'14px', padding:'13px', background: completing ? 'rgba(232,67,58,0.4)' : D.red, border:'none', color:D.text, fontSize:'14px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 15px rgba(232,67,58,0.3)'}}>
               {completing ? 'Боловсруулж байна...' : 'Захиалга дуусгах'}
@@ -559,7 +559,7 @@ export default function DriverPage() {
                       <div><p style={{color:D.muted, fontSize:'11px', margin:'0 0 2px'}}>Хүргэх газар</p><p style={{color:D.text, fontSize:'13px', margin:0, fontWeight:'600'}}>{o.to_address || '-'}</p></div>
                     </div>
                   </div>
-                  {sentOffersRef.current[o.id] ? (
+                  {o.has_offered || sentOffers[o.id] ? (
                     <div style={{background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,0.2)', borderRadius:'12px', padding:'12px', textAlign:'center'}}>
                       <p style={{color:'#22c55e', fontSize:'14px', fontWeight:'700', margin:0}}>✅ Санал илгээгдлээ!</p>
                     </div>

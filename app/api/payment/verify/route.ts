@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
   const secret = process.env.PAYMENT_WEBHOOK_SECRET
   const provided = req.headers.get('x-webhook-secret') || ''
   if (!secret || !provided || !safeEqual(secret, provided)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!allowRequest(`payment-webhook:${getClientIp(req)}`, 120, 60_000)) return NextResponse.json({ error: 'Rate limited' }, { status: 429 })
+  if (!(await allowRequest(`payment-webhook:${getClientIp(req)}`, 120, 60_000))) return NextResponse.json({ error: 'Rate limited' }, { status: 429 })
 
   const body = await req.json().catch(() => ({}))
   const smsText = String(body.sms || body.message || body.text || '')

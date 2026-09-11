@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 
 const D = {
   bg: '#060608',
@@ -22,42 +21,38 @@ export default function DriverProfilePage() {
   const router = useRouter()
 
   useEffect(() => {
-    const session = localStorage.getItem('driver_session')
-    if (!session) { router.push('/driver'); return }
-    const d = JSON.parse(session)
-    setDriver(d)
-    setForm({ name: d.name || '', car_type: d.car_type || '', car_number: d.car_number || '', photo_url: d.photo_url || '', pin: '', new_pin: '', confirm_pin: '' })
-  }, [])
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/driver/session', { cache: 'no-store' })
+        if (!res.ok) { router.replace('/driver'); return }
+        const body = await res.json()
+        if (cancelled || !body.driver) return
+        const d = body.driver
+        setDriver(d)
+        setForm({ name: d.name || '', car_type: d.car_type || '', car_number: d.car_number || '', photo_url: d.photo_url || '', pin: '', new_pin: '', confirm_pin: '' })
+        localStorage.setItem('driver_session', JSON.stringify(d))
+      } catch { if (!cancelled) router.replace('/driver') }
+    })()
+    return () => { cancelled = true }
+  }, [router])
 
   const handleSave = async () => {
     if (!form.name) return setError('Нэрээ бөглөнө үү')
     if (!form.car_type) return setError('Машины төрөл сонгоно уу')
     if (form.new_pin && form.new_pin !== form.confirm_pin) return setError('PIN тохирохгүй байна')
-    if (form.new_pin && form.new_pin.length !== 4) return setError('PIN 4 оронтой байх ёстой')
+    if (form.new_pin && !/^\d{6}$/.test(form.new_pin)) return setError('PIN 6 оронтой байх ёстой')
 
     setSaving(true)
     setError('')
 
-    const updates: any = {
-      name: form.name,
-      car_type: form.car_type,
-      car_number: form.car_number,
-      photo_url: form.photo_url
-    }
-    if (form.new_pin) updates.pin = form.new_pin
-
-    const { data, error: err } = await supabase
-      .from('drivers')
-      .update(updates)
-      .eq('id', driver.id)
-      .select()
-      .single()
-
-    if (err) {
-      setError('Хадгалахад алдаа гарлаа')
+    const res = await fetch('/api/driver/profile', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name:form.name, car_type:form.car_type, car_number:form.car_number, photo_url:form.photo_url, new_pin:form.new_pin || undefined }) })
+    const body = await res.json().catch(()=>({}))
+    if (!res.ok || !body.driver) {
+      setError(body.error || 'Хадгалахад алдаа гарлаа')
     } else {
-      localStorage.setItem('driver_session', JSON.stringify(data))
-      setDriver(data)
+      localStorage.setItem('driver_session', JSON.stringify(body.driver))
+      setDriver(body.driver)
       setSaved(true)
       setForm(f => ({ ...f, pin: '', new_pin: '', confirm_pin: '' }))
       setTimeout(() => setSaved(false), 2000)
@@ -145,10 +140,10 @@ export default function DriverProfilePage() {
         {/* PIN солих */}
         <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'14px', marginBottom:'20px'}}>
           <p style={{color:D.muted, fontSize:'11px', fontWeight:'700', letterSpacing:'1px', margin:'0 0 12px'}}>PIN КОД СОЛИХ</p>
-          <input type="password" placeholder="Шинэ PIN (4 оронтой)" maxLength={4} value={form.new_pin}
+          <input type="password" placeholder="Шинэ PIN (4 оронтой)" maxLength={6} value={form.new_pin}
             onChange={e => setForm({...form, new_pin: e.target.value})}
             style={{...D.input, marginBottom:'8px'}}/>
-          <input type="password" placeholder="PIN дахин оруулах" maxLength={4} value={form.confirm_pin}
+          <input type="password" placeholder="PIN дахин оруулах" maxLength={6} value={form.confirm_pin}
             onChange={e => setForm({...form, confirm_pin: e.target.value})}
             style={{...D.input}}/>
           <p style={{color:'rgba(255,255,255,0.2)', fontSize:'11px', margin:'8px 0 0'}}>Хоосон орхивол PIN өөрчлөгдөхгүй</p>

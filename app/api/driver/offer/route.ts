@@ -1,52 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifySession } from '@/lib/server/security'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
+import { allowRequest } from '@/lib/server/security'
+import { requireDriver } from '@/lib/server/driver'
 
 export async function POST(req: NextRequest) {
-  const session = verifySession(req.cookies.get('achilt_driver_session')?.value, 'driver')
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const body = await req.json().catch(() => ({}))
-  const price = Number(body.price)
-  if (!body.order_id || !Number.isFinite(price) || price <= 0 || price > 10_000_000) {
-    return NextResponse.json({ error: 'Invalid offer' }, { status: 400 })
+  const driver = await requireDriver(req)
+  if (!driver) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await allowRequest(`driver-offer:${driver.id}`, 20, 60_000))) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
-  const supabase = getSupabaseAdmin()
-  const [{ data: driver }, { data: order }] = await Promise.all([
-    supabase.from('drivers').select('id,name,phone,car_type,available,lat,lng').eq('id', session.sub).maybeSingle(),
-    supabase.from('orders').select('id,status,car_type').eq('id', body.order_id).maybeSingle(),
-  ])
-  if (!driver || !driver.available) return NextResponse.json({ error: 'Жолооч идэвхгүй байна' }, { status: 403 })
-  if (!order || order.status !== 'pending') return NextResponse.json({ error: 'Захиалга боломжгүй болсон' }, { status: 409 })
-  if (order.car_type && driver.car_type && order.car_type !== driver.car_type) return NextResponse.json({ error: 'Машины төрөл тохирохгүй' }, { status: 403 })
 
-  // Only one of the customer's current five invited drivers may quote.
-  const { data: invite } = await supabase
-    .from('driver_invites')
-    .select('id,status,expires_at')
-    .eq('order_id', order.id)
-    .eq('driver_id', driver.id)
-    .in('status', ['active', 'offered'])
-    .maybeSingle()
-  const inviteLive = invite && (invite.status === 'offered' || new Date(invite.expires_at).getTime() > Date.now())
-  if (!inviteLive) return NextResponse.json({ error: 'Энэ захиалгын үнийн санал өгөх хугацаа дууссан' }, { status: 403 })
+  const body = await req.json().catch(() => ({}))
+  const orderId = typeof body.order_id === 'string' ? body.order_id : ''
+  const price = Number(body.price)
+  const lat = Number(body.driver_lat)
+  const lng = Number(body.driver_lng)
 
-  const { error } = await supabase.from('offers').upsert({
-    order_id: order.id,
-    driver_id: driver.id,
-    driver_name: driver.name,
-    driver_phone: driver.phone,
-    car_type: driver.car_type,
-    price: Math.round(price),
-    status: 'pending',
-    driver_lat: Number.isFinite(body.driver_lat) ? body.driver_lat : driver.lat,
-    driver_lng: Number.isFinite(body.driver_lng) ? body.driver_lng : driver.lng,
-  }, { onConflict: 'order_id,driver_id' })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!orderId || !Number.isFinite(price) || price <= 0 || price > 10_000_000) {
+    return NextResponse.json({ error: 'Үнийн санал буруу байна' }, { status: 400 })
+  }
+  if (!driver.available) return NextResponse.json({ error: 'Жолооч идэвхгүй байна' }, { status: 403 })
 
-  await supabase.from('driver_invites').update({
-    status: 'offered',
-    offered_at: new Date().toISOString(),
-  }).eq('id', invite.id)
+  const { data, error } = await getSupabaseAdmin().rpc('submit_driver_offer_atomic', {
+    p_order_id: orderId,
+    p_driver_id: driver.id,
+    p_price: Math.round(price),
+    p_driver_lat: Number.isFinite(lat) && lat >= -90 && lat <= 90 ? lat : null,
+    p_driver_lng: Number.isFinite(lng) && lng >= -180 && lng <= 180 ? lng : null,
+  })
 
-  return NextResponse.json({ success: true })
+  if (error) {
+    const message = error.message || ''
+    if (/expired|Invite unavailable/i.test(message)) return NextResponse.json({ error: 'Энэ захиалгын санал өгөх хугацаа дууссан' }, { status: 409 })
+    if (/Order unavailable/i.test(message)) return NextResponse.json({ error: 'Захиалга аль хэдийн сонгогдсон' }, { status: 409 })
+    if (/busy|unavailable/i.test(message)) return NextResponse.json({ error: 'Одоогоор санал өгөх боломжгүй байна' }, { status: 409 })
+    return NextResponse.json({ error: 'Санал хадгалахад алдаа гарлаа' }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true, offer: data })
 }
