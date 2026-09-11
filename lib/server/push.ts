@@ -10,7 +10,7 @@ export async function notifyOrderInvites(orderId: string) {
   const s = getSupabaseAdmin()
   const { data: order } = await s.from('orders').select('id,from_address,car_type,car_mark,status').eq('id',orderId).maybeSingle()
   if (!order || order.status !== 'pending') return { sent: 0, invited: 0 }
-  const { data: invites } = await s.from('driver_invites').select('id,driver_id').eq('order_id',orderId).eq('status','active').is('notified_at',null).limit(5)
+  const { data: invites } = await s.from('driver_invites').select('id,driver_id').eq('order_id',orderId).eq('status','active').is('notified_at',null).limit(8)
   if (!invites?.length) return { sent: 0, invited: 0 }
   const ids = invites.map(i=>i.driver_id)
   const { data: subs } = await s.from('push_subscriptions').select('id,driver_id,subscription').in('driver_id',ids)
