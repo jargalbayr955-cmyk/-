@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
       .select('order_id,status,expires_at,rank')
       .eq('driver_id', driver.id)
       .in('status', ['active', 'offered'])
+      .gt('expires_at', now)
       .order('rank', { ascending: false })
       .limit(30),
     supabase
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
 
   if (inviteError || acceptedError) return NextResponse.json({ error: 'Захиалга татахад алдаа гарлаа' }, { status: 500 })
 
-  const liveInvites = (invites || []).filter(i => i.status === 'offered' || i.expires_at > now)
+  const liveInvites = invites || []
   if (!liveInvites.length) {
     return NextResponse.json({ orders: [], acceptedOrder: acceptedOrder || null, available: driver.available, active: true })
   }

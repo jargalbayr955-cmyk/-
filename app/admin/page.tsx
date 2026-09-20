@@ -1,5 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react'
+import { createDotMarker, freeMapStyle, loadFreeMap, validCoords, ULAANBAATAR } from '@/lib/client/free-map'
 
 type Driver = {
   id: string
@@ -42,70 +43,49 @@ const D = {
 }
 
 function MapTab({ drivers }: { drivers: any[] }) {
-  const mapRef = React.useRef<any>(null)
-  const mapInstanceRef = React.useRef<any>(null)
-  const markersRef = React.useRef<any[]>([])
-  const [mapReady, setMapReady] = React.useState(false)
+  const mapRef=React.useRef<HTMLDivElement|null>(null)
+  const mapInstanceRef=React.useRef<any>(null)
+  const [mapReady, setMapReady] = useState(0)
+  const markersRef=React.useRef<any[]>([])
 
-  React.useEffect(() => {
-    const link = document.createElement('link')
-    link.rel = 'stylesheet'
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
-    document.head.appendChild(link)
-    setMapReady(true)
-  }, [])
+  React.useEffect(()=>{
+    let cancelled=false
+    ;(async()=>{
+      try{
+        const ml=await loadFreeMap()
+        if(cancelled||!mapRef.current)return
+        const map=new ml.Map({container:mapRef.current,style:freeMapStyle(),center:[ULAANBAATAR.lng,ULAANBAATAR.lat],zoom:11.5,attributionControl:{}})
+        map.addControl(new ml.NavigationControl({showCompass:false}),'top-right')
+        mapInstanceRef.current=map
+        setMapReady(n => n + 1)
+      }catch{}
+    })()
+    return()=>{cancelled=true;markersRef.current.forEach(m=>m.remove?.());markersRef.current=[];mapInstanceRef.current?.remove?.();mapInstanceRef.current=null}
+  },[])
 
-  React.useEffect(() => {
-    if (!mapReady || !mapRef.current) return
-    import('leaflet').then((L) => {
-      const Leaflet = L.default
-      delete (Leaflet.Icon.Default.prototype as any)._getIconUrl
-      if (!mapInstanceRef.current) {
-        const map = Leaflet.map(mapRef.current!).setView([47.9, 106.9], 12)
-        ;(() => {
-          const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
-          return token
-            ? Leaflet.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}@2x?access_token=${token}`, { attribution: '© Mapbox © OpenStreetMap', tileSize: 512, zoomOffset: -1, crossOrigin: true, maxZoom: 19 })
-            : Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 })
-        })().addTo(map)
-        mapInstanceRef.current = map
-      }
-      // Markers цэвэрлэх
-      markersRef.current.forEach(m => m.remove())
-      markersRef.current = []
-      // Идэвхтэй жолоочдыг map дээр харуулах
-      drivers.filter(d => d.available && d.lat && d.lng).forEach(d => {
-        const icon = Leaflet.divIcon({
-          html: `<div style="background:#e8433a;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.5)">${d.name.charAt(0)}</div>`,
-          iconSize: [36, 36], iconAnchor: [18, 18], className: ''
-        })
-        const marker = Leaflet.marker([d.lat, d.lng], { icon })
-          .addTo(mapInstanceRef.current!)
-          .bindPopup(`<b>${d.name}</b><br>${d.phone}<br>${d.car_type === 'butten' ? 'Бүтэн ачигч' : 'Чирэгч'}`)
-        markersRef.current.push(marker)
-      })
+  React.useEffect(()=>{
+    const map=mapInstanceRef.current,ml=window.maplibregl
+    if(!map||!ml)return
+    markersRef.current.forEach(m=>m.remove?.());markersRef.current=[]
+    const active=drivers.filter(d=>d.available&&validCoords(d.lat,d.lng))
+    const bounds=new ml.LngLatBounds();let has=false
+    active.forEach(d=>{
+      const el=createDotMarker('#e8433a',22,d.name||'Жолооч')
+      const marker=new ml.Marker({element:el}).setLngLat([Number(d.lng),Number(d.lat)]).addTo(map)
+      const popup=new ml.Popup({offset:24}).setText(`${String(d.name||'Жолооч')} · ${String(d.phone||'')} · ${d.car_type==='butten'?'Бүтэн ачигч':'Чирэгч'}`)
+      marker.setPopup(popup);markersRef.current.push(marker);bounds.extend([Number(d.lng),Number(d.lat)]);has=true
     })
-  }, [mapReady, drivers])
+    if(has)map.fitBounds(bounds,{padding:60,maxZoom:15,duration:400})
+  },[drivers,mapReady])
 
-  const activeDrivers = drivers.filter(d => d.available && d.lat && d.lng)
-
-  return (
-    <div>
-      <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px'}}>
-        <p style={{color:'rgba(255,255,255,0.5)', fontSize:'13px', margin:0}}>
-          {activeDrivers.length} идэвхтэй жолооч байршил илгээсэн
-        </p>
-        <div style={{display:'flex', gap:'8px'}}>
-          {activeDrivers.map(d => (
-            <div key={d.id} style={{background:'rgba(232,67,58,0.12)', border:'1px solid rgba(232,67,58,0.3)', borderRadius:'20px', padding:'4px 12px', fontSize:'12px', color:'#ff6b5b', fontWeight:'700'}}>
-              {d.name}
-            </div>
-          ))}
-        </div>
-      </div>
-      <div ref={mapRef} style={{width:'100%', height:'500px', borderRadius:'16px', overflow:'hidden', border:'1px solid rgba(255,255,255,0.08)'}}/>
+  const activeDrivers=drivers.filter(d=>d.available&&validCoords(d.lat,d.lng))
+  return <div>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px',gap:10,flexWrap:'wrap'}}>
+      <p style={{color:'rgba(255,255,255,0.5)',fontSize:'13px',margin:0}}>{activeDrivers.length} идэвхтэй жолооч байршил илгээсэн</p>
+      <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>{activeDrivers.map(d=><div key={d.id} style={{background:'rgba(232,67,58,0.12)',border:'1px solid rgba(232,67,58,0.3)',borderRadius:'20px',padding:'4px 12px',fontSize:'12px',color:'#ff6b5b',fontWeight:'700'}}>{d.name}</div>)}</div>
     </div>
-  )
+    <div ref={mapRef} style={{width:'100%',height:'500px',borderRadius:'16px',overflow:'hidden',border:'1px solid rgba(255,255,255,0.08)'}}/>
+  </div>
 }
 
 export default function AdminPage() {

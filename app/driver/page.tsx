@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { createDotMarker, createTruckMarker, freeMapStyle, loadFreeMap } from '@/lib/client/free-map'
 
 const D = {
   bg: '#060608',
@@ -260,9 +261,10 @@ export default function DriverPage() {
       if (now - lastSentAt < 15000 && moved < 20) return
       lastSentAt = now; lastLat = lat; lastLng = lng
       driverRef.current = { ...driverRef.current, lat, lng }
-      if (driverMarkerRef.current) driverMarkerRef.current.setLatLng([lat, lng])
+      if (driverMarkerRef.current) driverMarkerRef.current.setLngLat([lng, lat])
       const activeOrder = acceptedOrderRef.current
-      if (lineRef.current && activeOrder?.from_lat) lineRef.current.setLatLngs([[lat, lng], [activeOrder.from_lat, activeOrder.from_lng]])
+      const routeSource = mapInstanceRef.current?.getSource?.('accepted-route')
+      if (routeSource?.setData && activeOrder?.from_lat && activeOrder?.from_lng) routeSource.setData({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:[[lng,lat],[Number(activeOrder.from_lng),Number(activeOrder.from_lat)]]}})
       await fetch('/api/driver/location', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lat, lng }) }).catch(()=>{})
     }, () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 })
     return () => navigator.geolocation.clearWatch(watchId)
@@ -270,51 +272,42 @@ export default function DriverPage() {
 
   useEffect(() => {
     if (!acceptedOrder?.id || !mapRef.current || mapInstanceRef.current) return
-    const order = acceptedOrderRef.current
-    if (!order) return
-    const link = document.createElement('link')
-    link.rel = 'stylesheet'
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
-    document.head.appendChild(link)
-    let cancelled = false
-    const timer = setTimeout(() => {
-      import('leaflet').then((L) => {
-        if (cancelled) return
-        const Leaflet = L.default
-        delete (Leaflet.Icon.Default.prototype as any)._getIconUrl
-        Leaflet.Icon.Default.mergeOptions({
-          iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-        })
-        const userLat = order.from_lat
-        const userLng = order.from_lng
-        const drvLat = driverRef.current?.lat || userLat
-        const drvLng = driverRef.current?.lng || userLng
-        const map = Leaflet.map(mapRef.current!).setView([userLat || 47.9, userLng || 106.9], 13)
-        ;(() => {
-          const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
-          return token
-            ? Leaflet.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}@2x?access_token=${token}`, { attribution: '© Mapbox © OpenStreetMap', tileSize: 512, zoomOffset: -1, crossOrigin: true, maxZoom: 19 })
-            : Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 })
-        })().addTo(map)
-        const userIcon = Leaflet.divIcon({ html: '<div style="background:#3b82f6;width:16px;height:16px;border-radius:50%;border:3px solid white"></div>', iconSize: [16,16], iconAnchor: [8,8], className: '' })
-        userMarkerRef.current = Leaflet.marker([userLat, userLng], { icon: userIcon }).addTo(map).bindPopup('Хэрэглэгч')
-        const truckIcon = Leaflet.divIcon({ html: '<div style="font-size:26px">🚛</div>', iconSize: [32,32], iconAnchor: [16,16], className: '' })
-        driverMarkerRef.current = Leaflet.marker([drvLat, drvLng], { icon: truckIcon }).addTo(map).bindPopup('Та')
-        lineRef.current = Leaflet.polyline([[drvLat, drvLng], [userLat, userLng]], { color: '#e8433a', weight: 3, dashArray: '10,8', opacity: 0.9 }).addTo(map)
-        const bounds = Leaflet.latLngBounds([[drvLat, drvLng], [userLat, userLng]])
-        map.fitBounds(bounds, { padding: [60, 60] })
-        mapInstanceRef.current = map
-      })
-    }, 300)
-    return () => { cancelled = true; clearTimeout(timer) }
+    const order=acceptedOrderRef.current
+    if(!order)return
+    let cancelled=false
+    const timer=setTimeout(()=>{
+      ;(async()=>{
+        try{
+          const ml=await loadFreeMap()
+          if(cancelled||!mapRef.current)return
+          const userLat=Number(order.from_lat),userLng=Number(order.from_lng)
+          const drvLat=Number(driverRef.current?.lat)||userLat,drvLng=Number(driverRef.current?.lng)||userLng
+          const map=new ml.Map({container:mapRef.current,style:freeMapStyle(),center:[userLng||106.9177,userLat||47.9184],zoom:13,attributionControl:{}})
+          map.addControl(new ml.NavigationControl({showCompass:false}),'top-right')
+          userMarkerRef.current=new ml.Marker({element:createDotMarker('#2563eb',18,'Хэрэглэгч')}).setLngLat([userLng,userLat]).addTo(map)
+          driverMarkerRef.current=new ml.Marker({element:createTruckMarker('Та')}).setLngLat([drvLng,drvLat]).addTo(map)
+          const routeData={type:'Feature' as const,properties:{},geometry:{type:'LineString' as const,coordinates:[[drvLng,drvLat],[userLng,userLat]]}}
+          map.on('load',()=>{
+            if(!map.getSource('accepted-route')){
+              map.addSource('accepted-route',{type:'geojson',data:routeData})
+              map.addLayer({id:'accepted-route-line',type:'line',source:'accepted-route',paint:{'line-color':'#e8433a','line-width':4,'line-opacity':.9,'line-dasharray':[2,2]}})
+            }
+          })
+          const bounds=new ml.LngLatBounds();bounds.extend([drvLng,drvLat]);bounds.extend([userLng,userLat]);map.fitBounds(bounds,{padding:60,maxZoom:16,duration:400})
+          mapInstanceRef.current=map
+          lineRef.current='accepted-route'
+        }catch{}
+      })()
+    },250)
+    return()=>{cancelled=true;clearTimeout(timer);driverMarkerRef.current?.remove?.();userMarkerRef.current?.remove?.();mapInstanceRef.current?.remove?.();mapInstanceRef.current=null;driverMarkerRef.current=null;userMarkerRef.current=null;lineRef.current=null}
   }, [acceptedOrder?.id])
 
   useEffect(() => {
     if (!acceptedOrder && mapInstanceRef.current) {
       mapInstanceRef.current.remove()
       mapInstanceRef.current = null
+      driverMarkerRef.current?.remove?.()
+      userMarkerRef.current?.remove?.()
       driverMarkerRef.current = null
       userMarkerRef.current = null
       lineRef.current = null
@@ -392,7 +385,7 @@ export default function DriverPage() {
           </div>
           <input type="tel" placeholder="Утасны дугаар" value={phone} onChange={e => setPhone(e.target.value)}
             style={{width:'100%', borderRadius:'14px', padding:'14px 16px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:D.text, fontSize:'16px', outline:'none', marginBottom:'12px', boxSizing:'border-box'}}/>
-          <input type="password" placeholder="4 оронтой PIN" maxLength={4} value={pin} onChange={e => setPin(e.target.value)}
+          <input type="password" placeholder="PIN код (4-8 орон)" maxLength={8} inputMode="numeric" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
             style={{width:'100%', borderRadius:'14px', padding:'14px 16px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:D.text, fontSize:'16px', outline:'none', marginBottom:'16px', boxSizing:'border-box'}}/>
           {error && <p style={{color:'#ff6b6b', fontSize:'13px', marginBottom:'12px'}}>⚠️ {error}</p>}
           <button onClick={handleLogin} disabled={loading}

@@ -1,173 +1,124 @@
 'use client'
-import { useState } from 'react'
+
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { createDotMarker, freeMapStyle, loadFreeMap, ULAANBAATAR } from '@/lib/client/free-map'
+
+type Point = { lat:number; lng:number }
 
 export default function ManualPage() {
+  const [pickup, setPickup] = useState<Point | null>(null)
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [carType, setCarType] = useState('')
   const [carMark, setCarMark] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [errors, setErrors] = useState<{from?:boolean, to?:boolean, carType?:boolean, carMark?:boolean}>({})
+  const [mapError, setMapError] = useState('')
+  const [errors, setErrors] = useState<{pickup?:boolean,to?:boolean,carType?:boolean,carMark?:boolean}>({})
+  const mapRef = useRef<HTMLDivElement | null>(null)
+  const mapInstanceRef = useRef<any>(null)
+  const markerRef = useRef<any>(null)
   const router = useRouter()
 
-  const handleSearch = async () => {
-    const newErrors: any = {}
-    if (!from) newErrors.from = true
-    if (!to) newErrors.to = true
-    if (!carType) newErrors.carType = true
-    if (!carMark) newErrors.carMark = true
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors)
-      return
-    }
-    setErrors({})
-    setLoading(true)
-
-    localStorage.setItem('fromAddress', from)
-    localStorage.setItem('from', from)
-    localStorage.setItem('dest', to)
-    localStorage.setItem('fromLat', '0')
-    localStorage.setItem('fromLng', '0')
-
-    let pickup: {lat:number,lng:number} | null = null
-    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
-    if (token) {
-      try {
-        const q = encodeURIComponent(from)
-        const r = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${q}.json?country=mn&limit=1&access_token=${token}`)
-        const j = await r.json()
-        const c = j?.features?.[0]?.center
-        if (Array.isArray(c) && c.length >= 2) pickup = {lng:Number(c[0]),lat:Number(c[1])}
-      } catch {}
-    }
-    if (!pickup) {
-      const pos = await new Promise<GeolocationPosition | null>((resolve) => {
-        if (!navigator.geolocation) return resolve(null)
-        navigator.geolocation.getCurrentPosition(resolve, () => resolve(null), { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 })
+  const putMarker = (lat:number,lng:number,fly=false) => {
+    const map = mapInstanceRef.current
+    const ml = window.maplibregl
+    if (!map || !ml) return
+    if (!markerRef.current) {
+      markerRef.current = new ml.Marker({element:createDotMarker('#e8433a',22),draggable:true}).setLngLat([lng,lat]).addTo(map)
+      markerRef.current.on('dragend',()=>{
+        const p=markerRef.current.getLngLat()
+        setPickup({lat:p.lat,lng:p.lng})
+        setErrors(e=>({...e,pickup:false}))
       })
-      if (pos) pickup = {lat:pos.coords.latitude,lng:pos.coords.longitude}
-    }
-    if (!pickup) {
-      setLoading(false)
-      setError('Авах газрын байршлыг тогтоож чадсангүй. Mapbox тохиргоо эсвэл GPS зөвшөөрлөө шалгана уу.')
-      return
-    }
-    const res = await fetch('/api/order/create', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ from_address:from, to_address:to, car_type:carType, car_mark:carMark, from_lat:pickup.lat, from_lng:pickup.lng })
-    })
-    const body = await res.json().catch(()=>({}))
-    if (!res.ok || !body.order?.id) {
-      setLoading(false)
-      setError(body.error || 'Захиалга үүсгэхэд алдаа гарлаа')
-      return
-    }
-    localStorage.setItem('fromLat', String(pickup.lat))
-    localStorage.setItem('fromLng', String(pickup.lng))
-    localStorage.setItem('current_order_id', body.order.id)
-    setLoading(false)
-    router.push('/drivers')
+    } else markerRef.current.setLngLat([lng,lat])
+    setPickup({lat,lng})
+    setErrors(e=>({...e,pickup:false}))
+    if(fly) map.easeTo({center:[lng,lat],zoom:15,duration:500})
   }
 
-  const D = {
-    bg: '#0a0a0f',
-    card: 'rgba(255,255,255,0.04)',
-    border: (err?: boolean) => `1px solid ${err ? 'rgba(232,67,58,0.5)' : 'rgba(255,255,255,0.08)'}`,
-    text: 'white',
-    muted: 'rgba(255,255,255,0.35)',
-    red: '#e8433a',
+  useEffect(()=>{
+    let cancelled=false
+    ;(async()=>{
+      try{
+        const ml=await loadFreeMap()
+        if(cancelled||!mapRef.current)return
+        const map=new ml.Map({container:mapRef.current,style:freeMapStyle(),center:[ULAANBAATAR.lng,ULAANBAATAR.lat],zoom:11.5,attributionControl:{}})
+        map.addControl(new ml.NavigationControl({showCompass:false}),'top-right')
+        map.on('click',(e:any)=>putMarker(e.lngLat.lat,e.lngLat.lng))
+        map.on('error',()=>setMapError('Газрын зураг ачаалахад түр алдаа гарлаа'))
+        mapInstanceRef.current=map
+      }catch{setMapError('Газрын зураг ачаалагдсангүй. Интернэтээ шалгана уу.')}
+    })()
+    return()=>{cancelled=true;markerRef.current?.remove?.();markerRef.current=null;mapInstanceRef.current?.remove?.();mapInstanceRef.current=null}
+  },[])
+
+  const useMyLocation=()=>{
+    if(!navigator.geolocation)return
+    navigator.geolocation.getCurrentPosition(p=>putMarker(p.coords.latitude,p.coords.longitude,true),()=>setError('GPS байршил авах боломжгүй байна'),{enableHighAccuracy:true,timeout:10000,maximumAge:15000})
   }
 
-  return (
-    <div style={{minHeight:'100vh', background:D.bg, display:'flex', flexDirection:'column'}}>
+  const handleSearch = async () => {
+    if(loading)return
+    const next:any={}
+    if(!pickup) next.pickup=true
+    if(!to.trim()) next.to=true
+    if(!carType) next.carType=true
+    if(!carMark.trim()) next.carMark=true
+    setErrors(next)
+    if(Object.keys(next).length){setError(!pickup?'Газрын зураг дээр ачих цэгээ сонгоно уу':'Мэдээллээ бүрэн бөглөнө үү');return}
 
-      {/* Header */}
-      <div style={{padding:'14px 20px', display:'flex', alignItems:'center', gap:'12px', borderBottom:'1px solid rgba(255,255,255,0.06)', background:'rgba(0,0,0,0.4)'}}>
-        <button onClick={() => router.back()} style={{background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'20px', padding:'7px 14px', color:'rgba(255,255,255,0.6)', fontSize:'13px', cursor:'pointer', fontWeight:'600'}}>← Буцах</button>
-        <p style={{color:D.text, fontWeight:'700', fontSize:'15px', margin:0}}>Гараар хаяг оруулах</p>
-      </div>
+    setLoading(true);setError('')
+    const coords=`${pickup!.lat.toFixed(5)}, ${pickup!.lng.toFixed(5)}`
+    const fromAddress=from.trim()?`${from.trim()} (${coords})`:`Газрын зураг дээр сонгосон цэг (${coords})`
+    try{
+      const res=await fetch('/api/order/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from_address:fromAddress,to_address:to.trim(),car_type:carType,car_mark:carMark.trim(),from_lat:pickup!.lat,from_lng:pickup!.lng})})
+      const body=await res.json().catch(()=>({}))
+      if(!res.ok||!body.order?.id){setError(body.error||'Захиалга үүсгэхэд алдаа гарлаа');if(res.status===401)router.push('/login');return}
+      localStorage.setItem('fromAddress',fromAddress)
+      localStorage.setItem('fromLat',String(pickup!.lat));localStorage.setItem('fromLng',String(pickup!.lng));localStorage.setItem('dest',to.trim());localStorage.setItem('current_order_id',body.order.id)
+      router.push('/drivers')
+    }catch{setError('Сүлжээний алдаа. Дахин оролдоно уу.')}finally{setLoading(false)}
+  }
 
-      {/* Form */}
-      <div style={{padding:'20px 16px', flex:1}}>
-        <p style={{color:D.muted, fontSize:'13px', marginBottom:'20px'}}>Авах болон хүргэх хаягаа оруулна уу</p>
-
-        {/* Авах хаяг */}
-        <div style={{background: errors.from ? 'rgba(232,67,58,0.08)' : D.card, border:D.border(errors.from), borderRadius:'14px', padding:'12px 14px', marginBottom:errors.from ? '4px' : '12px'}}>
-          <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px'}}>
-            <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#3b82f6', flexShrink:0}}/>
-            <span style={{color: errors.from ? '#ff6b6b' : D.muted, fontSize:'11px', fontWeight:'700', letterSpacing:'1px'}}>АВАХ ХАЯГ</span>
-          </div>
-          <input type="text" placeholder="Хаяг бичнэ үү..." value={from}
-            onChange={e => { setFrom(e.target.value); setErrors(p => ({...p, from:false})) }}
-            style={{width:'100%', background:'transparent', border:'none', color:D.text, fontSize:'15px', outline:'none', fontWeight:'600'}}/>
-        </div>
-        {errors.from && <p style={{color:'#ff6b6b', fontSize:'12px', margin:'0 0 12px 4px'}}>⚠️ Авах хаягаа бөглөнө үү</p>}
-
-        {/* Хүргэх хаяг */}
-        <div style={{background: errors.to ? 'rgba(232,67,58,0.08)' : D.card, border:D.border(errors.to), borderRadius:'14px', padding:'12px 14px', marginBottom:errors.to ? '4px' : '12px'}}>
-          <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px'}}>
-            <div style={{width:'8px', height:'8px', borderRadius:'50%', background:D.red, flexShrink:0}}/>
-            <span style={{color: errors.to ? '#ff6b6b' : D.muted, fontSize:'11px', fontWeight:'700', letterSpacing:'1px'}}>ХҮРГЭХ ХАЯГ</span>
-          </div>
-          <input type="text" placeholder="Хаяг бичнэ үү..." value={to}
-            onChange={e => { setTo(e.target.value); setErrors(p => ({...p, to:false})) }}
-            style={{width:'100%', background:'transparent', border:'none', color:D.text, fontSize:'15px', outline:'none', fontWeight:'600'}}/>
-        </div>
-        {errors.to && <p style={{color:'#ff6b6b', fontSize:'12px', margin:'0 0 12px 4px'}}>⚠️ Хүргэх хаягаа бөглөнө үү</p>}
-
-        {/* Машины төрөл */}
-        <p style={{color: errors.carType ? '#ff6b6b' : D.muted, fontSize:'11px', fontWeight:'700', letterSpacing:'1px', margin:'0 0 10px'}}>
-          МАШИНЫ ТӨРӨЛ {errors.carType && '— Сонгоно уу'}
-        </p>
-        <div style={{display:'flex', flexDirection:'column', gap:'8px', marginBottom:'12px'}}>
-          {[
-            {id:'butten', label:'Бүтэн ачигч', icon:'🚛', desc:'Тэвш дээрээ бүтэн ачих'},
-            {id:'chiregch', label:'Чирэгч', icon:'🔧', desc:'Урд юмуу хойд дугуйнаас чирэх'},
-          ].map(type => (
-            <div key={type.id} onClick={() => { setCarType(type.id); setErrors(p => ({...p, carType:false})) }} style={{
-              background: carType === type.id ? 'rgba(232,67,58,0.12)' : errors.carType ? 'rgba(232,67,58,0.05)' : D.card,
-              border:`1px solid ${carType === type.id ? 'rgba(232,67,58,0.5)' : errors.carType ? 'rgba(232,67,58,0.3)' : 'rgba(255,255,255,0.07)'}`,
-              borderRadius:'14px', padding:'14px 16px', display:'flex', alignItems:'center', gap:'12px', cursor:'pointer'
-            }}>
-              <span style={{fontSize:'24px'}}>{type.icon}</span>
-              <div style={{flex:1}}>
-                <p style={{color:D.text, fontWeight:'700', fontSize:'15px', margin:0}}>{type.label}</p>
-                <p style={{color:D.muted, fontSize:'12px', margin:'3px 0 0'}}>{type.desc}</p>
-              </div>
-              <div style={{width:'20px', height:'20px', borderRadius:'50%', border:`2px solid ${carType === type.id ? D.red : 'rgba(255,255,255,0.2)'}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
-                {carType === type.id && <div style={{width:'10px', height:'10px', borderRadius:'50%', background:D.red}}/>}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Машины марк */}
-        <div style={{background: errors.carMark ? 'rgba(232,67,58,0.08)' : D.card, border:D.border(errors.carMark), borderRadius:'14px', padding:'12px 14px', marginBottom:errors.carMark ? '4px' : '24px'}}>
-          <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px'}}>
-            <span style={{color: errors.carMark ? '#ff6b6b' : D.muted, fontSize:'11px', fontWeight:'700', letterSpacing:'1px'}}>🚗 МАШИНЫ МАРК, НЭР</span>
-          </div>
-          <input type="text" placeholder="Жишээ: Toyota Camry, Hyundai Sonata..." value={carMark}
-            onChange={e => { setCarMark(e.target.value); setErrors(p => ({...p, carMark:false})) }}
-            style={{width:'100%', background:'transparent', border:'none', color:D.text, fontSize:'14px', outline:'none', fontWeight:'500'}}/>
-        </div>
-        {errors.carMark && <p style={{color:'#ff6b6b', fontSize:'12px', margin:'0 0 20px 4px'}}>⚠️ Машины маркаа бөглөнө үү</p>}
-
-        {error && <p style={{color:'#ff6b6b',fontSize:'13px',margin:'0 0 12px 4px'}}>⚠️ {error}</p>}
-        <button onClick={handleSearch} disabled={loading} style={{
-          width:'100%', borderRadius:'16px', padding:'17px',
-          background: loading ? 'rgba(232,67,58,0.4)' : D.red,
-          border:'none', color:D.text, fontSize:'16px', fontWeight:'800',
-          cursor: loading ? 'not-allowed' : 'pointer',
-          boxShadow: loading ? 'none' : '0 6px 25px rgba(232,67,58,0.5)',
-          transition:'all 0.3s'
-        }}>
-          {loading ? 'Хайж байна...' : 'Машин хайх →'}
-        </button>
-      </div>
-
-      <style>{`input::placeholder{color:rgba(255,255,255,0.2);}input:focus{outline:none;}`}</style>
+  const D={bg:'#0a0a0f',card:'rgba(255,255,255,.04)',text:'white',muted:'rgba(255,255,255,.42)',red:'#e8433a'}
+  return <div style={{minHeight:'100vh',background:D.bg,color:'white'}}>
+    <div style={{position:'relative',height:'48vh',minHeight:340}}>
+      <div ref={mapRef} style={{position:'absolute',inset:0}}/>
+      <button onClick={()=>router.back()} style={{position:'absolute',top:14,left:14,zIndex:10,borderRadius:22,padding:'8px 14px',background:'rgba(8,10,16,.86)',border:'1px solid rgba(255,255,255,.12)',color:'white',fontWeight:700}}>← Буцах</button>
+      <button onClick={useMyLocation} style={{position:'absolute',right:14,bottom:18,zIndex:10,borderRadius:22,padding:'10px 14px',background:'#e8433a',border:0,color:'white',fontWeight:800}}>◎ Миний байршил</button>
+      <div style={{position:'absolute',left:'50%',top:14,transform:'translateX(-50%)',zIndex:10,background:'rgba(8,10,16,.86)',border:'1px solid rgba(255,255,255,.12)',borderRadius:20,padding:'7px 12px',fontSize:12,whiteSpace:'nowrap'}}>📍 Map дээр дарж эсвэл тэмдэглэгээг чирж ачих цэгээ сонгоно</div>
+      {mapError&&<div style={{position:'absolute',inset:0,zIndex:9,display:'grid',placeItems:'center',background:'rgba(8,10,16,.82)',padding:24,textAlign:'center'}}>{mapError}</div>}
     </div>
-  )
+
+    <div style={{maxWidth:720,margin:'0 auto',padding:'18px 16px 32px'}}>
+      <h1 style={{fontSize:22,margin:'0 0 5px'}}>Өөр газраас машин ачуулах</h1>
+      <p style={{color:D.muted,fontSize:13,margin:'0 0 16px'}}>Таны байгаа газраас өөр газар байгаа машины ачих цэгийг map дээр сонгоно.</p>
+
+      <div style={{background:errors.pickup?'rgba(232,67,58,.08)':D.card,border:`1px solid ${errors.pickup?'rgba(232,67,58,.55)':'rgba(255,255,255,.08)'}`,borderRadius:15,padding:'13px 14px',marginBottom:10}}>
+        <div style={{fontSize:11,color:D.muted,fontWeight:800,marginBottom:5}}>📍 АЧИХ ЦЭГ</div>
+        <div style={{fontSize:13,fontWeight:700,marginBottom:8}}>{pickup?`${pickup.lat.toFixed(5)}, ${pickup.lng.toFixed(5)}`:'Сонгоогүй байна'}</div>
+        <input value={from} onChange={e=>setFrom(e.target.value)} placeholder="Ойролцоох байр, орц, тайлбар (заавал биш)" style={{width:'100%',boxSizing:'border-box',background:'transparent',border:0,color:'white',outline:0,fontSize:14}}/>
+      </div>
+
+      <div style={{background:errors.to?'rgba(232,67,58,.08)':D.card,border:`1px solid ${errors.to?'rgba(232,67,58,.55)':'rgba(255,255,255,.08)'}`,borderRadius:15,padding:'13px 14px',marginBottom:12}}>
+        <div style={{fontSize:11,color:D.muted,fontWeight:800,marginBottom:5}}>🔴 ХҮРГЭХ ГАЗАР</div>
+        <input value={to} onChange={e=>{setTo(e.target.value);setErrors(p=>({...p,to:false}))}} placeholder="Хүрэх хаягаа бичнэ үү" style={{width:'100%',boxSizing:'border-box',background:'transparent',border:0,color:'white',outline:0,fontSize:15,fontWeight:650}}/>
+      </div>
+
+      <div style={{fontSize:11,color:D.muted,fontWeight:800,margin:'16px 0 8px'}}>МАШИНЫ ТӨРӨЛ</div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,marginBottom:12}}>
+        {[{id:'butten',label:'🚛 Бүтэн ачигч'},{id:'chiregch',label:'🔧 Чирэгч'}].map(x=><button key={x.id} onClick={()=>{setCarType(x.id);setErrors(p=>({...p,carType:false}))}} style={{padding:'14px 10px',borderRadius:14,border:`1px solid ${carType===x.id?'#e8433a':errors.carType?'rgba(232,67,58,.5)':'rgba(255,255,255,.08)'}`,background:carType===x.id?'rgba(232,67,58,.13)':D.card,color:'white',fontWeight:800}}>{x.label}</button>)}
+      </div>
+
+      <div style={{background:errors.carMark?'rgba(232,67,58,.08)':D.card,border:`1px solid ${errors.carMark?'rgba(232,67,58,.55)':'rgba(255,255,255,.08)'}`,borderRadius:15,padding:'13px 14px',marginBottom:14}}>
+        <div style={{fontSize:11,color:D.muted,fontWeight:800,marginBottom:5}}>🚗 МАШИНЫ МАРК, НЭР</div>
+        <input value={carMark} onChange={e=>{setCarMark(e.target.value);setErrors(p=>({...p,carMark:false}))}} placeholder="Жишээ: Toyota Camry" style={{width:'100%',boxSizing:'border-box',background:'transparent',border:0,color:'white',outline:0,fontSize:14}}/>
+      </div>
+
+      {error&&<div style={{padding:'11px 13px',borderRadius:12,background:'rgba(232,67,58,.1)',border:'1px solid rgba(232,67,58,.25)',color:'#ff8178',fontSize:13,marginBottom:12}}>⚠️ {error}</div>}
+      <button onClick={handleSearch} disabled={loading} style={{width:'100%',padding:16,borderRadius:16,border:0,background:loading?'rgba(232,67,58,.45)':D.red,color:'white',fontSize:16,fontWeight:900}}>{loading?'Хайж байна...':'Ойр 8 жолооч хайх →'}</button>
+    </div>
+  </div>
 }

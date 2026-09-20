@@ -9,8 +9,8 @@ const csp = [
   // Next.js currently emits bootstrap scripts/styles that require inline allowances.
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://api.mapbox.com https://*.tiles.mapbox.com https://*.tile.openstreetmap.org https://i.ibb.co",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.mapbox.com https://events.mapbox.com https://nominatim.openstreetmap.org",
+  "img-src 'self' data: blob: https://tiles.openfreemap.org https://*.openfreemap.org https://i.ibb.co",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://tiles.openfreemap.org https://*.openfreemap.org",
   "font-src 'self' data:",
   "worker-src 'self' blob:",
   "manifest-src 'self'",

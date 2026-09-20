@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { createDotMarker, createTruckMarker, freeMapStyle, loadFreeMap, validCoords } from '@/lib/client/free-map'
 
 export default function TrackingPage() {
   const [order, setOrder] = useState<any>(null)
@@ -12,12 +13,11 @@ export default function TrackingPage() {
   const [etaMinutes, setEtaMinutes] = useState<number | null>(null)
   const [driverLocationUpdatedAt, setDriverLocationUpdatedAt] = useState<string | null>(null)
   const [nowMs, setNowMs] = useState(0)
-  const [mapReady, setMapReady] = useState(false)
   const mapRef = useRef<any>(null)
+  const [mapReady, setMapReady] = useState(0)
   const mapInstanceRef = useRef<any>(null)
   const driverMarkerRef = useRef<any>(null)
   const userMarkerRef = useRef<any>(null)
-  const lineRef = useRef<any>(null)
   const markerAnimationRef = useRef<number | null>(null)
   const hasFitRouteRef = useRef(false)
   const router = useRouter()
@@ -32,13 +32,6 @@ export default function TrackingPage() {
     return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1)
   }
 
-  useEffect(() => {
-    const link = document.createElement('link')
-    link.rel = 'stylesheet'
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
-    document.head.appendChild(link)
-    setMapReady(true)
-  }, [])
 
   useEffect(() => {
     const handleVisibility = async () => {
@@ -64,18 +57,23 @@ export default function TrackingPage() {
     if (!orderId) return
 
     let stopped = false
+    let finished = false
+    let inFlight = false
     const fetchTracking = async () => {
+      if (stopped || finished || inFlight || document.visibilityState !== 'visible') return
+      inFlight = true
       try {
         const res = await fetch('/api/order/tracking', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({order_id:orderId}), cache:'no-store' })
         if (!res.ok || stopped) return
         const body = await res.json()
         if (body.order) {
           setOrder(body.order)
-          if (body.order.from_lat && body.order.from_lng) { setUserLat(Number(body.order.from_lat)); setUserLng(Number(body.order.from_lng)) }
+          finished = ['completed', 'cancelled'].includes(body.order.status)
+          if (validCoords(body.order.from_lat, body.order.from_lng)) { setUserLat(Number(body.order.from_lat)); setUserLng(Number(body.order.from_lng)) }
         }
         const lat = Number(body.driver?.lat), lng = Number(body.driver?.lng)
-        if (Number.isFinite(lat) && Number.isFinite(lng)) { setDriverLat(lat); setDriverLng(lng); setDriverLocationUpdatedAt(body.driver?.location_updated_at || null) }
-      } catch {}
+        if (validCoords(body.driver?.lat, body.driver?.lng)) { setDriverLat(lat); setDriverLng(lng); setDriverLocationUpdatedAt(body.driver?.location_updated_at || null) }
+      } catch {} finally { inFlight = false }
     }
     fetchTracking()
     const interval = setInterval(fetchTracking, 5000)
@@ -83,84 +81,52 @@ export default function TrackingPage() {
   }, [])
 
   useEffect(() => {
-    if (!mapReady || !userLat || !userLng || mapInstanceRef.current) return
-    import('leaflet').then((L) => {
-      const Leaflet = L.default
-      delete (Leaflet.Icon.Default.prototype as any)._getIconUrl
-      Leaflet.Icon.Default.mergeOptions({
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      })
-      const map = Leaflet.map(mapRef.current!).setView([userLat, userLng], 14)
-      ;(() => {
-          const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
-          return token
-            ? Leaflet.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}@2x?access_token=${token}`, { attribution: '© Mapbox © OpenStreetMap', tileSize: 512, zoomOffset: -1, crossOrigin: true, maxZoom: 19 })
-            : Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 })
-        })().addTo(map)
-      const userIcon = Leaflet.divIcon({
-        html: '<div style="background:#3b82f6;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5)"></div>',
-        iconSize: [16, 16], iconAnchor: [8, 8], className: ''
-      })
-      userMarkerRef.current = Leaflet.marker([userLat, userLng], { icon: userIcon }).addTo(map).bindPopup('Таны байршил')
-      mapInstanceRef.current = map
-    })
-  }, [mapReady, userLat, userLng])
+    if (!mapRef.current || userLat == null || userLng == null || mapInstanceRef.current) return
+    let cancelled=false
+    ;(async()=>{
+      try{
+        const ml=await loadFreeMap()
+        if(cancelled||!mapRef.current)return
+        const map=new ml.Map({container:mapRef.current,style:freeMapStyle(),center:[userLng,userLat],zoom:14,attributionControl:{}})
+        map.addControl(new ml.NavigationControl({showCompass:false}),'top-right')
+        userMarkerRef.current=new ml.Marker({element:createDotMarker('#2563eb',18,'Таны байршил')}).setLngLat([userLng,userLat]).addTo(map)
+        mapInstanceRef.current=map
+        setMapReady(n => n + 1)
+      }catch{}
+    })()
+    return()=>{cancelled=true;driverMarkerRef.current?.remove?.();driverMarkerRef.current=null;userMarkerRef.current?.remove?.();userMarkerRef.current=null;mapInstanceRef.current?.remove?.();mapInstanceRef.current=null;hasFitRouteRef.current=false}
+  }, [userLat, userLng])
 
   useEffect(() => {
-    if (!mapInstanceRef.current || !driverLat || !driverLng || !userLat || !userLng) return
-    let cancelled = false
-    import('leaflet').then(async (L) => {
-      const Leaflet = L.default
-      const truckIcon = Leaflet.divIcon({
-        html: '<div style="font-size:30px;line-height:1;filter:drop-shadow(0 3px 4px rgba(0,0,0,.7))">🚛</div>',
-        iconSize: [34, 34], iconAnchor: [17, 17], className: ''
-      })
-      if (driverMarkerRef.current) {
-        if (markerAnimationRef.current) cancelAnimationFrame(markerAnimationRef.current)
-        const start = driverMarkerRef.current.getLatLng()
-        const started = performance.now()
-        const duration = 1800
-        const animate = (now: number) => {
-          const t = Math.min(1, (now - started) / duration)
-          const eased = 1 - Math.pow(1 - t, 3)
-          const lat = start.lat + (driverLat - start.lat) * eased
-          const lng = start.lng + (driverLng - start.lng) * eased
-          driverMarkerRef.current?.setLatLng([lat, lng])
-          if (t < 1) markerAnimationRef.current = requestAnimationFrame(animate)
-        }
-        markerAnimationRef.current = requestAnimationFrame(animate)
-      } else driverMarkerRef.current = Leaflet.marker([driverLat, driverLng], { icon: truckIcon }).addTo(mapInstanceRef.current).bindPopup('Жолооч')
+    const map=mapInstanceRef.current
+    const ml=window.maplibregl
+    if(!map||!ml||driverLat==null||driverLng==null||userLat==null||userLng==null)return
 
-      let points:any[] = [[userLat, userLng], [driverLat, driverLng]]
-      const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
-      if (token) {
-        try {
-          const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${driverLng},${driverLat};${userLng},${userLat}?geometries=geojson&overview=full&access_token=${token}`
-          const res = await fetch(url)
-          const data = await res.json()
-          const route = data?.routes?.[0]
-          if (route?.geometry?.coordinates?.length) {
-            points = route.geometry.coordinates.map((c:number[]) => [c[1], c[0]])
-            setDistance((route.distance / 1000).toFixed(1))
-            setEtaMinutes(Math.max(1, Math.round(route.duration / 60)))
-          } else {
-            setDistance(calcDistance(userLat, userLng, driverLat, driverLng)); setEtaMinutes(null)
-          }
-        } catch { setDistance(calcDistance(userLat, userLng, driverLat, driverLng)); setEtaMinutes(null) }
-      } else { setDistance(calcDistance(userLat, userLng, driverLat, driverLng)); setEtaMinutes(null) }
-      if (cancelled) return
-      if (lineRef.current) lineRef.current.setLatLngs(points)
-      else lineRef.current = Leaflet.polyline(points, { color: '#e8433a', weight: 5, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(mapInstanceRef.current)
-      if (!hasFitRouteRef.current) {
-        const bounds = Leaflet.latLngBounds(points)
-        mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 })
-        hasFitRouteRef.current = true
-      }
-    })
-    return () => { cancelled = true }
-  }, [driverLat, driverLng, userLat, userLng])
+    if(driverMarkerRef.current)driverMarkerRef.current.setLngLat([driverLng,driverLat])
+    else driverMarkerRef.current=new ml.Marker({element:createTruckMarker('Жолооч')}).setLngLat([driverLng,driverLat]).addTo(map)
+
+    const km=calcDistance(userLat,userLng,driverLat,driverLng)
+    setDistance(km);setEtaMinutes(null)
+
+    const routeData={type:'Feature',properties:{},geometry:{type:'LineString',coordinates:[[userLng,userLat],[driverLng,driverLat]]}}
+    const existing=map.getSource?.('driver-route')
+    if(existing?.setData)existing.setData(routeData)
+    else if(map.isStyleLoaded?.()){
+      map.addSource('driver-route',{type:'geojson',data:routeData})
+      map.addLayer({id:'driver-route-line',type:'line',source:'driver-route',paint:{'line-color':'#e8433a','line-width':5,'line-opacity':.9}})
+    } else {
+      map.once('load',()=>{
+        if(!map.getSource('driver-route')){
+          map.addSource('driver-route',{type:'geojson',data:routeData})
+          map.addLayer({id:'driver-route-line',type:'line',source:'driver-route',paint:{'line-color':'#e8433a','line-width':5,'line-opacity':.9}})
+        }
+      })
+    }
+
+    if(!hasFitRouteRef.current){
+      const bounds=new ml.LngLatBounds();bounds.extend([userLng,userLat]);bounds.extend([driverLng,driverLat]);map.fitBounds(bounds,{padding:55,maxZoom:16,duration:500});hasFitRouteRef.current=true
+    }
+  }, [driverLat, driverLng, userLat, userLng, mapReady])
 
   useEffect(() => () => {
     if (markerAnimationRef.current) cancelAnimationFrame(markerAnimationRef.current)
@@ -204,7 +170,7 @@ export default function TrackingPage() {
               <div style={{flex:1}}>
                 <p style={{color:'white', fontWeight:'800', fontSize:'17px', margin:0, letterSpacing:'-0.3px'}}>{order.driver_name}</p>
                 <p style={{color:'rgba(255,255,255,0.4)', fontSize:'13px', margin:'3px 0 0'}}>
-                  {locationStale ? '⚠️ Жолоочийн GPS 2 минутаас удаан шинэчлэгдээгүй' : `${distance ? `📍 ${distance} км зайтай${etaMinutes ? ` · ~${etaMinutes} мин` : ''} · ` : ''}Таны байршил руу явж байна`}
+                  {locationStale ? '⚠️ Жолоочийн GPS 2 минутаас удаан шинэчлэгдээгүй' : `${distance ? `📍 ${distance} км шулуун зайтай${etaMinutes ? ` · ~${etaMinutes} мин` : ''} · ` : ''}Таны байршил руу явж байна`}
                 </p>
               </div>
               {distance && (
