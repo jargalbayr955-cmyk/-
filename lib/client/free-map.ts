@@ -97,3 +97,10 @@ export function validCoords(lat: unknown, lng: unknown) {
 }
 
 export const ULAANBAATAR = { lat: 47.9184, lng: 106.9177 }
+
+export function mapErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  return /webgl|graphics context/i.test(message)
+    ? 'Энэ browser 3D газрын зураг дэмжихгүй байна. Chrome/Safari-г шинэчлэх эсвэл өөр browser ашиглана уу.'
+    : 'Газрын зураг ачаалагдсангүй. Интернэтээ шалгаад хуудсыг дахин нээнэ үү.'
+}

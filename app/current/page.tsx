@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createDotMarker, freeMapStyle, loadFreeMap, ULAANBAATAR } from '@/lib/client/free-map'
+import { createDotMarker, freeMapStyle, loadFreeMap, mapErrorMessage, ULAANBAATAR } from '@/lib/client/free-map'
 
 type LocationPoint = { lat: number; lng: number }
 type FieldErrors = { dest?: boolean; carType?: boolean; carMark?: boolean }
@@ -69,10 +69,11 @@ export default function CurrentPage() {
         setGpsError(false)
       })
       map.on('error', () => setMapError('Газрын зураг ачаалахад түр алдаа гарлаа'))
+      map.on('idle', () => setMapError(''))
       mapInstanceRef.current = map
     } catch (error) {
       console.error('Map initialization failed', error)
-      setMapError('Газрын зураг ачаалагдсангүй. Интернэтээ шалгаад дахин оролдоно уу.')
+      setMapError(mapErrorMessage(error))
     }
   }, [setMarker])
 

@@ -25,8 +25,8 @@ export async function POST(req: NextRequest) {
     p_order_id: orderId,
     p_driver_id: driver.id,
     p_price: Math.round(price),
-    p_driver_lat: Number.isFinite(lat) && lat >= -90 && lat <= 90 ? lat : null,
-    p_driver_lng: Number.isFinite(lng) && lng >= -180 && lng <= 180 ? lng : null,
+    p_driver_lat: body.driver_lat != null && Number.isFinite(lat) && lat >= -90 && lat <= 90 ? lat : null,
+    p_driver_lng: body.driver_lng != null && Number.isFinite(lng) && lng >= -180 && lng <= 180 ? lng : null,
   })
 
   if (error) {

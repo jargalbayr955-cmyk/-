@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   if (!(await allowRequest(`order-create:${user.id}:${getClientIp(req)}`, 6, 5*60_000))) return NextResponse.json({ error: 'Хэт олон захиалга үүсгэлээ' }, { status: 429 })
   const b = await req.json().catch(() => ({}))
   const lat = Number(b.from_lat), lng = Number(b.from_lng)
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return NextResponse.json({ error: 'Байршил буруу байна' }, { status: 400 })
+  if (b.from_lat == null || b.from_lng == null || b.from_lat === '' || b.from_lng === '' || !Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return NextResponse.json({ error: 'Байршил буруу байна' }, { status: 400 })
   if (!String(b.from_address || '').trim() || !String(b.to_address || '').trim() || !['butten','chiregch'].includes(String(b.car_type))) return NextResponse.json({ error: 'Мэдээллээ бүрэн оруулна уу' }, { status: 400 })
   const supabase = getSupabaseAdmin()
   const { data, error } = await supabase.from('orders').insert({

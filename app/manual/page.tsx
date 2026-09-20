@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createDotMarker, freeMapStyle, loadFreeMap, ULAANBAATAR } from '@/lib/client/free-map'
+import { createDotMarker, freeMapStyle, loadFreeMap, mapErrorMessage, ULAANBAATAR } from '@/lib/client/free-map'
 
 type Point = { lat:number; lng:number }
 
@@ -48,8 +48,9 @@ export default function ManualPage() {
         map.addControl(new ml.NavigationControl({showCompass:false}),'top-right')
         map.on('click',(e:any)=>putMarker(e.lngLat.lat,e.lngLat.lng))
         map.on('error',()=>setMapError('Газрын зураг ачаалахад түр алдаа гарлаа'))
+      map.on('idle', () => setMapError(''))
         mapInstanceRef.current=map
-      }catch(error){console.error('Map initialization failed',error);setMapError('Газрын зураг ачаалагдсангүй. Интернэтээ шалгана уу.')}
+      }catch(error){console.error('Map initialization failed',error);setMapError(mapErrorMessage(error))}
     })()
     return()=>{cancelled=true;markerRef.current?.remove?.();markerRef.current=null;mapInstanceRef.current?.remove?.();mapInstanceRef.current=null}
   },[])
@@ -89,7 +90,7 @@ export default function ManualPage() {
       <button onClick={()=>router.back()} style={{position:'absolute',top:14,left:14,zIndex:10,borderRadius:22,padding:'8px 14px',background:'rgba(8,10,16,.86)',border:'1px solid rgba(255,255,255,.12)',color:'white',fontWeight:700}}>← Буцах</button>
       <button onClick={useMyLocation} style={{position:'absolute',right:14,bottom:18,zIndex:10,borderRadius:22,padding:'10px 14px',background:'#e8433a',border:0,color:'white',fontWeight:800}}>◎ Миний байршил</button>
       <div style={{position:'absolute',left:'50%',top:14,transform:'translateX(-50%)',zIndex:10,background:'rgba(8,10,16,.86)',border:'1px solid rgba(255,255,255,.12)',borderRadius:20,padding:'7px 12px',fontSize:12,whiteSpace:'nowrap'}}>📍 Map дээр дарж эсвэл тэмдэглэгээг чирж ачих цэгээ сонгоно</div>
-      {mapError&&<div style={{position:'absolute',inset:0,zIndex:9,display:'grid',placeItems:'center',background:'rgba(8,10,16,.82)',padding:24,textAlign:'center'}}>{mapError}</div>}
+      {mapError&&<div style={{position:'absolute',left:14,right:14,top:64,zIndex:9,pointerEvents:'none',background:'rgba(8,10,16,.82)',padding:24,textAlign:'center'}}>{mapError}</div>}
     </div>
 
     <div style={{maxWidth:720,margin:'0 auto',padding:'18px 16px 32px'}}>
