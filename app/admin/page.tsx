@@ -58,7 +58,7 @@ function MapTab({ drivers }: { drivers: any[] }) {
         map.addControl(new ml.NavigationControl({showCompass:false}),'top-right')
         mapInstanceRef.current=map
         setMapReady(n => n + 1)
-      }catch{}
+      }catch(error){console.error('Map initialization failed',error)}
     })()
     return()=>{cancelled=true;markersRef.current.forEach(m=>m.remove?.());markersRef.current=[];mapInstanceRef.current?.remove?.();mapInstanceRef.current=null}
   },[])

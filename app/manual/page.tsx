@@ -49,7 +49,7 @@ export default function ManualPage() {
         map.on('click',(e:any)=>putMarker(e.lngLat.lat,e.lngLat.lng))
         map.on('error',()=>setMapError('Газрын зураг ачаалахад түр алдаа гарлаа'))
         mapInstanceRef.current=map
-      }catch{setMapError('Газрын зураг ачаалагдсангүй. Интернэтээ шалгана уу.')}
+      }catch(error){console.error('Map initialization failed',error);setMapError('Газрын зураг ачаалагдсангүй. Интернэтээ шалгана уу.')}
     })()
     return()=>{cancelled=true;markerRef.current?.remove?.();markerRef.current=null;mapInstanceRef.current?.remove?.();mapInstanceRef.current=null}
   },[])

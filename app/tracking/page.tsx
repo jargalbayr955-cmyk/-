@@ -92,7 +92,7 @@ export default function TrackingPage() {
         userMarkerRef.current=new ml.Marker({element:createDotMarker('#2563eb',18,'Таны байршил')}).setLngLat([userLng,userLat]).addTo(map)
         mapInstanceRef.current=map
         setMapReady(n => n + 1)
-      }catch{}
+      }catch(error){console.error('Map initialization failed',error)}
     })()
     return()=>{cancelled=true;driverMarkerRef.current?.remove?.();driverMarkerRef.current=null;userMarkerRef.current?.remove?.();userMarkerRef.current=null;mapInstanceRef.current?.remove?.();mapInstanceRef.current=null;hasFitRouteRef.current=false}
   }, [userLat, userLng])

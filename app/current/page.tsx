@@ -70,7 +70,8 @@ export default function CurrentPage() {
       })
       map.on('error', () => setMapError('Газрын зураг ачаалахад түр алдаа гарлаа'))
       mapInstanceRef.current = map
-    } catch {
+    } catch (error) {
+      console.error('Map initialization failed', error)
       setMapError('Газрын зураг ачаалагдсангүй. Интернэтээ шалгаад дахин оролдоно уу.')
     }
   }, [setMarker])

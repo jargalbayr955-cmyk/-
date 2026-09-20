@@ -296,7 +296,7 @@ export default function DriverPage() {
           const bounds=new ml.LngLatBounds();bounds.extend([drvLng,drvLat]);bounds.extend([userLng,userLat]);map.fitBounds(bounds,{padding:60,maxZoom:16,duration:400})
           mapInstanceRef.current=map
           lineRef.current='accepted-route'
-        }catch{}
+        }catch(error){console.error('Map initialization failed',error)}
       })()
     },250)
     return()=>{cancelled=true;clearTimeout(timer);driverMarkerRef.current?.remove?.();userMarkerRef.current?.remove?.();mapInstanceRef.current?.remove?.();mapInstanceRef.current=null;driverMarkerRef.current=null;userMarkerRef.current=null;lineRef.current=null}

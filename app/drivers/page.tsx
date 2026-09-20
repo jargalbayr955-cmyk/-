@@ -158,7 +158,7 @@ export default function DriversPage() {
         userMarkerRef.current=new ml.Marker({element:createDotMarker('#2563eb',18,'Таны байршил')}).setLngLat([userLng,userLat]).addTo(map)
         mapInstanceRef.current=map
         setMapReady(n => n + 1)
-      }catch{}
+      }catch(error){console.error('Map initialization failed',error)}
     })()
     const markerStore=driverMarkersRef.current
     return()=>{cancelled=true;userMarkerRef.current?.remove?.();userMarkerRef.current=null;for(const m of markerStore.values())m.remove?.();markerStore.clear();mapInstanceRef.current?.remove?.();mapInstanceRef.current=null}
