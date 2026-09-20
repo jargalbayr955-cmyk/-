@@ -62,7 +62,7 @@ export function getClientIp(req: Request) {
 
 export function normalizeMnPhone(value: unknown) {
   const digits = String(value ?? '').replace(/\D/g, '')
-  const local = digits.startsWith('976') ? digits.slice(3) : digits
+  const local = digits.length === 11 && digits.startsWith('976') ? digits.slice(3) : digits
   if (!/^\d{8}$/.test(local)) return null
   return `+976${local}`
 }
