@@ -10,6 +10,10 @@ function getSecret() {
   return value
 }
 
+export function isSessionConfigured() {
+  try { getSecret(); return true } catch { return false }
+}
+
 export type SessionRole = 'admin' | 'driver' | 'customer'
 export type SessionPayload = { sub: string; role: SessionRole; exp: number }
 
