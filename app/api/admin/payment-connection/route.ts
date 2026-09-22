@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase.from('settings').select('key,value').eq('key', 'bank_account').maybeSingle()
   if (error) return NextResponse.json({ error: 'Тохиргоог ачаалж чадсангүй.' }, { status: 503 })
   const config = { sender: body.sender.trim(), accountMask: body.accountMask.trim(), receivingAccount: normalizeReceivingAccount(data?.value) }
-  if (!validBankSmsConfig(config, data?.value)) return NextResponse.json({ error: '«Жолооч» цэсэнд банкны дансаа хадгална уу. SMS дэх дансны сүүлийн 4 орон тэр данстай таарч, илгээгч хоосон биш байх ёстой.' }, { status: 400 })
+  if (!validBankSmsConfig(config, data?.value)) return NextResponse.json({ error: '«Тохиргоо → Шимтгэл хүлээн авах данс» хэсэгт дансаа хадгална уу. SMS дэх дансны сүүлийн 4 орон тэр данстай таарч, илгээгч хоосон биш байх ёстой.' }, { status: 400 })
   const saved = await supabase.from('settings').upsert({ key: 'bank_sms_config', value: JSON.stringify(config) })
   if (saved.error) return NextResponse.json({ error: 'Хадгалж чадсангүй.' }, { status: 503 })
   return NextResponse.json({ success: true, sender: config.sender, accountMask: config.accountMask }, { headers: { 'Cache-Control': 'no-store' } })

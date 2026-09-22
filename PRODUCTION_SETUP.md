@@ -96,7 +96,7 @@ Promote only after reviewing the Preview verification results. Device GPS, push 
 
 The service fee is 5% of the agreed fare, rounded to the nearest 500 MNT. Example: 112820 × 5% = 5641 → 5500. Exact half steps round upward. The database stores the authoritative fee, so neither the browser nor MacroDroid chooses it.
 
-Current admins can copy the callback URL and dedicated key from **Эрх нээх → MacroDroid холболт тохируулах**. `PAYMENT_WEBHOOK_SECRET` overrides the default domain-separated HMAC key derived from `SESSION_SECRET`; no session secret is exposed. Set the receiving bank/account in **Жолооч**, then save the actual SMS sender ID and the SMS's masked account in the connection panel. The sender's contact display name is not sufficient. The masked account must match the visible digits of the receiving account. Changing the saved transfer account requires rebinding the SMS configuration.
+Current admins can copy the callback URL and dedicated key from **Тохиргоо → Төлбөр ормогц эрх автоматаар нээх → MacroDroid холболт тохируулах**. `PAYMENT_WEBHOOK_SECRET` overrides the default domain-separated HMAC key derived from `SESSION_SECRET`; no session secret is exposed. Set the receiving bank/account in **Тохиргоо → Шимтгэл хүлээн авах данс**, then save the actual SMS sender ID and the SMS's masked account in the connection panel. The sender's contact display name is not sufficient. The masked account must match the visible digits of the receiving account. Changing the saved transfer account requires rebinding the SMS configuration.
 
 For MacroDroid, use the bank sender's **SMS Received** trigger and an **HTTP Request** action:
 

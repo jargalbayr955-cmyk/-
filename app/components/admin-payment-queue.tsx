@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import styles from './admin-payment-queue.module.css'
 
 export type PendingDriverPayment = {
@@ -21,6 +22,7 @@ export function AdminPaymentQueue({ payments, approvingId, disabled, onApprove }
   disabled: boolean
   onApprove: (id: string) => void
 }) {
+  const [confirming, setConfirming] = useState<string | null>(null)
   return <div>{payments.map(payment => <article key={payment.id} className={styles.card}>
         <div className={styles.row}>
           <div><strong>{payment.driver_name || 'Жолооч'}</strong>
@@ -32,8 +34,10 @@ export function AdminPaymentQueue({ payments, approvingId, disabled, onApprove }
         {Number(payment.fare_amount) > 0 && <p className={styles.phone}>Тохиролцсон үнэ: {Number(payment.fare_amount).toLocaleString('mn-MN')} ₮ · Шимтгэл 5%</p>}
         <p className={styles.route}>{payment.from_address || 'Ачих газар'} → {payment.to_address || 'Хүргэх газар'}</p>
         <p className={styles.code}>Гүйлгээний утга: <strong>{payment.code}</strong></p>
-        <button type="button" disabled={disabled || approvingId !== null} onClick={() => onApprove(payment.id)}>
-          {approvingId === payment.id ? 'Зөвшөөрч байна…' : 'Зөвшөөрөх · Эрх нээх'}
-        </button>
+        {confirming === `${payment.id}:${payment.code}:${payment.amount}` ? <div className={styles.confirmation} role="group" aria-label="Төлбөрийн зөвшөөрөл баталгаажуулах">
+          <p><strong>{Number(payment.amount).toLocaleString('mn-MN')} ₮</strong> орлого <strong>{payment.code}</strong> гэсэн гүйлгээний утгатай орсныг шалгасан уу?</p>
+          <p className={styles.note}>Энэ захиалгын шимтгэлийг төлөгдсөнд тооцно. Хүлээгдэж буй өөр төлбөр байвал жолоочийн эрх хаалттай хэвээр байна.</p>
+          <div className={styles.searchRow}><button type="button" disabled={approvingId !== null} onClick={() => setConfirming(null)}>Болих</button><button type="button" disabled={disabled || approvingId !== null} onClick={() => onApprove(payment.id)}>{approvingId === payment.id ? 'Нээж байна…' : 'Орлогыг шалгасан · Эрх нээх'}</button></div>
+        </div> : <button type="button" disabled={disabled || approvingId !== null} onClick={() => setConfirming(`${payment.id}:${payment.code}:${payment.amount}`)}>Энэ төлбөрийг зөвшөөрөх · Эрх нээх</button>}
       </article>)}</div>
 }

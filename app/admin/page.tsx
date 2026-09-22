@@ -1,617 +1,224 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useScreenHistory } from '@/lib/client/use-screen-history'
 import { backInApp, readScreen } from '@/lib/client/navigation'
+import { createRequestSignal } from '@/lib/client/request-signal'
+import { adminSections, validAdminScreen, filterAdminDrivers, adminMoney, adminCarLabel, adminDate, type AdminTab, type AdminDashboard, type AdminDriver, type AdminOrder, type DriverFilter } from '@/lib/client/admin-view'
 import { AdminPasswordForm } from '../components/admin-password-form'
 import { AdminPaymentPanel } from '../components/admin-payment-panel'
-import { createDotMarker, freeMapStyle, loadFreeMap, validCoords, ULAANBAATAR } from '@/lib/client/free-map'
+import { AdminSettings } from '../components/admin-settings'
+import { AdminDriverMap } from '../components/admin-driver-map'
+import styles from './admin.module.css'
 
-type Driver = {
-  id: string
-  name: string
-  phone: string
-  car_type: string
-  car_number?: string | null
-  photo_url?: string | null
-  price: number | null
-  available: boolean
-  active: boolean
-  lat?: number | null
-  lng?: number | null
-  location_updated_at?: string | null
-}
+const emptyDashboard: AdminDashboard = { drivers: [], orders: [], activeOrders: [], pendingApprovalCount: 0, heroUrl: '', bankName: '', bankAccount: '' }
+type DriverAction = { action: 'toggle' | 'delete' | 'reset_pin'; driver: AdminDriver }
+type DriverNotice = { ok: boolean; text: string; pin?: string; phone?: string }
 
-type Order = {
-  id: string
-  created_at: string
-  completed_at: string
-  from_address: string
-  to_address: string
-  driver_name: string
-  driver_phone: string
-  car_type: string
-  car_mark: string
-  status: string
-  final_price: number
-  duration_minutes: number
-}
-
-const D = {
-  bg: '#060608',
-  card: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  text: 'white',
-  muted: 'rgba(255,255,255,0.4)',
-  red: '#e8433a',
-  input: {background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'white', borderRadius:'12px', padding:'12px 14px', fontSize:'14px', outline:'none', width:'100%', boxSizing:'border-box' as const, marginBottom:'10px'},
-}
-
-function MapTab({ drivers }: { drivers: any[] }) {
-  const mapRef=React.useRef<HTMLDivElement|null>(null)
-  const mapInstanceRef=React.useRef<any>(null)
-  const [mapReady, setMapReady] = useState(0)
-  const markersRef=React.useRef<any[]>([])
-
-  React.useEffect(()=>{
-    let cancelled=false
-    ;(async()=>{
-      try{
-        const ml=await loadFreeMap()
-        if(cancelled||!mapRef.current)return
-        const map=new ml.Map({container:mapRef.current,style:freeMapStyle(),center:[ULAANBAATAR.lng,ULAANBAATAR.lat],zoom:11.5,attributionControl:{}})
-        map.addControl(new ml.NavigationControl({showCompass:false}),'top-right')
-        mapInstanceRef.current=map
-        setMapReady(n => n + 1)
-      }catch(error){console.error('Map initialization failed',error)}
-    })()
-    return()=>{cancelled=true;markersRef.current.forEach(m=>m.remove?.());markersRef.current=[];mapInstanceRef.current?.remove?.();mapInstanceRef.current=null}
-  },[])
-
-  React.useEffect(()=>{
-    const map=mapInstanceRef.current,ml=window.maplibregl
-    if(!map||!ml)return
-    markersRef.current.forEach(m=>m.remove?.());markersRef.current=[]
-    const active=drivers.filter(d=>d.available&&validCoords(d.lat,d.lng))
-    const bounds=new ml.LngLatBounds();let has=false
-    active.forEach(d=>{
-      const el=createDotMarker('#e8433a',22,d.name||'Жолооч')
-      const marker=new ml.Marker({element:el}).setLngLat([Number(d.lng),Number(d.lat)]).addTo(map)
-      const popup=new ml.Popup({offset:24}).setText(`${String(d.name||'Жолооч')} · ${String(d.phone||'')} · ${d.car_type==='butten'?'Бүтэн ачигч':'Чирэгч'}`)
-      marker.setPopup(popup);markersRef.current.push(marker);bounds.extend([Number(d.lng),Number(d.lat)]);has=true
-    })
-    if(has)map.fitBounds(bounds,{padding:60,maxZoom:15,duration:400})
-  },[drivers,mapReady])
-
-  const activeDrivers=drivers.filter(d=>d.available&&validCoords(d.lat,d.lng))
-  return <div>
-    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px',gap:10,flexWrap:'wrap'}}>
-      <p style={{color:'rgba(255,255,255,0.5)',fontSize:'13px',margin:0}}>{activeDrivers.length} идэвхтэй жолооч байршил илгээсэн</p>
-      <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>{activeDrivers.map(d=><div key={d.id} style={{background:'rgba(232,67,58,0.12)',border:'1px solid rgba(232,67,58,0.3)',borderRadius:'20px',padding:'4px 12px',fontSize:'12px',color:'#ff6b5b',fontWeight:'700'}}>{d.name}</div>)}</div>
+function OrderCard({ order, now }: { order: AdminOrder; now: number }) {
+  const completed = order.status === 'completed'
+  const minutes = completed ? order.duration_minutes : Math.max(0, Math.round((now - new Date(order.created_at).getTime()) / 60000))
+  return <article className={styles.listCard}>
+    <div className={styles.driverHeader}>
+      <div><span className={`${styles.badge} ${styles.ready}`}>{completed ? 'Дууссан' : 'Явагдаж байна'}</span><p className={styles.muted}>Үүссэн: {adminDate(order.created_at)}</p></div>
+      <div><span className={styles.muted}>Тохиролцсон үнэ</span><h3>{Number(order.final_price) > 0 ? adminMoney(order.final_price) : 'Үнэ бүртгэгдээгүй'}</h3></div>
     </div>
-    <div ref={mapRef} style={{width:'100%',height:'500px',borderRadius:'16px',overflow:'hidden',border:'1px solid rgba(255,255,255,0.08)'}}/>
-  </div>
+    <h3>{order.driver_name || 'Жолоочийн нэр бүртгэгдээгүй'}</h3>
+    <p className={styles.muted}>{order.driver_phone && <a href={`tel:${order.driver_phone}`}>{order.driver_phone}</a>} · {adminCarLabel(order.car_type)}{order.car_mark ? ` · ${order.car_mark}` : ''}</p>
+    <div className={styles.orderRoute}><p><span>Хаанаас</span><strong>{order.from_address || 'Байршлаар сонгосон'}</strong></p><p><span>Хаашаа</span><strong>{order.to_address || 'Хүргэх газар оруулаагүй'}</strong></p></div>
+    <p className={styles.muted}>{completed ? `Дууссан: ${adminDate(order.completed_at)}` : 'Захиалга үүссэнээс хойш'}{minutes != null && Number.isFinite(minutes) ? ` · ${minutes} минут` : ''}</p>
+  </article>
 }
 
 export default function AdminPage() {
-  const router = useRouter()
-  const navigation = useScreenHistory('admin', 'drivers', (value): value is string => /^(drivers|payments|active|history|map)(:password|:add)?$/.test(value))
-  const tab = navigation.screen.split(':')[0] as 'drivers'|'payments'|'active'|'history'|'map'
-  const setTab = (value: typeof tab) => navigation.navigate(value)
-  const showForm = navigation.screen.endsWith(':add')
-  const showPasswordForm = navigation.screen.endsWith(':password')
-  const setShowForm = (show: boolean) => { if (show) navigation.navigate(`${tab}:add`); else if (readScreen('admin')?.value.endsWith(':add')) navigation.back() }
-  const setShowPasswordForm = (show: boolean) => { if (show) navigation.navigate(`${tab}:password`); else if (readScreen('admin')?.value.endsWith(':password')) navigation.back() }
-  const [drivers, setDrivers] = useState<Driver[]>([])
-  const [orders, setOrders] = useState<Order[]>([])
-  const [activeOrders, setActiveOrders] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState({ phone: '' })
-  const [adding, setAdding] = useState(false)
-  const [password, setPassword] = useState('')
-  const [authed, setAuthed] = useState(false)
-  const [mustChangePassword, setMustChangePassword] = useState(false)
-  const [loginError, setLoginError] = useState('')
-  const [loginBusy, setLoginBusy] = useState(false)
-  const [passwordMessage, setPasswordMessage] = useState('')
-  const loginPending = React.useRef(false)
-  const [mounted, setMounted] = useState(false)
-  const [heroUrl, setHeroUrl] = useState('')
-  const [bankName, setBankName] = useState('')
-  const [bankAccount, setBankAccount] = useState('')
-  const [search, setSearch] = useState('')
-  const [heroSaved, setHeroSaved] = useState(false)
-  const [bankSaved, setBankSaved] = useState(false)
-  const [nowMs, setNowMs] = useState(0)
-  const [dashboardError, setDashboardError] = useState('')
-  const [pendingApprovalCount, setPendingApprovalCount] = useState(0)
-  const dashboardSequence = React.useRef(0)
+  const router = useRouter(), navigation = useScreenHistory('admin', 'overview', validAdminScreen)
+  const tab = navigation.screen.split(':')[0] as AdminTab
+  const showForm = navigation.screen.endsWith(':add'), showPassword = navigation.screen.endsWith(':password')
+  const [dashboard, setDashboard] = useState<AdminDashboard>(emptyDashboard)
+  const [checkingSession, setCheckingSession] = useState(true), [authed, setAuthed] = useState(false), [mustChangePassword, setMustChangePassword] = useState(false)
+  const [password, setPassword] = useState(''), [loginError, setLoginError] = useState(''), [loginBusy, setLoginBusy] = useState(false)
+  const [loading, setLoading] = useState(true), [refreshing, setRefreshing] = useState(false), [dashboardError, setDashboardError] = useState('')
+  const [updatedAt, setUpdatedAt] = useState(''), [now, setNow] = useState(0), [passwordMessage, setPasswordMessage] = useState('')
+  const [search, setSearch] = useState(''), [filter, setFilter] = useState<DriverFilter>('all'), [phone, setPhone] = useState('')
+  const [driverAction, setDriverAction] = useState<DriverAction | null>(null), [driverBusy, setDriverBusy] = useState(false), [driverNotice, setDriverNotice] = useState<DriverNotice | null>(null)
+  const pendingLogin = useRef(false), pendingDriver = useRef(false), sequence = useRef(0), sessionGeneration = useRef(0)
+  const lifetime = useRef<AbortController | null>(null), dashboardRequest = useRef<AbortController | null>(null)
+  const heading = useRef<HTMLHeadingElement>(null), notice = useRef<HTMLDivElement>(null), previousScreen = useRef(navigation.screen)
+  const { drivers, orders, activeOrders, pendingApprovalCount } = dashboard
+  const availableDrivers = drivers.filter(driver => driver.active && driver.available)
+  const filteredDrivers = filterAdminDrivers(drivers, search, filter)
+  const currentSection = adminSections.find(section => section.id === tab) || adminSections[0]
 
-  useEffect(() => {
-    setMounted(true)
-    setNowMs(Date.now())
-    const clock = setInterval(() => setNowMs(Date.now()), 60_000)
-    fetch('/api/admin/session', { cache: 'no-store' })
-      .then(async r => { if (r.ok) { const body = await r.json(); setMustChangePassword(Boolean(body.mustChangePassword)); setAuthed(true) } })
-      .catch(() => {})
-    return () => clearInterval(clock)
+  const clearPrivateState = useCallback(() => {
+    sessionGeneration.current++; sequence.current++; dashboardRequest.current?.abort()
+    setAuthed(false); setDashboard(emptyDashboard); setDriverNotice(null); setDriverAction(null); setPhone('')
+    setUpdatedAt(''); setLoading(true); setPasswordMessage(''); setSearch(''); setFilter('all')
   }, [])
-
-  const fetchDashboard = React.useCallback(async (refreshSettings = false) => {
-    const sequence = ++dashboardSequence.current
+  const sessionExpired = useCallback(() => { clearPrivateState(); setLoginError('Нэвтрэлт дууслаа. Админы нууц үгээр дахин нэвтэрнэ үү.') }, [clearPrivateState])
+  const fetchDashboard = useCallback(async () => {
+    const attempt = ++sequence.current
+    dashboardRequest.current?.abort()
+    const controller = new AbortController(); dashboardRequest.current = controller
+    const request = createRequestSignal(12_000, controller.signal)
+    setRefreshing(true)
     try {
-    const res = await fetch('/api/admin/dashboard', { cache:'no-store', signal: AbortSignal.timeout(12_000) })
-    if (sequence !== dashboardSequence.current) return
-    if (res.status === 401) { setAuthed(false); return }
-    if (!res.ok) { setDashboardError('Мэдээлэл шинэчлэгдээгүй байна. Дахин оролдоно уу.'); return }
-    const body = await res.json()
-    if (sequence !== dashboardSequence.current) return
-    setDashboardError('')
-    setDrivers(body.drivers || [])
-    setActiveOrders(body.activeOrders || [])
-    setOrders(body.orders || [])
-    setPendingApprovalCount(body.pendingApprovalCount || 0)
-    // Background updates must not overwrite bank/account fields being edited.
-    if (refreshSettings) {
-      setHeroUrl(body.heroUrl || '')
-      setBankName(body.bankName || '')
-      setBankAccount(body.bankAccount || '')
-    }
-    } catch { if (sequence === dashboardSequence.current) setDashboardError('Сүлжээ тасарсан байна. Мэдээлэл шинэчлэгдээгүй.') }
-    finally { if (sequence === dashboardSequence.current) setLoading(false) }
-  }, [])
-  const fetchDrivers = () => fetchDashboard()
-  const fetchActiveOrders = () => fetchDashboard()
-  const fetchOrders = () => fetchDashboard()
-
+      const response = await fetch('/api/admin/dashboard', { cache: 'no-store', signal: request.signal })
+      if (attempt !== sequence.current || lifetime.current?.signal.aborted) return
+      if (response.status === 401 || response.status === 403) { sessionExpired(); return }
+      const body = await response.json()
+      if (attempt !== sequence.current || lifetime.current?.signal.aborted) return
+      if (!response.ok) throw new Error(body.error || 'Мэдээлэл ачаалж чадсангүй.')
+      setDashboard({ drivers: body.drivers || [], orders: body.orders || [], activeOrders: body.activeOrders || [], pendingApprovalCount: body.pendingApprovalCount || 0,
+        heroUrl: body.heroUrl || '', bankName: body.bankName || '', bankAccount: body.bankAccount || '' })
+      setUpdatedAt(new Date().toISOString()); setDashboardError('')
+    } catch (cause) {
+      if (attempt === sequence.current && !lifetime.current?.signal.aborted) setDashboardError(cause instanceof Error && cause.name !== 'AbortError' ? cause.message : 'Холболт тасарлаа. Мэдээлэл хамгийн сүүлд шинэчилсэн үеийнх байна.')
+    } finally { request.dispose(); if (attempt === sequence.current && !lifetime.current?.signal.aborted) { setLoading(false); setRefreshing(false) } }
+  }, [sessionExpired])
   useEffect(() => {
-    if (authed && !mustChangePassword) {
-      void fetchDashboard(true)
-      const refresh = () => { if (document.visibilityState === 'visible') void fetchDashboard() }
-      const interval = setInterval(refresh, 10_000)
-      document.addEventListener('visibilitychange', refresh)
-      return () => { clearInterval(interval); document.removeEventListener('visibilitychange', refresh); dashboardSequence.current++ }
-    }
-  }, [authed, mustChangePassword, fetchDashboard])
-
-  const paymentSessionExpired = React.useCallback(() => {
-    setAuthed(false); setLoginError('Нэвтрэлт дууслаа. Дахин нэвтэрнэ үү.')
+    const controller = new AbortController(); lifetime.current = controller
+    const request = createRequestSignal(12_000, controller.signal)
+    setNow(Date.now())
+    const timer = setInterval(() => setNow(Date.now()), 60_000)
+    void (async () => {
+      try {
+        const response = await fetch('/api/admin/session', { cache: 'no-store', signal: request.signal })
+        const body = await response.json()
+        if (controller.signal.aborted) return
+        if (response.ok) { setMustChangePassword(Boolean(body.mustChangePassword)); setAuthed(true) }
+        else if (response.status !== 401) setLoginError('Нэвтрэлтийг шалгаж чадсангүй. Дахин оролдоно уу.')
+      } catch { if (!controller.signal.aborted) setLoginError('Интернэт холболтоо шалгаад нэвтэрнэ үү.') }
+      finally { request.dispose(); if (!controller.signal.aborted) setCheckingSession(false) }
+    })()
+    return () => { controller.abort(); request.dispose(); clearInterval(timer); sequence.current++; dashboardRequest.current?.abort() }
   }, [])
-
-  const saveHeroUrl = async () => {
-    const res = await fetch('/api/admin/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:'hero_url',value:heroUrl}) })
-    if (!res.ok) return alert('Хадгалахад алдаа гарлаа')
-    setHeroSaved(true)
-    setTimeout(() => setHeroSaved(false), 2000)
+  useEffect(() => {
+    if (!authed || mustChangePassword) return
+    void fetchDashboard()
+    const refresh = () => { if (document.visibilityState === 'visible' && !pendingDriver.current) void fetchDashboard() }
+    const timer = setInterval(refresh, 10_000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', refresh); sequence.current++; dashboardRequest.current?.abort() }
+  }, [authed, mustChangePassword, fetchDashboard])
+  useEffect(() => {
+    if (previousScreen.current !== navigation.screen) {
+      previousScreen.current = navigation.screen; heading.current?.focus()
+      if (tab !== 'drivers') { setDriverNotice(null); setDriverAction(null) }
+    }
+  }, [navigation.screen, tab])
+  useEffect(() => { if (driverNotice) notice.current?.focus() }, [driverNotice])
+  const setTab = (next: AdminTab) => { if (next !== navigation.screen) navigation.navigate(next) }
+  const closeSubpage = () => { if (readScreen('admin')?.value.includes(':')) navigation.back() }
+  const mutateDriver = async (action: 'add' | DriverAction['action'], driver?: AdminDriver) => {
+    if (pendingDriver.current) return
+    pendingDriver.current = true; setDriverBusy(true); setDriverNotice(null)
+    const generation = sessionGeneration.current, parent = lifetime.current?.signal, request = createRequestSignal(12_000, parent)
+    try {
+      const response = await fetch('/api/admin/drivers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: request.signal,
+        body: JSON.stringify(action === 'add' ? { action, driver: { phone, name: 'Шинэ жолооч' } } : { action, id: driver?.id }) })
+      const body = await response.json()
+      if (parent?.aborted || generation !== sessionGeneration.current) return
+      if (response.status === 401 || response.status === 403) { sessionExpired(); return }
+      if (!response.ok) throw new Error(body.error || 'Үйлдэл хадгалагдсангүй.')
+      if (!readScreen('admin')?.value.startsWith('drivers')) { void fetchDashboard(); return }
+      setDriverNotice({ ok: true, text: action === 'add' ? 'Жолооч бүртгэгдлээ.' : action === 'reset_pin' ? 'Жолоочийн PIN шинэчлэгдлээ.' : action === 'delete' ? 'Жолооч жагсаалтаас хасагдлаа. Захиалгын түүх хадгалагдсан.' : body.active ? 'Бүртгэл идэвхжлээ. Жолооч өөрөө нэвтэрч ажиллах төлөвөө асаана.' : 'Жолоочийн бүртгэлийг түр хаалаа.', pin: body.pin, phone: driver?.phone || phone })
+      setDriverAction(null)
+      if (action === 'add') { setPhone(''); navigation.navigate('drivers', true) }
+      void fetchDashboard()
+    } catch (cause) {
+      if (!parent?.aborted && generation === sessionGeneration.current) setDriverNotice({ ok: false, text: cause instanceof Error && cause.name !== 'AbortError' ? cause.message : 'Холболт тасарлаа. Дахин үйлдэхээс өмнө жагсаалтаа шинэчилж шалгана уу.' })
+    } finally { request.dispose(); pendingDriver.current = false; if (!parent?.aborted) setDriverBusy(false) }
   }
-
-  const saveBankSettings = async () => {
-    const results = await Promise.all([
-      fetch('/api/admin/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:'bank_name',value:bankName}) }),
-      fetch('/api/admin/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:'bank_account',value:bankAccount}) }),
-    ])
-    if (results.some(r => !r.ok)) return alert('Дансны мэдээлэл хадгалахад алдаа гарлаа')
-    setBankSaved(true)
-    setTimeout(() => setBankSaved(false), 2000)
-  }
-
-  const handleAdd = async () => {
-    if (!form.phone) return
-    setAdding(true)
-    const res = await fetch('/api/admin/drivers', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'add', driver: { phone: form.phone, name: 'Шинэ жолооч' } })
-    })
-    const body = await res.json().catch(()=>({}))
-    if (!res.ok) { setAdding(false); alert(body.error || 'Жолооч нэмэхэд алдаа гарлаа'); return }
-    if (body.pin) alert(`Жолоочийн түр PIN: ${body.pin}\nЖолоочид аюулгүй сувгаар дамжуулна уу.`)
-    setForm({ phone: '' })
-    setShowForm(false)
-    fetchDrivers()
-    setAdding(false)
-  }
-
-  const toggleDriverActive = async (id: string) => {
-    const res = await fetch('/api/admin/drivers', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'toggle', id })
-    })
-    if (!res.ok) alert('Эрх өөрчлөхөд алдаа гарлаа')
-    fetchDrivers()
-  }
-
-  const resetDriverPin = async (id: string) => {
-    const res = await fetch('/api/admin/drivers', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'reset_pin',id}) })
-    const body = await res.json().catch(()=>({}))
-    if (!res.ok) return alert(body.error || 'PIN шинэчлэхэд алдаа гарлаа')
-    alert(`Шинэ түр PIN: ${body.pin}\nЖолоочид аюулгүй сувгаар дамжуулна уу.`)
-  }
-
-  const deleteDriver = async (id: string) => {
-    if (!confirm('Жолоочийг идэвхгүй болгож жагсаалтаас хасах уу? Өмнөх захиалгын түүх хадгалагдана.')) return
-    const res = await fetch('/api/admin/drivers', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', id })
-    })
-    if (!res.ok) alert('Устгахад алдаа гарлаа')
-    fetchDrivers()
-  }
-
-  const formatDuration = (mins: number) => {
-    if (!mins) return '-'
-    if (mins < 60) return `${mins} мин`
-    return `${Math.floor(mins/60)}ц ${mins%60}мин`
-  }
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '-'
-    const d = new Date(dateStr)
-    return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`
-  }
-
-  const carLabel = (type: string) => {
-    if (type === 'butten') return 'Бүтэн ачигч'
-    if (type === 'chiregch') return 'Чирэгч'
-    return type || '-'
-  }
-
   const logout = async () => {
     try {
       const response = await fetch('/api/admin/session', { method: 'DELETE' })
       if (!response.ok) { setDashboardError('Гарч чадсангүй. Дахин оролдоно уу.'); return }
-      setAuthed(false); setMustChangePassword(false); setShowPasswordForm(false)
-      setPasswordMessage(''); setDashboardError(''); setDrivers([]); setOrders([]); setActiveOrders([])
-    } catch { setDashboardError('Холболтоо шалгаад дахин оролдоно уу.') }
+      clearPrivateState(); setMustChangePassword(false); setPassword(''); setLoginError(''); setDashboardError(''); navigation.navigate('overview', true)
+    } catch { setDashboardError('Интернэт холболтоо шалгаад дахин оролдоно уу.') }
   }
+  const passwordChanged = () => { setMustChangePassword(false); closeSubpage(); setPasswordMessage('Нууц үг солигдлоо. Дараагийн нэвтрэлтэд шинэ нууц үгээ ашиглана уу.') }
 
-  const passwordChanged = () => {
-    setMustChangePassword(false); setShowPasswordForm(false)
-    setPasswordMessage('Нууц үг солигдлоо. Дараа нэвтрэхдээ шинэ нууц үгээ ашиглана уу.')
-  }
+  if (checkingSession) return <div className={`${styles.page} ${styles.login}`}><p role="status">Админы нэвтрэлтийг шалгаж байна…</p></div>
+  if (!authed) return <main className={`${styles.page} ${styles.login}`}><div className={styles.loginCard}>
+    <div className={styles.brandMark} aria-hidden="true">А</div><p className={styles.eyebrow}>АЧИЛТ · УДИРДЛАГА</p><h1>Админаар нэвтрэх</h1><p className={styles.muted}>Жолооч, захиалга, төлбөрийн эрхийг удирдана.</p>
+    <form onSubmit={async event => {
+      event.preventDefault(); if (pendingLogin.current) return
+      pendingLogin.current = true; setLoginBusy(true); setLoginError('')
+      const parent = lifetime.current?.signal, request = createRequestSignal(12_000, parent)
+      try {
+        const response = await fetch('/api/admin/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }), signal: request.signal })
+        const body = await response.json()
+        if (parent?.aborted) return
+        if (!response.ok) { setLoginError(body.error || 'Нэвтэрч чадсангүй.'); return }
+        setMustChangePassword(Boolean(body.mustChangePassword)); setAuthed(true); setPassword(''); setLoading(true)
+      } catch { if (!parent?.aborted) setLoginError('Холболтоо шалгаад дахин оролдоно уу.') }
+      finally { request.dispose(); pendingLogin.current = false; if (!parent?.aborted) setLoginBusy(false) }
+    }}><label htmlFor="admin-login-password">Админы нууц үг</label><input id="admin-login-password" type="password" autoComplete="current-password" required maxLength={128} value={password} disabled={loginBusy} onChange={event => setPassword(event.target.value)} />
+      {loginError && <p className={styles.error} role="alert">{loginError}</p>}<button className={styles.primary} type="submit" disabled={loginBusy}>{loginBusy ? 'Нэвтэрч байна…' : 'Нэвтрэх'}</button>
+    </form><button type="button" className={styles.linkButton} onClick={() => backInApp(router, '/start')}>← Эхлэх хуудас</button>
+  </div></main>
+  if (mustChangePassword) return <main className={`${styles.page} ${styles.login}`}><div>{dashboardError && <p className={styles.error} role="alert">{dashboardError}</p>}<AdminPasswordForm required onChanged={passwordChanged} onCancel={() => void logout()} onSessionExpired={sessionExpired} /></div></main>
 
-  // Нийт статистик
-  const totalRevenue = orders.reduce((sum, o) => sum + (o.final_price || 0), 0)
-  const totalOrders = orders.length
-
-  if (!mounted) return <div style={{minHeight:'100vh', background:'#060608'}}/>
-
-  if (!authed) {
-    return (
-      <div style={{minHeight:'100vh', background:D.bg, display:'flex', alignItems:'center', justifyContent:'center', padding:'16px'}}>
-        <div style={{background:D.card, border:D.border, borderRadius:'20px', padding:'32px', width:'100%', maxWidth:'360px'}}>
-          <div style={{textAlign:'center', marginBottom:'24px'}}>
-            <div style={{fontSize:'36px', marginBottom:'8px'}}>🔐</div>
-            <h1 style={{color:D.text, fontSize:'20px', fontWeight:'800', margin:0}}>Admin</h1>
-          </div>
-          <form onSubmit={async event => {
-            event.preventDefault()
-            if (loginPending.current) return
-            loginPending.current = true; setLoginBusy(true); setLoginError('')
-            try {
-              const res = await fetch('/api/admin/session', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }),
-              })
-              const body = await res.json().catch(() => ({}))
-              if (res.ok) { setMustChangePassword(Boolean(body.mustChangePassword)); setAuthed(true); setPassword('') }
-              else setLoginError(body.error || 'Нэвтэрч чадсангүй. Дахин оролдоно уу.')
-            } catch { setLoginError('Холболтоо шалгаад дахин оролдоно уу.') }
-            finally { loginPending.current = false; setLoginBusy(false) }
-          }}>
-            <label htmlFor="admin-login-password" style={{display:'block', color:'#c4ccd8', fontSize:13, marginBottom:8}}>Админы нууц үг</label>
-            <input id="admin-login-password" type="password" autoComplete="current-password" required maxLength={128} placeholder="Нууц үг" value={password} disabled={loginBusy} onChange={e => setPassword(e.target.value)}
-              style={{...D.input, fontSize:16, marginBottom:14}}/>
-            {loginError && <p className="admin-auth-error" role="alert">{loginError}</p>}
-            <button type="submit" disabled={loginBusy}
-              style={{width:'100%', borderRadius:14, padding:14, background:D.red, border:'none', color:D.text, fontSize:15, fontWeight:800, cursor:'pointer'}}>
-              {loginBusy ? 'Нэвтэрч байна…' : 'Нэвтрэх →'}
-            </button>
-          </form>
-        </div>
-        <style>{`input::placeholder{color:rgba(255,255,255,0.25);}`}</style>
-      </div>
-    )
-  }
-
-  if (mustChangePassword) return <main className="admin-password-screen">
-    {dashboardError && <p className="admin-auth-error" role="alert">{dashboardError}</p>}
-    <AdminPasswordForm required onChanged={passwordChanged} onCancel={logout} onSessionExpired={() => { setAuthed(false); setLoginError('Нэвтрэлт дууслаа. Дахин нэвтэрнэ үү.') }} />
-  </main>
-
-  return (
-    <div style={{minHeight:'100vh', background:D.bg, paddingBottom:'40px'}}>
-      {dashboardError && <div role="alert" style={{padding:'16px', color:'#ff6b6b'}}>{dashboardError} <button onClick={() => void fetchDashboard()}>Дахин ачаалах</button></div>}
-      {/* Header */}
-      <button type="button" className="offers-back" style={{margin:'12px 20px 0'}} onClick={() => { if (!navigation.back()) backInApp(router, '/start') }}>← Буцах</button>
-      <div style={{padding:'16px 20px', background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap'}}>
-        <div style={{display:'flex', alignItems:'center', gap:'10px', flex:1}}>
-          <span style={{fontSize:'24px'}}>🚛</span>
-          <h1 style={{color:D.text, fontSize:'18px', fontWeight:'800', margin:0}}>Admin Panel</h1>
-        </div>
-        {tab === 'drivers' && (
-          <button onClick={() => setShowForm(!showForm)}
-            style={{borderRadius:'20px', padding:'8px 16px', background:D.red, border:'none', color:D.text, fontSize:'13px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 15px rgba(232,67,58,0.35)'}}>
-            + Жолооч нэмэх
-          </button>
-        )}
-        <button className="admin-account-action" onClick={() => { setShowPasswordForm(!showPasswordForm); setPasswordMessage('') }}>Нууц үг солих</button>
-        <button className="admin-account-action" onClick={logout}>Гарах</button>
-      </div>
-
-      {passwordMessage && <p className="admin-password-success" role="status">{passwordMessage}</p>}
-      {showPasswordForm && <div className="admin-password-wrapper">
-        <AdminPasswordForm onChanged={passwordChanged} onCancel={() => setShowPasswordForm(false)} onSessionExpired={() => { setAuthed(false); setLoginError('Нэвтрэлт дууслаа. Дахин нэвтэрнэ үү.') }} />
-      </div>}
-
-      {/* Tabs */}
-      <div style={{display:'flex', gap:'8px', flexWrap:'wrap', padding:'16px 20px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
-        {[
-          {id:'drivers', label:'🚛 Жолооч'},
-          {id:'payments', label:`✓ Эрх нээх${pendingApprovalCount ? ` (${pendingApprovalCount})` : ''}`},
-          {id:'active', label:'⚡ Идэвхтэй'},
-          {id:'history', label:'📋 Захиалгын түүх'},
-          {id:'map', label:'🗺️ Газрын зураг'}
-        ].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id as any)} style={{
-            borderRadius:'20px', padding:'8px 18px', fontSize:'13px', fontWeight:'700', cursor:'pointer',
-            background: tab === t.id ? D.red : 'rgba(255,255,255,0.05)',
-            border: tab === t.id ? 'none' : '1px solid rgba(255,255,255,0.08)',
-            color: tab === t.id ? 'white' : D.muted,
-            boxShadow: tab === t.id ? '0 4px 15px rgba(232,67,58,0.3)' : 'none'
-          }}>{t.label}</button>
-        ))}
-      </div>
-
-      <div style={{padding:'16px', maxWidth:'700px', margin:'0 auto'}}>
-
-        {tab === 'payments' && <AdminPaymentPanel onSessionExpired={paymentSessionExpired} onApproved={fetchDashboard} />}
-
-        {/* DRIVERS TAB */}
-        {tab === 'drivers' && (
-          <>
-            {/* Hero URL */}
-            <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'16px', marginBottom:'16px'}}>
-              <p style={{color:D.text, fontWeight:'700', fontSize:'14px', margin:'0 0 12px'}}>🖼️ Нүүр хуудасны зураг</p>
-              <input type="text" placeholder="Зургийн URL..." value={heroUrl} onChange={e => setHeroUrl(e.target.value)} style={{...D.input}}/>
-              {heroUrl && <img src={heroUrl} alt="preview" style={{width:'100%', height:'120px', objectFit:'cover', borderRadius:'10px', marginBottom:'10px'}}/>}
-              <button onClick={saveHeroUrl} style={{width:'100%', borderRadius:'12px', padding:'12px', background:D.red, border:'none', color:D.text, fontSize:'14px', fontWeight:'700', cursor:'pointer'}}>
-                {heroSaved ? '✅ Хадгалагдлаа!' : 'Хадгалах'}
-              </button>
+  return <div className={styles.page}>
+    <header className={styles.topbar}><div className={styles.topbarInner}>
+      <div className={styles.brand}><div className={styles.brandMark} aria-hidden="true">А</div><div><p className={styles.eyebrow}>АЧИЛТ</p><h1>Удирдлагын самбар</h1></div></div>
+      <div className={styles.actions}><button type="button" className={styles.quiet} disabled={driverBusy} onClick={() => { if (!navigation.back()) backInApp(router, '/start') }}>← Буцах</button><button type="button" disabled={refreshing} onClick={() => void fetchDashboard()}>{refreshing ? 'Шинэчилж байна…' : 'Мэдээлэл шинэчлэх'}</button><button type="button" className={styles.quiet} disabled={driverBusy} onClick={() => void logout()}>Гарах</button></div>
+    </div></header>
+    <div className={styles.layout}>
+      <aside className={styles.sidebar}><nav className={styles.nav} aria-label="Админы үндсэн цэс">{adminSections.map((section, index) => <button type="button" key={section.id} className={styles.navItem} disabled={driverBusy} aria-current={tab === section.id ? 'page' : undefined} onClick={() => setTab(section.id)}>
+        <span className={styles.navIndex}>{String(index + 1).padStart(2, '0')}</span><span><strong>{section.label}</strong><small>{section.description}</small></span>{section.id === 'payments' && pendingApprovalCount > 0 && <span className={styles.navBadge}>{pendingApprovalCount}</span>}
+      </button>)}</nav><p className={styles.sidebarNote}>Нээлттэй үед мэдээлэл 10 секунд тутам шинэчлэгдэнэ.<br />{updatedAt ? `Сүүлд: ${adminDate(updatedAt)}` : 'Мэдээлэл хүлээж байна…'}</p></aside>
+      <main className={styles.main}>
+        <div className={styles.pageHeading}><div><h2 ref={heading} tabIndex={-1}>{currentSection.label}</h2><p className={styles.muted}>{currentSection.description}</p></div>{tab === 'drivers' && !showForm && <button type="button" className={styles.primary} disabled={driverBusy} onClick={() => { setDriverNotice(null); navigation.navigate('drivers:add') }}>+ Жолооч бүртгэх</button>}</div>
+        {dashboardError && <p className={styles.error} role="alert">{dashboardError} <button type="button" onClick={() => void fetchDashboard()}>Дахин ачаалах</button></p>}
+        {passwordMessage && <p className={styles.success} role="status">{passwordMessage}</p>}
+        {showPassword && <div className={styles.passwordWrap}><AdminPasswordForm onChanged={passwordChanged} onCancel={closeSubpage} onSessionExpired={sessionExpired} /></div>}
+        {loading && <p className={styles.empty} role="status">Мэдээллийг ачаалж байна…</p>}
+        {!loading && !updatedAt && <p className={styles.empty}>Мэдээлэл хараахан ачаалагдаагүй. Дээрх «Дахин ачаалах» товчийг дарна уу.</p>}
+        {updatedAt && <>
+          {tab === 'overview' && <>
+            <div className={styles.cards}>
+              <button className={`${styles.stat} ${pendingApprovalCount ? styles.attention : ''}`} onClick={() => setTab('payments')}><span>Төлбөр хүлээж буй</span><strong>{pendingApprovalCount}</strong><small>Шимтгэл шалгах, эрх нээх →</small></button>
+              <button className={styles.stat} onClick={() => setTab('active')}><span>Явагдаж буй захиалга</span><strong>{activeOrders.length}{activeOrders.length >= 50 ? '+' : ''}</strong><small>Жолооч сонгогдсон захиалгууд →</small></button>
+              <button className={styles.stat} onClick={() => { setFilter('available'); setSearch(''); setTab('drivers') }}><span>Захиалга авахад бэлэн</span><strong>{availableDrivers.length}</strong><small>Нийт {drivers.length} жолооч бүртгэлтэй →</small></button>
+              <button className={styles.stat} onClick={() => setTab('history')}><span>Дууссан захиалга</span><strong>{orders.length}{orders.length >= 100 ? '+' : ''}</strong><small>Сүүлийн 24 цагт үүссэн захиалга →</small></button>
             </div>
-
-            <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'16px', marginBottom:'16px'}}>
-              <p style={{color:D.text, fontWeight:'700', fontSize:'14px', margin:'0 0 12px'}}>🏦 Төлбөр хүлээн авах данс</p>
-              <input type="text" placeholder="Банкны нэр" value={bankName} onChange={e => setBankName(e.target.value)} style={{...D.input}}/>
-              <input type="text" placeholder="Дансны дугаар" value={bankAccount} onChange={e => setBankAccount(e.target.value)} style={{...D.input}}/>
-              <button onClick={saveBankSettings} style={{width:'100%', borderRadius:'12px', padding:'12px', background:D.red, border:'none', color:D.text, fontSize:'14px', fontWeight:'700', cursor:'pointer'}}>
-                {bankSaved ? '✅ Хадгалагдлаа!' : 'Данс хадгалах'}
-              </button>
-            </div>
-
-            {/* Add form */}
-            {showForm && (
-              <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'16px', marginBottom:'16px'}}>
-                <p style={{color:D.text, fontWeight:'700', fontSize:'14px', margin:'0 0 6px'}}>Шинэ жолооч нэмэх</p>
-                <p style={{color:D.muted, fontSize:'12px', margin:'0 0 14px'}}>Нэмсний дараа 6 оронтой түр PIN нэг удаа харагдана. Жолооч нэвтэрсний дараа PIN-ээ сольж болно.</p>
-                <input type="tel" placeholder="Утасны дугаар" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} style={D.input}/>
-                <div style={{display:'flex', gap:'10px'}}>
-                  <button onClick={handleAdd} disabled={adding} style={{flex:1, borderRadius:'12px', padding:'12px', background: adding ? 'rgba(232,67,58,0.4)' : D.red, border:'none', color:D.text, fontSize:'14px', fontWeight:'700', cursor:'pointer'}}>
-                    {adding ? 'Нэмж байна...' : 'Нэмэх'}
-                  </button>
-                  <button onClick={() => setShowForm(false)} style={{flex:1, borderRadius:'12px', padding:'12px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:D.muted, fontSize:'14px', cursor:'pointer'}}>
-                    Болих
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Хайлт */}
-            <div style={{position:'relative', marginBottom:'12px'}}>
-              <input
-                type="text"
-                placeholder="Нэр эсвэл дугаараар хайх..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                style={{...D.input, marginBottom:0, paddingLeft:'36px'}}
-              />
-              <span style={{position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)', color:D.muted, fontSize:'14px'}}>🔍</span>
-            </div>
-            <p style={{color:D.muted, fontSize:'12px', margin:'0 0 12px'}}>{drivers.length} жолооч бүртгэлтэй</p>
-
-            {loading ? (
-              <p style={{color:D.muted, textAlign:'center', padding:'40px 0'}}>Ачааллаж байна...</p>
-            ) : (
-              <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
-                {drivers.filter(d =>
-                !search ||
-                d.name?.toLowerCase().includes(search.toLowerCase()) ||
-                d.phone?.includes(search)
-              ).map((d) => (
-                  <div key={d.id} style={{background:D.card, border:D.border, borderRadius:'16px', padding:'14px 16px'}}>
-                    <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
-                      <div style={{width:'42px', height:'42px', borderRadius:'50%', background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.3)', display:'flex', alignItems:'center', justifyContent:'center', color:'#ff6b5b', fontSize:'16px', fontWeight:'800', flexShrink:0}}>
-                        {d.name.charAt(0)}
-                      </div>
-                      <div style={{flex:1}}>
-                        <p style={{color:D.text, fontWeight:'700', fontSize:'14px', margin:0}}>{d.name}</p>
-                        <p style={{color:D.muted, fontSize:'12px', margin:'3px 0 0'}}>{d.phone} · {carLabel(d.car_type)} · ₮{d.price?.toLocaleString()}</p>
-                      </div>
-                      <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-                        {!d.active ? (
-                          <button onClick={() => toggleDriverActive(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border:'1px solid rgba(232,67,58,0.4)', background:'rgba(232,67,58,0.12)', color:'#ff6b5b'}}>
-                            Бүртгэл идэвхжүүлэх
-                          </button>
-                        ) : (
-                          <button onClick={() => toggleDriverActive(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border:'1px solid rgba(34,197,94,0.3)', background:'rgba(34,197,94,0.12)', color:'#22c55e'}}>
-                            Бүртгэл түр хаах
-                          </button>
-                        )}
-                        <button onClick={() => resetDriverPin(d.id)} style={{borderRadius:'10px', padding:'6px 10px', fontSize:'12px', fontWeight:'700', cursor:'pointer', background:'rgba(59,130,246,0.1)', border:'1px solid rgba(59,130,246,0.25)', color:'#60a5fa'}}>
-                          PIN
-                        </button>
-                        <button onClick={() => deleteDriver(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', background:'rgba(232,67,58,0.1)', border:'1px solid rgba(232,67,58,0.2)', color:'#ff6b5b'}}>
-                          Хасах
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ACTIVE ORDERS TAB */}
-        {tab === 'active' && (
-          <div>
-            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'14px'}}>
-              <p style={{color:D.muted, fontSize:'12px', margin:0}}>⚡ Одоо явагдаж байгаа захиалгууд</p>
-              <button onClick={fetchActiveOrders} style={{borderRadius:'12px', padding:'7px 14px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:D.muted, fontSize:'13px', cursor:'pointer'}}>
-                ↺ Шинэчлэх
-              </button>
-            </div>
-            {activeOrders.filter(o => o.status === 'confirmed').length === 0 ? (
-              <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'40px', textAlign:'center'}}>
-                <p style={{color:D.muted, fontSize:'14px', margin:0}}>Одоогоор идэвхтэй захиалга байхгүй</p>
-              </div>
-            ) : (
-              <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
-                {activeOrders.filter(o => o.status === 'confirmed').map((o) => {
-                  const mins = Math.round(((nowMs || new Date(o.created_at).getTime()) - new Date(o.created_at).getTime()) / 60000)
-                  const price = o.final_price || (o.offers && o.offers.length > 0 ? o.offers[0].price : 0)
-                  return (
-                    <div key={o.id} style={{background:D.card, border:'1px solid rgba(232,67,58,0.2)', borderRadius:'16px', padding:'16px'}}>
-                      <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px'}}>
-                        <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
-                          <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#22c55e', animation:'pulse 1.5s infinite'}}/>
-                          <span style={{color:'#22c55e', fontSize:'12px', fontWeight:'700'}}>Явагдаж байна</span>
-                        </div>
-                        <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                          <span style={{color:'#3b82f6', fontSize:'13px', fontWeight:'600'}}>⏱ {mins} мин</span>
-                          {price > 0 && <span style={{color:'#e8433a', fontSize:'14px', fontWeight:'800'}}>₮{price.toLocaleString()}</span>}
-                        </div>
-                      </div>
-                      {/* Жолооч */}
-                      {o.driver_name && (
-                        <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px'}}>
-                          <div style={{width:'32px', height:'32px', borderRadius:'50%', background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.25)', display:'flex', alignItems:'center', justifyContent:'center', color:'#ff6b5b', fontSize:'13px', fontWeight:'800'}}>
-                            {o.driver_name?.charAt(0)}
-                          </div>
-                          <div>
-                            <p style={{color:'white', fontWeight:'700', fontSize:'13px', margin:0}}>{o.driver_name}</p>
-                            <p style={{color:D.muted, fontSize:'11px', margin:'1px 0 0'}}>{o.driver_phone}</p>
-                          </div>
-                        </div>
-                      )}
-                      {/* Маршрут */}
-                      <div style={{background:'rgba(255,255,255,0.03)', borderRadius:'10px', padding:'10px', marginBottom:'12px'}}>
-                        <div style={{display:'flex', gap:'8px', marginBottom:'6px'}}>
-                          <div style={{width:'7px', height:'7px', borderRadius:'50%', background:'#3b82f6', marginTop:'4px', flexShrink:0}}/>
-                          <p style={{color:'rgba(255,255,255,0.6)', fontSize:'12px', margin:0}}>{o.from_address || '-'}</p>
-                        </div>
-                        <div style={{display:'flex', gap:'8px'}}>
-                          <div style={{width:'7px', height:'7px', borderRadius:'50%', background:D.red, marginTop:'4px', flexShrink:0}}/>
-                          <p style={{color:'rgba(255,255,255,0.6)', fontSize:'12px', margin:0}}>{o.to_address || '-'}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-
-          </div>
-        )}
-
-        {/* MAP TAB */}
-        {tab === 'map' && (
-          <MapTab drivers={drivers} />
-        )}
-
-        {/* HISTORY TAB */}
-        {tab === 'history' && (
-          <>
-            {/* Статистик */}
-            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'16px'}}>
-              <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'16px', textAlign:'center'}}>
-                <p style={{color:D.muted, fontSize:'12px', margin:'0 0 6px'}}>Нийт захиалга</p>
-                <p style={{color:'white', fontWeight:'800', fontSize:'28px', margin:0}}>{totalOrders}</p>
-              </div>
-              <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'16px', textAlign:'center'}}>
-                <p style={{color:D.muted, fontSize:'12px', margin:'0 0 6px'}}>Нийт орлого</p>
-                <p style={{color:'#e8433a', fontWeight:'800', fontSize:'24px', margin:0}}>₮{totalRevenue.toLocaleString()}</p>
-              </div>
-            </div>
-
-            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'14px'}}>
-              <p style={{color:D.muted, fontSize:'12px', margin:0}}>⏰ Сүүлийн 24 цагийн захиалга</p>
-              <button onClick={fetchOrders} style={{borderRadius:'12px', padding:'7px 14px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', color:D.muted, fontSize:'13px', cursor:'pointer'}}>
-                ↺ Шинэчлэх
-              </button>
-            </div>
-
-            {orders.length === 0 ? (
-              <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'40px', textAlign:'center'}}>
-                <p style={{color:D.muted, fontSize:'14px', margin:0}}>Дууссан захиалга байхгүй</p>
-              </div>
-            ) : (
-              <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
-                {orders.map((o) => (
-                  <div key={o.id} style={{background:D.card, border:D.border, borderRadius:'16px', padding:'14px 16px'}}>
-                    <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'10px'}}>
-                      <span style={{color:D.muted, fontSize:'12px'}}>{formatDate(o.created_at)}</span>
-                      <span style={{color:'#22c55e', fontSize:'12px', fontWeight:'700', background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,0.2)', borderRadius:'10px', padding:'3px 10px'}}>✅ Дууссан</span>
-                    </div>
-
-                    {/* Жолооч */}
-                    {o.driver_name && (
-                      <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px'}}>
-                        <div style={{width:'32px', height:'32px', borderRadius:'50%', background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.25)', display:'flex', alignItems:'center', justifyContent:'center', color:'#ff6b5b', fontSize:'13px', fontWeight:'800'}}>
-                          {o.driver_name?.charAt(0)}
-                        </div>
-                        <div style={{flex:1}}>
-                          <p style={{color:'white', fontWeight:'700', fontSize:'13px', margin:0}}>{o.driver_name}</p>
-                          <p style={{color:D.muted, fontSize:'11px', margin:'1px 0 0'}}>{carLabel(o.car_type)}{o.car_mark ? ` · ${o.car_mark}` : ''}</p>
-                        </div>
-                        {o.final_price ? (
-                          <p style={{color:'#e8433a', fontWeight:'800', fontSize:'15px', margin:0}}>₮{o.final_price?.toLocaleString()}</p>
-                        ) : null}
-                      </div>
-                    )}
-
-                    {/* Маршрут */}
-                    <div style={{background:'rgba(255,255,255,0.03)', borderRadius:'10px', padding:'10px', marginBottom:'10px'}}>
-                      <div style={{display:'flex', gap:'8px', marginBottom:'6px'}}>
-                        <div style={{width:'7px', height:'7px', borderRadius:'50%', background:'#3b82f6', marginTop:'4px', flexShrink:0}}/>
-                        <p style={{color:'rgba(255,255,255,0.6)', fontSize:'12px', margin:0}}>{o.from_address || '-'}</p>
-                      </div>
-                      <div style={{display:'flex', gap:'8px'}}>
-                        <div style={{width:'7px', height:'7px', borderRadius:'50%', background:D.red, marginTop:'4px', flexShrink:0}}/>
-                        <p style={{color:'rgba(255,255,255,0.6)', fontSize:'12px', margin:0}}>{o.to_address || '-'}</p>
-                      </div>
-                    </div>
-
-                    {/* Статистик */}
-                    <div style={{display:'flex', gap:'8px'}}>
-                      {o.duration_minutes ? (
-                        <div style={{flex:1, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.2)', borderRadius:'10px', padding:'8px', textAlign:'center'}}>
-                          <p style={{color:'rgba(255,255,255,0.4)', fontSize:'10px', margin:'0 0 2px'}}>Хугацаа</p>
-                          <p style={{color:'#3b82f6', fontWeight:'700', fontSize:'13px', margin:0}}>{formatDuration(o.duration_minutes)}</p>
-                        </div>
-                      ) : null}
-                      {o.final_price ? (
-                        <div style={{flex:1, background:'rgba(232,67,58,0.08)', border:'1px solid rgba(232,67,58,0.2)', borderRadius:'10px', padding:'8px', textAlign:'center'}}>
-                          <p style={{color:'rgba(255,255,255,0.4)', fontSize:'10px', margin:'0 0 2px'}}>Төлбөр</p>
-                          <p style={{color:D.red, fontWeight:'700', fontSize:'13px', margin:0}}>₮{o.final_price?.toLocaleString()}</p>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </div>
-      <style>{`input::placeholder{color:rgba(255,255,255,0.25);}select option{background:#1a1a1a;color:white;}`}</style>
+            {(!dashboard.bankName || !dashboard.bankAccount) && <div className={styles.notice}><strong>Төлбөр авах дансаа тохируулна уу.</strong><p>Жолоочид шилжүүлэх данс харагдахын тулд банк, дансны дугаараа хадгална.</p><button type="button" onClick={() => setTab('settings')}>Банкны данс тохируулах →</button></div>}
+            <section className={styles.panel}><h3>Та юу хийх вэ?</h3><ol className={styles.steps}>
+              <li><div><strong>Шинэ жолооч бүртгэх</strong><br />Утасны дугаарыг нэмээд, үүссэн түр PIN-ийг жолоочид дамжуулна.<br /><button type="button" className={styles.linkButton} onClick={() => navigation.navigate('drivers:add')}>Жолооч бүртгэх →</button></div></li>
+              <li><div><strong>Төлбөр төлсөн жолоочийн эрх нээх</strong><br />Улсын дугаар эсвэл утсаар хайж, банкны орлогын дүн, гүйлгээний кодыг тулгана.<br /><button type="button" className={styles.linkButton} onClick={() => setTab('payments')}>Төлбөр шалгах →</button></div></li>
+              <li><div><strong>Автоматаар эрх нээлгэх</strong><br />Банкны дансаа хадгалаад SMS авдаг утасны MacroDroid-ыг холбоно.<br /><button type="button" className={styles.linkButton} onClick={() => setTab('settings')}>Тохиргоо нээх →</button></div></li>
+            </ol></section>
+          </>}
+          {tab === 'payments' && <AdminPaymentPanel onSessionExpired={sessionExpired} onApproved={fetchDashboard} onConfigure={() => setTab('settings')} />}
+          {tab === 'drivers' && <>
+            <p className={styles.muted}>Бүртгэл идэвхтэй байх нь жолоочийн төлбөр төлөгдсөнийг илэрхийлэхгүй. Шимтгэлийн зөвшөөрлийг «Төлбөр · Эрх нээх» цэсээс удирдана.</p>
+            {showForm && <section className={styles.panel}><h3>Шинэ жолооч бүртгэх</h3><p className={styles.muted}>Утасны дугаараар бүртгэнэ. 6 оронтой түр PIN зөвхөн энэ удаа харагдана. Жолооч нэвтрээд нэр, машин, улсын дугаараа нөхөж оруулна.</p><form onSubmit={event => { event.preventDefault(); void mutateDriver('add') }}>
+              <label htmlFor="new-driver-phone">Жолоочийн утасны дугаар</label><input id="new-driver-phone" type="tel" inputMode="tel" autoComplete="tel" maxLength={16} required placeholder="Жишээ: 99112233" value={phone} disabled={driverBusy} onChange={event => setPhone(event.target.value)} />
+              <div className={styles.cardFooter}><button type="submit" className={styles.primary} disabled={driverBusy}>{driverBusy ? 'Бүртгэж байна…' : 'Бүртгээд түр PIN үүсгэх'}</button><button type="button" disabled={driverBusy} onClick={closeSubpage}>Болих</button></div>
+            </form></section>}
+            {driverNotice && <div ref={notice} tabIndex={-1} role={driverNotice.ok ? 'status' : 'alert'} className={driverNotice.ok ? styles.success : styles.error}><strong>{driverNotice.text}</strong>{driverNotice.pin && <><p>{driverNotice.phone} дугаарт нэвтрэх түр PIN:</p><output className={styles.pin}>{driverNotice.pin}</output><p>Жолоочид аюулгүй сувгаар дамжуулна уу. Энэ хэсгийг хаавал PIN дахин харагдахгүй.</p><button type="button" onClick={() => setDriverNotice(null)}>PIN-ийг дамжуулсан · Хаах</button></>}</div>}
+            <div className={styles.searchRow}><div><label htmlFor="driver-search">Жолооч хайх</label><input id="driver-search" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Нэр, утас эсвэл улсын дугаар" /></div><div><label htmlFor="driver-filter">Төлөвөөр шүүх</label><select id="driver-filter" value={filter} onChange={event => setFilter(event.target.value as DriverFilter)}><option value="all">Бүх жолооч</option><option value="available">Захиалга авахад бэлэн</option><option value="paused">Бүртгэл түр хаасан</option></select></div></div>
+            <p className={styles.muted}>Нийт {drivers.length} жолоочоос {filteredDrivers.length} харагдаж байна. {(search || filter !== 'all') && <button type="button" className={styles.linkButton} onClick={() => { setSearch(''); setFilter('all') }}>Хайлт, шүүлтүүр арилгах</button>}</p>
+            {!filteredDrivers.length && <p className={styles.empty}>{drivers.length ? 'Тохирох жолооч олдсонгүй. Хайлт, төлөвийн шүүлтүүрээ өөрчилнө үү.' : 'Жолооч бүртгэгдээгүй байна. Дээрх «Жолооч бүртгэх» товчоор эхэлнэ.'}</p>}
+            {filteredDrivers.map(driver => <article className={styles.listCard} key={driver.id}>
+              <div className={styles.driverHeader}><div className={styles.driverIdentity}><span className={styles.avatar} aria-hidden="true">{(driver.name || 'Ж')[0]}</span><div><h3>{driver.name || 'Шинэ жолооч'}</h3><span className={styles.plate}>{driver.car_number || 'Улсын дугаар бүртгээгүй'}</span></div></div><span className={`${styles.badge} ${!driver.active ? styles.paused : driver.available ? styles.ready : ''}`}>{!driver.active ? 'Бүртгэл түр хаасан' : driver.available ? 'Захиалга авахад бэлэн' : 'Одоогоор захиалга авахгүй'}</span></div>
+              <dl className={styles.details}><div><dt>Утасны дугаар</dt><dd><a href={`tel:${driver.phone}`}>{driver.phone}</a></dd></div><div><dt>Машины төрөл</dt><dd>{adminCarLabel(driver.car_type)}</dd></div></dl>
+              <div className={styles.cardFooter}><button disabled={driverBusy} onClick={() => { setDriverNotice(null); setDriverAction({ action: 'toggle', driver }) }}>{driver.active ? 'Бүртгэл түр хаах' : 'Бүртгэл идэвхжүүлэх'}</button><button disabled={driverBusy} onClick={() => { setDriverNotice(null); setDriverAction({ action: 'reset_pin', driver }) }}>PIN шинэчлэх</button><button className={styles.danger} disabled={driverBusy} onClick={() => { setDriverNotice(null); setDriverAction({ action: 'delete', driver }) }}>Жагсаалтаас хасах</button></div>
+              {driverAction?.driver.id === driver.id && <div className={styles.confirmation} role="group" aria-label="Жолоочийн үйлдэл баталгаажуулах">
+                <h3>{driverAction.action === 'reset_pin' ? 'Шинэ түр PIN үүсгэх үү?' : driverAction.action === 'delete' ? 'Жолоочийг жагсаалтаас хасах уу?' : driver.active ? 'Жолоочийн бүртгэлийг түр хаах уу?' : 'Жолоочийн бүртгэлийг идэвхжүүлэх үү?'}</h3>
+                <p>{driver.name} · {driver.phone}</p><p className={styles.muted}>{driverAction.action === 'reset_pin' ? 'Одоогийн PIN хүчингүй болж, шинэ 6 оронтой PIN энэ дэлгэцэд харагдана.' : driverAction.action === 'delete' ? 'Шинэ захиалга авах боломжгүй болж, жагсаалтаас хасагдана. Өмнөх захиалгын түүх хадгалагдана.' : driver.active ? 'Шинэ захиалга авах боломжийг хаана. Дараа нь дахин идэвхжүүлж болно.' : 'Бүртгэл нээгдэнэ. Төлөгдөөгүй шимтгэл болон бусад ажиллах нөхцөл хэвээр шалгагдана.'}</p>
+                <div className={styles.actions}><button type="button" disabled={driverBusy} onClick={() => setDriverAction(null)}>Болих</button><button type="button" className={styles.primary} disabled={driverBusy} onClick={() => void mutateDriver(driverAction.action, driver)}>{driverBusy ? 'Хадгалж байна…' : driverAction.action === 'reset_pin' ? 'Тийм, PIN шинэчлэх' : driverAction.action === 'delete' ? 'Тийм, жагсаалтаас хасах' : 'Тийм, бүртгэлийг өөрчлөх'}</button></div>
+              </div>}
+            </article>)}
+          </>}
+          {tab === 'active' && <><p className={styles.muted}>Жолооч сонгогдсон, хараахан дуусаагүй захиалгууд. Хамгийн сүүлийн 50 хүртэл захиалга харагдана.</p>{!activeOrders.length && <p className={styles.empty}>Одоогоор явагдаж буй захиалга алга.</p>}{activeOrders.map(order => <OrderCard key={order.id} order={order} now={now} />)}</>}
+          {tab === 'history' && <><div className={styles.cards}><div className={styles.stat}><span>Энэ жагсаалтын захиалга</span><strong>{orders.length}</strong></div><div className={styles.stat}><span>Тохиролцсон үнийн нийлбэр</span><strong>{adminMoney(orders.reduce((sum, order) => sum + Number(order.final_price || 0), 0))}</strong><small>Шимтгэлийн бодит орлогыг «Төлбөр» хэсэгт тулган шалгана.</small></div></div><p className={styles.muted}>Сүүлийн 24 цагт үүссэн, дууссан төлөвтэй 100 хүртэл захиалга.</p>{!orders.length && <p className={styles.empty}>Энэ хугацаанд дууссан захиалга алга.</p>}{orders.map(order => <OrderCard key={order.id} order={order} now={now} />)}</>}
+          {tab === 'map' && <AdminDriverMap drivers={drivers} />}
+          {tab === 'settings' && !showPassword && <AdminSettings initial={dashboard} onSaved={fetchDashboard} onPassword={() => { setPasswordMessage(''); navigation.navigate('settings:password') }} onSessionExpired={sessionExpired} />}
+        </>}
+      </main>
     </div>
-  )
+  </div>
 }

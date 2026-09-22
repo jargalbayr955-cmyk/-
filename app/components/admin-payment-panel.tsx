@@ -3,10 +3,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { createRequestSignal } from '@/lib/client/request-signal'
 import { AdminPaymentQueue, type PendingDriverPayment } from './admin-payment-queue'
-import { AdminPaymentConnection } from './admin-payment-connection'
 import styles from './admin-payment-queue.module.css'
 
-export function AdminPaymentPanel({ onSessionExpired, onApproved }: { onSessionExpired: () => void; onApproved: () => void }) {
+export function AdminPaymentPanel({ onSessionExpired, onApproved, onConfigure }: { onSessionExpired: () => void; onApproved: () => void; onConfigure: () => void }) {
   const [draft, setDraft] = useState('')
   const [search, setSearch] = useState('')
   const [offset, setOffset] = useState(0)
@@ -84,10 +83,10 @@ export function AdminPaymentPanel({ onSessionExpired, onApproved }: { onSessionE
 
   const clear = () => { setDraft(''); setSearch(''); setOffset(0); setMessage(''); setError(''); setApprovalError('') }
   return <section className={styles.queue} aria-label="Жолоочийн эрх нээх">
-    <h2 className={styles.heading}>Жолоочийн эрх нээх {current && <span>{current.total}</span>}</h2>
+    <h3 className={styles.heading}>Шимтгэл хүлээж буй захиалга {current && <span>{current.total}</span>}</h3>
     <p className={styles.note}>Шимтгэл: тохиролцсон үнийн 5%, хамгийн ойрын 500 ₮. Орлогын дүн, 6 оронтой код таарвал автоматаар нээнэ.</p>
-    <AdminPaymentConnection />
-    <p className={styles.note}>Улсын дугаар эсвэл утасны дугаараар хайж, төлбөрийг шалгаад зөвшөөрнө үү.</p>
+    <ol className={styles.instructions}><li>Жолоочийг улсын дугаар эсвэл утсаар хайна.</li><li>Банкны хуулгаас орлого орсныг, дүн болон 6 оронтой код таарсныг шалгана.</li><li>«Эрх нээх» товчийг дараад баталгаажуулна.</li></ol>
+    <p className={styles.note}>Данс болон автомат SMS холболт: <button type="button" className={styles.settingsLink} onClick={onConfigure}>Тохиргоо нээх →</button></p>
     <form role="search" className={styles.search} onSubmit={event => { event.preventDefault(); if (approvalPending.current) return; setSearch(draft.trim()); setOffset(0); setMessage(''); setError(''); setRevision(value => value + 1) }}>
       <label htmlFor="approval-search">Машины улсын дугаар / утасны дугаар</label>
       <div className={styles.searchRow}>

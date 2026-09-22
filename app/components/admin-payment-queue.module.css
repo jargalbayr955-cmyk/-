@@ -33,3 +33,9 @@
 .connection label { display: block; margin: 12px 0 6px; color: #dcdce2; font-size: 13px; }
 .connection input { width: 100%; min-width: 0; border: 1px solid #52525c; border-radius: 10px; padding: 10px; color: white; background: #16161d; font-size: 14px; }
 .connection pre { overflow-wrap: anywhere; white-space: pre-wrap; background: #16161d; padding: 12px; font-size: 12px; }
+.instructions { padding: 16px 18px 16px 38px; margin: 16px 0; background: #18212d; border: 1px solid #34455c; border-radius: 12px; color: #c9d5e5; font-size: 14px; line-height: 1.8; }
+.settingsLink { background: transparent; border: 0; color: #9cceff; min-height: 44px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.confirmation { margin-top: 16px; padding: 14px; border-top: 1px solid #665536; line-height: 1.7; }
+.confirmation .searchRow { flex-wrap: wrap; }
+.confirmation .searchRow button { flex: 1 1 170px; }
+.connection form { margin-bottom: 20px; }

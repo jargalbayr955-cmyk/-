@@ -195,6 +195,25 @@ test('matching bank receipts confirm through the atomic RPC; duplicate receipts 
 })
 
 const approvalOrder = '00000000-0000-4000-8000-000000000123'
+test('bank settings save name/account in one write and do not accept a masked account', async () => {
+  const body={key:'bank_details',value:{bank_name:' Хаан банк ',bank_account:'5000 002086'}}
+  const h=harness()
+  assert.equal((await h.load('app/api/admin/settings/route.ts').POST(request(body))).status,200)
+  assert.equal(h.calls.length,1)
+  const write=h.calls[0].filters.find(x=>x[0]==='upsert')[1]
+  assert.deepEqual(JSON.parse(JSON.stringify(write)),[{key:'bank_name',value:'Хаан банк'},{key:'bank_account',value:'5000002086'}])
+  for(const value of [null,{}, {bank_name:'Хаан банк',bank_account:'5***2086'}, {bank_name:'',bank_account:'5000002086'}]) {
+    const invalid=harness();assert.equal((await invalid.load('app/api/admin/settings/route.ts').POST(request({key:'bank_details',value}))).status,400);assert.equal(invalid.calls.length,0)
+  }
+})
+test('bank settings reject unauthenticated, temporary and cross-origin writes, and report save failures',async()=>{
+  const body={key:'bank_details',value:{bank_name:'Хаан банк',bank_account:'5000002086'}}
+  for(const status of [401,403]){const h=harness({adminAccess:{ok:false,status,error:'Denied'}});assert.equal((await h.load('app/api/admin/settings/route.ts').POST(request(body))).status,status);assert.equal(h.calls.length,0)}
+  const h=harness(),req=request(body);req.headers.set('origin','https://other.example')
+  assert.equal((await h.load('app/api/admin/settings/route.ts').POST(req)).status,403);assert.equal(h.calls.length,0)
+  const fail=harness({rows:{settings:{data:null,error:{code:'XX000'}}}})
+  assert.equal((await fail.load('app/api/admin/settings/route.ts').POST(request(body))).status,503)
+})
 test('payment approval requires admin authentication and the same origin before writes', async () => {
   for (const access of [{ ok:false, status:401, error:'Unauthorized' }, { ok:false, status:403, error:'Change temporary password' }]) {
     const h = harness({ adminAccess: access })

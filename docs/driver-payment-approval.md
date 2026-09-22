@@ -13,13 +13,28 @@ ambiguous records are excluded from conversion and automatic settlement; no
 duplicate is marked as paid or deleted without reconciliation. The paid-history
 amount digest remained unchanged after the migration and rollback-only tests.
 
-The admin dashboard has a separate **Эрх нээх** tab for unpaid completed jobs,
+The admin dashboard opens on **Ерөнхий тойм**, with shortcuts to pending payments,
+ready drivers, confirmed orders and recent completed orders. Driver registration,
+payment approval and settings have distinct navigation items. Bank/account and
+MacroDroid setup are together under **Тохиргоо**, followed by the landing image
+and admin password. The bank name/account save together in one authenticated,
+same-origin database statement. Background refresh does not replace typed drafts.
+Times use Ulaanbaatar time and numeric dates. History labels explicitly describe
+the API's last-24-hour creation filter/100-row limit; agreed fare totals are not
+presented as company revenue. Driver registration availability is shown separately
+from payment approval. PIN resets, disabling and removal first show the specific
+driver and consequences. Temporary PINs live only in component state and clear
+when dismissed, leaving the driver area, or ending the admin session.
+
+The admin dashboard has a separate **Төлбөр · Эрх нээх** tab for unpaid completed jobs,
 including older jobs outside recent history. Search by car plate or driver phone,
 including partial numbers. Spaces, hyphens and letter case are ignored. Search
 runs over the whole queue before pagination (50 results per page), rather than
 only the dashboard's first 200 rows. Clearing the search restores all pending jobs.
 Each card shows the driver's name, plate, phone, route, amount and payment reference.
-**Зөвшөөрөх · Эрх нээх** approves only that job and keeps the current search.
+**Энэ төлбөрийг зөвшөөрөх · Эрх нээх** first shows the exact amount and reference.
+After reconciling the bank receipt, **Орлогыг шалгасан · Эрх нээх** approves only
+that job and keeps the current search. A changed amount/code requires review again.
 The visible queue refreshes every ten seconds; it stops when another tab is open.
 The main dashboard also refreshes without overwriting bank settings being edited.
 
@@ -57,12 +72,12 @@ job or bring a resting/disabled driver online. Wrong amounts and anonymous calls
 do not unlock anything. Codes are globally unique
 and are never reused. The old `confirm_payment_atomic` remains disabled.
 
-In **Эрх нээх → MacroDroid холболт тохируулах**, current admins can copy the URL
+In **Тохиргоо → Төлбөр ормогц эрх автоматаар нээх → MacroDroid холболт тохируулах**, current admins can copy the URL
 and dedicated key. An existing `PAYMENT_WEBHOOK_SECRET` takes precedence; when
 absent, a domain-separated HMAC key is derived from `SESSION_SECRET`. The parent
 session secret is never returned. The key is never included in driver responses,
 public pages or storage; closing the admin settings clears it from component state.
-Set the receiving bank/account in **Жолооч**, then save the actual sender ID and
+Set the receiving bank/account in **Тохиргоо → Шимтгэл хүлээн авах данс**, then save the actual sender ID and
 the exact masked account (for example `5***2086`) in the MacroDroid connection
 panel. The sender cannot be inferred from the contact display name. The mask's
 last four digits must match the receiving account, and the first digit must also
@@ -84,6 +99,13 @@ network access and background operation. SMS filtering and a private device key
 are not a cryptographically signed bank API. Confirm one real incoming payment
 on the physical phone before relying on automation; manual approval remains
 available after reconciling the bank statement.
+
+Admin UI verification uses actual component event handlers with isolated HTTP,
+history and timers (`tests/admin-ui.test.cjs`): session gating, navigation, driver
+search, registration/PIN delivery, explicit approval, draft preservation, atomic
+bank saves, duplicate clicks and late responses after logout. It creates no live
+drivers and approves no real payments. This is separate from authenticated browser
+or physical-device testing.
 
 Verification: `node --test tests/*.test.cjs`, `npm run lint -- --quiet`,
 `npm run build`, and rollback-only `tests/payment-database.sql` and

@@ -54,7 +54,7 @@ export function AdminPaymentConnection() {
     {open && <div>
       <p className={styles.note}>Хаан банкны орлогын SMS-ийг бүтнээр нь илгээнэ. Сервер ORLOGO-оос орлогын дүн, Utga-аас 6 оронтой кодыг уншина. Үлдэгдэл, зарлага, амжилтгүй гүйлгээг төлбөрт тооцохгүй.</p>
       {connection ? <>
-        <p className={styles.note}>Төлбөр авах данс: <strong>{connection.bankName} {connection.bankAccount || 'Хадгалаагүй'}</strong>. Үүнийг «Жолооч» цэсэнд хадгалж эсвэл солино. Данс сольсон бол SMS тохиргоог дахин хадгална.</p>
+        <p className={styles.note}>Төлбөр авах данс: <strong>{connection.bankName} {connection.bankAccount || 'Хадгалаагүй'}</strong>. Дээрх «Шимтгэл хүлээн авах данс» хэсэгт хадгалж эсвэл солино. Данс сольсон бол SMS тохиргоог дахин хадгална.</p>
         <form onSubmit={event => { event.preventDefault(); void save() }}>
           <label htmlFor="payment-sms-sender">Банкны SMS илгээгчийн дугаар / ID</label>
           <input id="payment-sms-sender" value={sender} required maxLength={64} autoComplete="off" disabled={saving} onChange={event => setSender(event.target.value)} />
