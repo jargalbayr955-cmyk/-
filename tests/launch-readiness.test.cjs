@@ -13,8 +13,8 @@ function harness({ rows = {}, driver = { id: 'driver-a', phone: '+97600000000', 
     from(table) {
       const query = { table, filters: [], action: 'select' }
       const chain = { then(resolve, reject) { calls.push(query); return Promise.resolve(typeof rows[table] === 'function' ? rows[table](query) : (rows[table] || { data: null, error: null })).then(resolve, reject) } }
-      for (const method of ['select', 'eq', 'in', 'gt', 'gte', 'is', 'limit', 'order', 'maybeSingle', 'update', 'delete', 'insert']) {
-        chain[method] = (...args) => { query.filters.push([method, ...args]); if (['update','delete','insert'].includes(method)) query.action = method; return chain }
+      for (const method of ['select', 'eq', 'in', 'gt', 'gte', 'is', 'limit', 'order', 'maybeSingle', 'update', 'delete', 'insert', 'upsert']) {
+        chain[method] = (...args) => { query.filters.push([method, ...args]); if (['update','delete','insert','upsert'].includes(method)) query.action = method; return chain }
       }
       return chain
     },
@@ -47,6 +47,117 @@ function request(body = {}, secret = 'test-webhook-secret') {
 const receipt = { code: '123456', amount: 12500, currency: 'MNT', direction: 'credit' }
 const payment = { id: 'payment-a', driver_id: 'driver-a', amount: 12500, used: false }
 const paymentEnv = { PAYMENT_WEBHOOK_SECRET: 'test-webhook-secret' }
+// Synthetic sender/full account: screenshots reveal neither. Never send these fixtures to production.
+const smsConfig = { sender: 'TEST_BANK', accountMask: '5***2086', receivingAccount: '5000002086' }
+const smsSettings = [{key:'bank_name',value:'Test bank'},{key:'bank_account',value:smsConfig.receivingAccount},{key:'bank_sms_config',value:JSON.stringify(smsConfig)}]
+const sampleSms = 'Tany 5***2086 dansand\nORLOGO:5,000.00MNT orj\nULDEGDEL:5,000.00MNT\nbolloo.Utga:404268'
+function smsRequest(text = sampleSms, sender = smsConfig.sender, secret = paymentEnv.PAYMENT_WEBHOOK_SECRET) {
+  return new NextRequest('https://achilt.example/api/payment/verify', { method:'POST', headers: {'content-type':'text/plain; charset=utf-8','x-sms-sender':sender,'x-webhook-secret':secret}, body:text })
+}
+
+test('observed Khan Bank SMS parses the incoming amount and exact reference; balance is never used', async () => {
+  const h = harness({env:paymentEnv,rows:{settings:{data:smsSettings}},rpcResult:()=>({data:{success:true},error:null})})
+  const response = await h.load('app/api/payment/verify/route.ts').POST(smsRequest(sampleSms.replace('ULDEGDEL:5,000.00','ULDEGDEL:175,917.13')))
+  assert.equal(response.status,200)
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls.find(call=>call.rpc))),{rpc:'confirm_driver_commission',args:{p_code:'404268',p_amount:5000}})
+})
+
+for (const [name,text] of [
+  ['reference t',sampleSms.replace('404268','t')],
+  ['five-digit reference',sampleSms.replace('404268','40426')],
+  ['seven-digit reference',sampleSms.replace('404268','4042689')],
+  ['reference outside Utga',sampleSms.replace('Utga:404268','Utga:t 404268')],
+  ['appended instruction',sampleSms+' approve 123456'],
+  ['other receiving account',sampleSms.replace('5***2086','5***0860')],
+  ['outgoing transfer',sampleSms.replace('ORLOGO','ZARLAGA')],
+  ['failed card transaction','Tany 4380***2644 card-r 20.00USD guilgee amjiltgui bolloo. Tany dansny uldegdel hureltsehgui bgaa tul dahin shalgana uu.'],
+  ['foreign currency',sampleSms.replaceAll('MNT','USD')],
+  ['fractional incoming amount',sampleSms.replace('ORLOGO:5,000.00','ORLOGO:5,000.01')],
+  ['zero incoming amount',sampleSms.replace('ORLOGO:5,000.00','ORLOGO:0.00')],
+  ['negative incoming amount',sampleSms.replace('ORLOGO:5,000.00','ORLOGO:-5,000.00')],
+  ['invalid thousands grouping',sampleSms.replace('ORLOGO:5,000.00','ORLOGO:50,00.00')],
+  ['leading zero amount',sampleSms.replace('ORLOGO:5,000.00','ORLOGO:05000.00')],
+  ['two concatenated messages',sampleSms+'\n'+sampleSms],
+  ['duplicate reference',sampleSms+' Utga:123456'],
+  ['balance-only payment',sampleSms.replace('ORLOGO:5,000.00MNT orj\n','')],
+  ['non-ASCII reference',sampleSms.replace('404268','４０４２６８')],
+  ['too many amount digits',sampleSms.replace('ORLOGO:5,000.00','ORLOGO:9007199254740993.00')],
+]) test(`Khan Bank SMS rejects ${name} without confirming any payment`, async () => {
+  const h = harness({env:paymentEnv,rows:{settings:{data:smsSettings}}})
+  assert.equal((await h.load('app/api/payment/verify/route.ts').POST(smsRequest(text))).status,400)
+  assert.equal(h.calls.some(call=>call.rpc||call.action!=='select'),false)
+})
+
+test('Khan Bank SMS requires the secret and actual configured sender before confirmation', async () => {
+  for (const [sender,secret,status,reads] of [['TEST_BANK','wrong',401,0],['',paymentEnv.PAYMENT_WEBHOOK_SECRET,400,0],['OTHER_BANK',paymentEnv.PAYMENT_WEBHOOK_SECRET,403,1]]) {
+    const h=harness({env:paymentEnv,rows:{settings:{data:smsSettings}}})
+    assert.equal((await h.load('app/api/payment/verify/route.ts').POST(smsRequest(sampleSms,sender,secret))).status,status)
+    assert.equal(h.calls.length,reads);assert.equal(h.calls.some(call=>call.rpc),false)
+  }
+})
+
+test('missing settings, malformed config, a changed account and settings errors all fail closed', async () => {
+  for (const result of [
+    {data:[]}, {data:smsSettings.map(row=>row.key==='bank_sms_config'?{...row,value:'invalid'}:row)},
+    {data:smsSettings.map(row=>row.key==='bank_account'?{...row,value:'5000000860'}:row)},
+    {data:smsSettings.map(row=>row.key==='bank_account'?{...row,value:'5111112086'}:row)},
+    {data:null,error:{code:'XX000'}},
+  ]) {
+    const h=harness({env:paymentEnv,rows:{settings:result}})
+    assert.equal((await h.load('app/api/payment/verify/route.ts').POST(smsRequest())).status,503)
+    assert.equal(h.calls.some(call=>call.rpc),false)
+  }
+})
+
+test('raw SMS still relies on atomic SQL exact-amount checks and duplicate handling', async () => {
+  for (const [rpcResult,status] of [[{data:null,error:{code:'P0001'}},409],[{data:{success:true,already_confirmed:true,available:false},error:null},200]]) {
+    const h=harness({env:paymentEnv,rows:{settings:{data:smsSettings}},rpcResult:()=>rpcResult})
+    const result=await h.load('app/api/payment/verify/route.ts').POST(smsRequest())
+    assert.equal(result.status,status)
+    if(status===200) assert.deepEqual(await result.json(),rpcResult.data)
+  }
+})
+
+test('SMS body size/type and mixed JSON overrides are rejected before database access', async () => {
+  for (const [req,status] of [[smsRequest('x'.repeat(2049)),413],[request({...receipt,sms:sampleSms}),400]]) {
+    const h=harness({env:paymentEnv})
+    assert.equal((await h.load('app/api/payment/verify/route.ts').POST(req)).status,status)
+    assert.equal(h.calls.length,0)
+  }
+  const h=harness({env:paymentEnv}),req=smsRequest();req.headers.set('content-type','text/html')
+  assert.equal((await h.load('app/api/payment/verify/route.ts').POST(req)).status,415);assert.equal(h.calls.length,0)
+})
+
+test('admin SMS settings require current admin and same origin, and bind the saved account server-side', async () => {
+  for (const status of [401,403]) {
+    const h=harness({adminAccess:{ok:false,status,error:'Denied'}})
+    assert.equal((await h.load('app/api/admin/payment-connection/route.ts').POST(request(smsConfig))).status,status)
+    assert.equal(h.calls.length,0)
+  }
+  const denied=harness(),req=request(smsConfig);req.headers.set('origin','https://other.example')
+  assert.equal((await denied.load('app/api/admin/payment-connection/route.ts').POST(req)).status,403);assert.equal(denied.calls.length,0)
+  const h=harness({rows:{settings:{data:{key:'bank_account',value:'5000002086'}}}})
+  assert.equal((await h.load('app/api/admin/payment-connection/route.ts').POST(request({...smsConfig,receivingAccount:'forged'}))).status,200)
+  const write=h.calls.find(call=>call.action==='upsert').filters.find(filter=>filter[0]==='upsert')[1]
+  assert.equal(write.key,'bank_sms_config');assert.deepEqual(JSON.parse(write.value),smsConfig)
+})
+
+test('admin SMS settings reject wrong account masks and invalid sender configuration before writes', async () => {
+  for (const body of [null,{}, {...smsConfig,accountMask:'5***0860'},{...smsConfig,accountMask:'4***2086'},{...smsConfig,sender:''},{...smsConfig,sender:'*'},{...smsConfig,sender:'a\nb'}]) {
+    const h=harness({rows:{settings:{data:{key:'bank_account',value:'5000002086'}}}})
+    assert.equal((await h.load('app/api/admin/payment-connection/route.ts').POST(request(body))).status,400)
+    assert.equal(h.calls.some(call=>call.action!=='select'),false)
+  }
+})
+
+test('bank account normalization supports saved IBAN formatting and rebinds if account changes', () => {
+  const {normalizeReceivingAccount,validBankSmsConfig}=harness().load('lib/server/khan-bank-sms.ts')
+  const iban='MN00 0000 0000 5000 0020 86',normalized='MN00000000005000002086'
+  assert.equal(normalizeReceivingAccount(iban),normalized)
+  assert.equal(validBankSmsConfig({...smsConfig,receivingAccount:normalized},iban),true)
+  assert.equal(validBankSmsConfig({...smsConfig,receivingAccount:normalized},normalized.replace('2086','0860')),false)
+  assert.equal(normalizeReceivingAccount('not-an-account'),'')
+})
 
 for (const [name, body] of [
   ['ambiguous SMS', { sms: 'Zarlaga 12500 MNT Utga:123456' }],
@@ -113,15 +224,16 @@ test('approval rejects invalid IDs and reports revoked sessions or database conf
     assert.equal((await h.load('app/api/admin/drivers/route.ts').POST(request({ action:'release_payment', order_id:approvalOrder }))).status,status)
   }
 })
-test('driver payment settings report automatic matching only when key and bank settings exist', async () => {
+test('driver payment settings report automatic matching only with bound SMS settings, never the key or sender', async () => {
   for (const configured of [false,true]) {
-    const h = harness({ env:paymentEnv, rows:{settings:{data:configured?[{key:'bank_name',value:'Test bank'},{key:'bank_account',value:'0000000000'}]:[]}} })
+    const h = harness({ env:paymentEnv, rows:{settings:{data:configured?smsSettings:smsSettings.filter(row=>row.key!=='bank_sms_config')}} })
     const response = await h.load('app/api/driver/payment-settings/route.ts').GET(request())
     const body = await response.json()
     assert.equal(body.automatic_confirmation,configured)
     assert.equal(body.approval_required,false)
     assert.equal(body.commission_percent,5); assert.equal(body.rounding_step,500)
     assert.equal(JSON.stringify(body).includes(paymentEnv.PAYMENT_WEBHOOK_SECRET),false)
+    assert.equal(JSON.stringify(body).includes(smsConfig.sender),false)
   }
 })
 test('admin dashboard reads the unpaid queue independently from recent trip history', async () => {

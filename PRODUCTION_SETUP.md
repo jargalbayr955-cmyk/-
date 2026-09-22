@@ -96,9 +96,21 @@ Promote only after reviewing the Preview verification results. Device GPS, push 
 
 The service fee is 5% of the agreed fare, rounded to the nearest 500 MNT. Example: 112820 × 5% = 5641 → 5500. Exact half steps round upward. The database stores the authoritative fee, so neither the browser nor MacroDroid chooses it.
 
-Current admins can copy the callback URL and dedicated key from **Эрх нээх → MacroDroid холболт тохируулах**. `PAYMENT_WEBHOOK_SECRET` overrides the default domain-separated HMAC key derived from `SESSION_SECRET`; no session secret is exposed. Set the receiving bank/account in the admin dashboard. Configure and verify the actual phone's bank SMS extraction before relying on automation; manual admin approval remains available.
+Current admins can copy the callback URL and dedicated key from **Эрх нээх → MacroDroid холболт тохируулах**. `PAYMENT_WEBHOOK_SECRET` overrides the default domain-separated HMAC key derived from `SESSION_SECRET`; no session secret is exposed. Set the receiving bank/account in **Жолооч**, then save the actual SMS sender ID and the SMS's masked account in the connection panel. The sender's contact display name is not sufficient. The masked account must match the visible digits of the receiving account. Changing the saved transfer account requires rebinding the SMS configuration.
 
-The trusted bank adapter must validate an actual incoming transfer to the configured receiving account before calling `POST /api/payment/verify`. Send the secret only in `x-webhook-secret`, and use `Content-Type: application/json`:
+For MacroDroid, use the bank sender's **SMS Received** trigger and an **HTTP Request** action:
+
+- Method: `POST`; URL: copy from the authenticated connection panel.
+- Header `x-webhook-secret`: copy the dedicated key from that panel.
+- Header `x-sms-sender`: select the incoming SMS sender number from Magic Text.
+- Content type: `text/plain; charset=utf-8`.
+- Request body: select the complete incoming SMS text from Magic Text. Do not manually extract the amount/code, JSON-quote the message, or send an old SMS as a test.
+
+The server recognizes the user-provided Khan Bank incoming SMS format, reads the amount only from `ORLOGO`, and requires exactly six digits after `Utga`. `ULDEGDEL` is never a payment amount. Sender and account must match the saved binding. Wrong formats, `Utga:t`, outgoing/failed transfers, non-MNT, fractional incoming amounts, and combined messages are rejected. HTTP 200 indicates confirmed/already confirmed; 400 rejected format, 401 wrong key, 403 sender mismatch, 404 unknown payment code, 409 amount/order mismatch, and 503 missing configuration/database unavailable. A rejected receipt makes no payment changes. Unknown formats require manual reconciliation rather than heuristic extraction.
+
+Bank masks hide digits, so two accounts with the same visible mask cannot be distinguished. Use a dedicated receiving account. The phone needs SMS permission, internet and MacroDroid background operation. SMS sender filtering is not equivalent to a signed bank API. Verify one actual incoming payment end-to-end on the physical phone; manual admin approval remains available. No real payment is approved during automated tests.
+
+Existing trusted adapters can continue using the JSON contract below. They must themselves validate an actual incoming transfer, sender and receiving account before calling `POST /api/payment/verify`. Send the secret only in `x-webhook-secret`, and use `Content-Type: application/json`:
 
 ```json
 {
@@ -109,7 +121,7 @@ The trusted bank adapter must validate an actual incoming transfer to the config
 }
 ```
 
-This is an example, not a real payment. `code` is the exact six-digit payment reference. `amount` is a positive integer in MNT and must equal the amount stored for that payment. An already confirmed code returns success without releasing the driver again. Do not send a balance, outgoing transfer, guessed amount or unverified user message. The endpoint deliberately rejects raw `sms`/`message`/`text` payloads: there is no verified bank SMS format available in this repository. Never put the dedicated key in public browser code, URLs or a `NEXT_PUBLIC_*` variable. Only the authenticated admin connection screen exposes it for copying into the trusted phone's private HTTP header.
+This is an example, not a real payment. `code` is the exact six-digit payment reference. `amount` is a positive integer in MNT and must equal the amount stored for that payment. An already confirmed code returns success without releasing the driver again. Do not send a balance, outgoing transfer, guessed amount or unverified user message. Mixed JSON `sms`/`message`/`text` payloads are rejected; use the text/plain contract for raw SMS. Never put the dedicated key in public browser code, URLs or a `NEXT_PUBLIC_*` variable. Only the authenticated admin connection screen exposes it for copying into the trusted phone's private HTTP header.
 
 The HTTP completion guard prevents retries of already completed trips from generating another payment. Apply the accompanying payment-locking migration before deploying this branch. It serializes completion and confirmation and guards online availability. Run `tests/payment-database.sql` through an authorized database connection; fixtures roll back.
 

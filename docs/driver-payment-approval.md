@@ -35,13 +35,26 @@ Password changes revoke old approval requests. Temporary admin passwords cannot
 approve. The RPCs are available only to the server service role, run as the caller,
 and grant no customer/driver access to payment or administrator data.
 
-`POST /api/payment/verify` requires a dedicated `x-webhook-secret`, a six-digit
-`code`, positive integer `amount`, `currency: "MNT"` and `direction: "credit"`.
+`POST /api/payment/verify` requires a dedicated `x-webhook-secret`. For MacroDroid,
+send `Content-Type: text/plain; charset=utf-8`, the actual SMS sender in
+`x-sms-sender`, and the complete incoming SMS as the body. Only the observed Khan
+Bank format is accepted: `Tany <mask> dansand ORLOGO:<amount>MNT orj
+ULDEGDEL:<balance>MNT bolloo.Utga:<six digits>`. Only ORLOGO supplies the payment
+amount; the balance is ignored. Fractional incoming amounts, `Utga:t`, extra text,
+multiple concatenated messages, failed/outgoing transfers, other currencies,
+unrecognized formats, wrong senders/accounts and bodies over 2048 characters fail
+closed. Whitespace and letter case variations are accepted; the code is exactly
+six ASCII digits. No live payment is simulated using a screenshot.
+
+The authenticated JSON contract remains available for existing trusted bank
+adapters: six-digit `code`, positive integer `amount`, `currency: "MNT"` and
+`direction: "credit"`. Those adapters must verify the sender and receiving account
+themselves. JSON containing `sms`, `message` or `text` cannot override the parser.
 `confirm_driver_commission` checks the code and exact stored fee together inside
 the same order → driver → payment transaction, rechecks the fee against the fare,
 and records `approved_via: "macrodroid"`. Repeated receipts cannot pay a second
-job or bring a resting/disabled driver online. Wrong amounts, outgoing transfers,
-raw SMS and anonymous calls do not unlock anything. Codes are globally unique
+job or bring a resting/disabled driver online. Wrong amounts and anonymous calls
+do not unlock anything. Codes are globally unique
 and are never reused. The old `confirm_payment_atomic` remains disabled.
 
 In **Эрх нээх → MacroDroid холболт тохируулах**, current admins can copy the URL
@@ -49,10 +62,28 @@ and dedicated key. An existing `PAYMENT_WEBHOOK_SECRET` takes precedence; when
 absent, a domain-separated HMAC key is derived from `SESSION_SECRET`. The parent
 session secret is never returned. The key is never included in driver responses,
 public pages or storage; closing the admin settings clears it from component state.
-The phone adapter must be configured separately to accept only the bank sender
-and incoming transfers to the configured receiving account. A real bank SMS sample
-is still needed to verify its amount/reference extraction. No bank SMS format is
-guessed and no real payment is simulated during verification.
+Set the receiving bank/account in **Жолооч**, then save the actual sender ID and
+the exact masked account (for example `5***2086`) in the MacroDroid connection
+panel. The sender cannot be inferred from the contact display name. The mask's
+last four digits must match the receiving account, and the first digit must also
+match for domestic numeric account numbers. Formatted MN IBANs are accepted for
+the transfer account; this check is not an IBAN checksum validation. The full saved
+transfer account is bound into the configuration: changing it disables SMS
+confirmation until an admin rebinds it. Masked messages cannot distinguish two
+accounts with the same visible digits. Never bind such accounts to the same
+receiving phone without a bank feed that identifies the full account.
+
+The same-origin, current-admin POST saves the SMS binding; it never accepts a
+client-supplied receiving account. The config/key are not returned to drivers.
+Driver responses advertise automatic matching only after a valid binding exists;
+this does not prove that the physical phone is connected. Configure MacroDroid
+to trigger on that bank sender, choose the incoming sender number and full SMS
+from its Magic Text menu, and send the POST. The actual sender, transfer account
+and on-device setup still require the operator. The phone needs SMS permission,
+network access and background operation. SMS filtering and a private device key
+are not a cryptographically signed bank API. Confirm one real incoming payment
+on the physical phone before relying on automation; manual approval remains
+available after reconciling the bank statement.
 
 Verification: `node --test tests/*.test.cjs`, `npm run lint -- --quiet`,
 `npm run build`, and rollback-only `tests/payment-database.sql` and

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '@/lib/server/admin'
+import { requireAdmin, sameOriginAdminRequest } from '@/lib/server/admin'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 
 const ALLOWED_KEYS = new Set(['hero_url', 'bank_name', 'bank_account'])
@@ -7,6 +7,7 @@ const ALLOWED_KEYS = new Set(['hero_url', 'bank_name', 'bank_account'])
 export async function POST(req: NextRequest) {
   const access = await requireAdmin(req)
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+  if (!sameOriginAdminRequest(req)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { key, value } = await req.json().catch(() => ({}))
   if (!ALLOWED_KEYS.has(String(key))) return NextResponse.json({ error: 'Invalid key' }, { status: 400 })
