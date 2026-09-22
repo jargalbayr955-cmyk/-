@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createDotMarker, freeMapStyle, loadFreeMap, mapErrorMessage, ULAANBAATAR } from '@/lib/client/free-map'
-import { BrandAccess } from '../components/access-shortcuts'
 import { CustomerAccount } from '../components/customer-account'
 
 type LocationPoint = { lat: number; lng: number }
@@ -195,7 +194,6 @@ export default function CurrentPage() {
 
       <header className="current-map-header">
         <div className="current-brand-row">
-          <div className="brand-wrap"><BrandAccess /><div className="brand-name">Ачилт</div></div>
           <CustomerAccount />
         </div>
         <div className="current-map-instructions">
