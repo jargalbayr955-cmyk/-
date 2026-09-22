@@ -2,7 +2,8 @@ import 'server-only'
 import crypto from 'crypto'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7
+export const DEVICE_SESSION_TTL_SECONDS = 60 * 60 * 24 * 90
+const ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 24 * 7
 
 function getSecret() {
   const value = process.env.SESSION_SECRET
@@ -18,7 +19,8 @@ export type SessionRole = 'admin' | 'driver' | 'customer'
 export type SessionPayload = { sub: string; role: SessionRole; exp: number }
 
 export function signSession(sub: string, role: SessionRole) {
-  const payload: SessionPayload = { sub, role, exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS }
+  const ttl = role === 'admin' ? ADMIN_SESSION_TTL_SECONDS : DEVICE_SESSION_TTL_SECONDS
+  const payload: SessionPayload = { sub, role, exp: Math.floor(Date.now() / 1000) + ttl }
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
   const sig = crypto.createHmac('sha256', getSecret()).update(body).digest('base64url')
   return `${body}.${sig}`
@@ -26,14 +28,14 @@ export function signSession(sub: string, role: SessionRole) {
 
 export function verifySession(value: string | undefined, role?: SessionRole): SessionPayload | null {
   if (!value) return null
-  const [body, sig] = value.split('.')
-  if (!body || !sig) return null
+  const [body, sig, extra] = value.split('.')
+  if (!body || !sig || extra !== undefined) return null
   const expected = crypto.createHmac('sha256', getSecret()).update(body).digest('base64url')
   const a = Buffer.from(sig), b = Buffer.from(expected)
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null
   try {
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as SessionPayload
-    if (!payload?.sub || !payload?.role || payload.exp <= Math.floor(Date.now() / 1000)) return null
+    if (typeof payload?.sub !== 'string' || !payload.sub || !['admin', 'driver', 'customer'].includes(payload.role) || !Number.isFinite(payload.exp) || payload.exp <= Math.floor(Date.now() / 1000)) return null
     if (role && payload.role !== role) return null
     return payload
   } catch { return null }

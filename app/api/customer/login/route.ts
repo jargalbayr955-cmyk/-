@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { setDeviceSession } from '@/lib/server/device-session'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
-import { allowRequest, getClientIp, isSessionConfigured, normalizeMnPhone, signSession } from '@/lib/server/security'
+import { allowRequest, getClientIp, isSessionConfigured, normalizeMnPhone } from '@/lib/server/security'
 
 export async function POST(req: NextRequest) {
   if (!isSessionConfigured()) {
@@ -19,6 +20,6 @@ export async function POST(req: NextRequest) {
   }
   if (!id) return NextResponse.json({ error: 'Дугаар эсвэл PIN буруу байна' }, { status: 401 })
   const res = NextResponse.json({ user: { id, phone: normalized } })
-  res.cookies.set('achilt_customer_session', signSession(String(id), 'customer'), { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 60*60*24*7 })
+  setDeviceSession(res, String(id), 'customer')
   return res
 }

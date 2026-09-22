@@ -30,7 +30,8 @@ export async function requireDriver(req: NextRequest): Promise<DriverSessionReco
     .is('deleted_at', null)
     .maybeSingle()
 
-  if (error || !data) return null
+  if (error) throw new Error('Driver session lookup unavailable')
+  if (!data) return null
   return data as DriverSessionRecord
 }
 

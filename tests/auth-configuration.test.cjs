@@ -30,6 +30,7 @@ function harness(secret, rpcResult = { data: null, error: null }) {
         if (name === 'server-only') return {}
         if (name === '@/lib/server/supabase-admin') return { getSupabaseAdmin: () => admin }
         if (name.startsWith('@/')) return load(name.slice(2) + '.ts')
+        if (name.startsWith('./')) return load(path.join(path.dirname(file), name) + '.ts')
         return require(name)
       },
     }, { filename: file })

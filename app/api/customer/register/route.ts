@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { setDeviceSession } from '@/lib/server/device-session'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
-import { allowRequest, getClientIp, isSessionConfigured, normalizeMnPhone, signSession } from '@/lib/server/security'
+import { allowRequest, getClientIp, isSessionConfigured, normalizeMnPhone } from '@/lib/server/security'
 
 export async function POST(req: NextRequest) {
   // Validate before any database write: registration must not succeed without a usable session.
@@ -30,6 +31,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Бүртгүүлэх үйлчилгээ түр боломжгүй байна. Дахин оролдоно уу.' }, { status: 503 })
   }
   const res = NextResponse.json({ user: { id: data, phone: normalized } })
-  res.cookies.set('achilt_customer_session', signSession(String(data), 'customer'), { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 60*60*24*7 })
+  setDeviceSession(res, String(data), 'customer')
   return res
 }

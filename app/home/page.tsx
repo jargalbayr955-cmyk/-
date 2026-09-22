@@ -1,9 +1,16 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { SessionGate } from '../components/session-gate'
 
 export default function HomePage() {
+  return <SessionGate mode="customer"><HomeContent /></SessionGate>
+}
+
+function HomeContent() {
   const router = useRouter()
+  const [signingOut, setSigningOut] = useState(false)
+  const [logoutError, setLogoutError] = useState('')
   const [visible, setVisible] = useState(false)
   const [heroUrl, setHeroUrl] = useState('https://i.ibb.co/5WrSCdV3/Jun-4-2026-12-21-53-AM.png')
   const pressTimer = useRef<any>(null)
@@ -23,6 +30,20 @@ export default function HomePage() {
   }, [])
 
   const handleLogoPress = () => { pressTimer.current = setTimeout(() => router.push('/driver'), 3000) }
+  const logout = async () => {
+    if (signingOut) return
+    setSigningOut(true)
+    setLogoutError('')
+    try {
+      const response = await fetch('/api/customer/logout', { method: 'POST' })
+      if (!response.ok) throw new Error('Logout failed')
+      try { localStorage.removeItem('user') } catch { /* The cookie is the source of truth. */ }
+      router.replace('/login')
+    } catch {
+      setLogoutError('Гарч чадсангүй. Холболтоо шалгаад дахин оролдоно уу.')
+      setSigningOut(false)
+    }
+  }
   const handleLogoRelease = () => { if (pressTimer.current) clearTimeout(pressTimer.current) }
   const handleBadgeTap = () => {
     setTapCount(c => {
@@ -104,6 +125,8 @@ export default function HomePage() {
           <span>🚛</span>
           <div><strong>Тавцан · Чирэгч · Аварийн тусламж</strong><small>Үнэ ирсний дараа жолоочоо өөрөө сонгоно.</small></div>
         </div>
+        <button type="button" onClick={() => void logout()} disabled={signingOut} style={{ display: 'block', margin: '24px auto 0', padding: '10px 18px', border: '1px solid rgba(255,255,255,.16)', borderRadius: 12, background: 'transparent', color: '#b5b5bd' }}>{signingOut ? 'Гарч байна...' : 'Бүртгэлээс гарах'}</button>
+        {logoutError && <p role="alert" style={{ color: '#ff8178', textAlign: 'center', fontSize: 13 }}>{logoutError}</p>}
       </section>
     </main>
   )

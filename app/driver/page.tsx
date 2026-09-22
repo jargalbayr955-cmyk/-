@@ -31,6 +31,8 @@ export default function DriverPage() {
   const [notifStatus, setNotifStatus] = useState<'default'|'granted'|'denied'>('default')
   const [pushReady, setPushReady] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [sessionError, setSessionError] = useState(false)
+  const [sessionAttempt, setSessionAttempt] = useState(0)
 
   const [bankInfo, setBankInfo] = useState({ bank_name: '', bank_account: '', automatic_confirmation: false })
   const prevOrderIds = useRef<string[]>([])
@@ -235,28 +237,43 @@ export default function DriverPage() {
 
   // Mounted + session сэргээх
   useEffect(() => {
-    setMounted(true)
+    let cancelled = false
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10_000)
+    setMounted(false)
+    setSessionError(false)
     const restore = async () => {
       try {
-        const res = await fetch('/api/driver/session', { cache: 'no-store' })
+        const res = await fetch('/api/driver/session', { cache: 'no-store', signal: controller.signal })
+        if (cancelled) return
         if (res.ok) {
           const body = await res.json()
+          if (cancelled) return
           setDriver(body.driver)
-          localStorage.setItem('driver_session', JSON.stringify(body.driver))
-          localStorage.removeItem('accepted_order')
-          localStorage.removeItem('payment_info')
-        } else {
-          localStorage.removeItem('driver_session')
-          localStorage.removeItem('accepted_order')
-          localStorage.removeItem('payment_info')
+          try {
+            localStorage.setItem('driver_session', JSON.stringify(body.driver))
+            localStorage.removeItem('accepted_order')
+            localStorage.removeItem('payment_info')
+          } catch { /* Browser storage is optional; authentication uses the cookie. */ }
+        } else if (res.status === 401) {
+          try {
+            localStorage.removeItem('driver_session')
+            localStorage.removeItem('accepted_order')
+            localStorage.removeItem('payment_info')
+          } catch {}
+        } else throw new Error('Session unavailable')
+      } catch { if (!cancelled) setSessionError(true) }
+      finally {
+        clearTimeout(timeout)
+        if (!cancelled) {
+          setMounted(true)
+          if ('Notification' in window) setNotifStatus(Notification.permission as any)
         }
-      } catch {}
-      if ('Notification' in window) {
-        setNotifStatus(Notification.permission as any)
       }
     }
-    restore()
-  }, [])
+    void restore()
+    return () => { cancelled = true; clearTimeout(timeout); controller.abort() }
+  }, [sessionAttempt])
 
   // Browser буцах товч блоклох
   useEffect(() => {
@@ -402,8 +419,9 @@ export default function DriverPage() {
 
   // Mounted болохоос өмнө хоосон screen
   if (!mounted) {
-    return <div style={{minHeight:'100vh', background:'#060608'}}/>
+    return <div role="status" style={{minHeight:'100vh', background:D.bg, color:D.muted, display:'grid', placeItems:'center'}}>Нэвтрэлтийг шалгаж байна...</div>
   }
+  if (sessionError) return <div style={{minHeight:'100vh', background:D.bg, color:D.text, display:'grid', placeItems:'center'}}><div style={{textAlign:'center'}}><p role="alert">Холболтоо шалгаад дахин оролдоно уу.</p><button onClick={() => setSessionAttempt(value => value + 1)} style={{padding:'12px 24px', background:D.red, color:D.text, border:0, borderRadius:12}}>Дахин оролдох</button></div></div>
 
   // LOGIN
   if (!driver) {
