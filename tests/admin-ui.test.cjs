@@ -122,3 +122,9 @@ test('manual payment approval shows the exact amount/code first, and changed amo
   h.click('Энэ төлбөрийг зөвшөөрөх · Эрх нээх');h.update({payments:[{...payment,amount:6000}]});assert.ok(h.button('Энэ төлбөрийг зөвшөөрөх · Эрх нээх'))
   h.click('Энэ төлбөрийг зөвшөөрөх · Эрх нээх');h.click('Орлогыг шалгасан · Эрх нээх');assert.deepEqual(calls,['o1']);h.unmount()
 })
+
+test('background polling does not repeatedly abort a slow dashboard response',async()=>{
+ const h=await ready();h.tick(10000);const pending=h.requests.length-1
+ h.tick(10000);assert.equal(h.requests.length,pending+1);assert.equal(h.requests[pending].init.signal.aborted,false)
+ await h.reply(pending,200,dashboard);h.tick(10000);assert.equal(h.requests.length,pending+2);h.unmount()
+})

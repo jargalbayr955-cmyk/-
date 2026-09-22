@@ -20,10 +20,11 @@ function componentHarness(file, name, initial = {}, replacements = {}, globals =
     const exports = {}; cache[file] = exports
     const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText
     vm.runInNewContext(source, {
-      exports, console, AbortController, AbortSignal, setTimeout: () => 1, clearTimeout() {}, setInterval: () => 2, clearInterval() {},
+      exports, console, AbortController, AbortSignal: {}, setTimeout: () => 1, clearTimeout() {}, setInterval: () => 2, clearInterval() {},
       window: { addEventListener() {}, removeEventListener() {} }, document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} }, navigator: {}, localStorage: { setItem() {}, removeItem() {} }, ...globals,
       require(module) {
         if (Object.hasOwn(replacements, module)) return replacements[module]
+        if (module === '@/lib/client/request-signal') return load('lib/client/request-signal.ts')
         if (module === 'react') return react
         if (module === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) }
         if (module === '@/lib/order-offers' || module === './order-offers') return load('lib/order-offers.ts')
@@ -140,7 +141,7 @@ test('customer call control is first on a confirmed order and disappears after c
   const h = componentHarness('app/tracking/page.tsx', 'default', {}, {
     'next/navigation': { useRouter: () => router },
     '@/lib/client/navigation': { backInApp() {} },
-    '@/lib/client/booking-draft': { clearBookingDraft() {} },
+    '@/lib/client/booking-draft': { clearBookingDraft() {}, currentOrderId: () => 'order-customer' },
     '../components/driver-summary': { DriverSummary: 'DriverSummary' },
   }, {
     localStorage: { getItem: () => 'order-customer' },

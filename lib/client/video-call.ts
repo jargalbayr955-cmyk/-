@@ -1,6 +1,7 @@
 'use client'
 import { liveCall, type CallResponse, type CallRole, type VideoCall } from '@/lib/video-call'
 import { createRequestSignal } from '@/lib/client/request-signal'
+import { createRequestId } from '@/lib/client/request-id'
 
 export type VideoState = {
   phase: 'idle' | 'preparing' | 'ringing' | 'incoming' | 'connecting' | 'connected' | 'busy'
@@ -37,7 +38,7 @@ export function gatheredDescription(pc: RTCPeerConnection, signal: AbortSignal):
 }
 
 export class OrderVideoSession {
-  private instance = crypto.randomUUID()
+  private instance = createRequestId()
   private state: VideoState = { ...initialVideoState }
   private call: VideoCall | null = null
   private pc: RTCPeerConnection | null = null
@@ -194,7 +195,7 @@ export class OrderVideoSession {
       await pc.setLocalDescription(incoming ? await pc.createAnswer() : await pc.createOffer())
       const sdp = await gatheredDescription(pc, this.controller.signal)
       if (!this.valid(generation)) return
-      const id = incoming?.id || crypto.randomUUID()
+      const id = incoming?.id || createRequestId()
       // Remember the ID before sending, so a lost response or immediate navigation can end it.
       this.call = incoming || { id, caller_role: this.role, owned: true, status: 'ringing', expires_at: new Date(Date.now() + 60_000).toISOString(), offer_sdp: null, answer_sdp: null }
       pendingCall = this.call

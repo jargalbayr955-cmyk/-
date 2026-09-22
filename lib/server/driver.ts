@@ -24,15 +24,16 @@ export async function requireDriver(req: NextRequest): Promise<DriverSessionReco
 
   const { data, error } = await getSupabaseAdmin()
     .from('drivers')
-    .select('id,name,phone,car_type,car_number,photo_url,price,available,active,lat,lng,location_updated_at')
+    .select('id,name,phone,car_type,car_number,photo_url,price,available,active,lat,lng,location_updated_at,session_version')
     .eq('id', session.sub)
     .eq('active', true)
     .is('deleted_at', null)
     .maybeSingle()
 
   if (error) throw new Error('Driver session lookup unavailable')
-  if (!data) return null
-  return data as DriverSessionRecord
+  if (!data || (data.session_version ?? null) !== (session.version ?? null)) return null
+  const { session_version: _version, ...driver } = data
+  return driver as DriverSessionRecord
 }
 
 export async function driverHasBlockingWork(driverId: string) {

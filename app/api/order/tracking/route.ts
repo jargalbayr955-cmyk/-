@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   const user = await requireCustomer(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await allowRequest(`order-tracking:${user.id}`, 40, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
-  const { order_id } = await req.json().catch(()=>({}))
+  const { order_id } = (await req.json().catch(() => null)) ?? {}
   if (!order_id) return NextResponse.json({ error:'Missing order' }, {status:400})
   const s = getSupabaseAdmin()
   const { data: order, error: orderError } = await s.from('orders').select('id,user_id,user_phone,driver_id,driver_name,driver_phone,from_lat,from_lng,from_address,to_address,status,final_price').eq('id',order_id).maybeSingle()

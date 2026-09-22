@@ -1,3 +1,6 @@
+import { createRequestSignal } from './request-signal'
+import { clearBookingDraft } from './booking-draft'
+
 export type SessionGateMode = 'entry' | 'guest' | 'customer'
 export type CustomerIdentity = { id: string; phone: string }
 export type SessionState = { destination: string | null; user: CustomerIdentity | null }
@@ -31,7 +34,7 @@ export const CUSTOMER_SESSION_EVENT = 'achilt:customer-session-changed'
 export const CUSTOMER_SESSION_STORAGE_KEY = 'achilt_customer_session_changed'
 
 export function clearCustomerBrowserState() {
-  try { sessionStorage.removeItem('achilt_booking_draft') } catch {}
+  clearBookingDraft()
   // Remove only customer data. Never erase driver work or unrelated preferences.
   for (const key of ['user', 'current_order_id', 'tracking_driver_id', 'fromAddress', 'from', 'fromLat', 'fromLng', 'dest', 'phone_called']) {
     try { localStorage.removeItem(key) } catch { /* Cookie auth works even when storage is blocked. */ }
@@ -49,7 +52,10 @@ export function notifyCustomerSessionChanged() {
 }
 
 export async function logoutCustomer() {
-  const response = await fetch('/api/customer/logout', { method: 'POST', credentials: 'same-origin', signal: AbortSignal.timeout(15_000) })
+  const deadline = createRequestSignal(15_000)
+  let response: Response
+  try { response = await fetch('/api/customer/logout', { method: 'POST', credentials: 'same-origin', signal: deadline.signal }) }
+  finally { deadline.dispose() }
   if (!response.ok) throw new Error('Logout failed')
   clearCustomerBrowserState()
   try { sessionStorage.setItem('achilt_signed_out', '1') } catch {}

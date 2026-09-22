@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  const { available } = await req.json().catch(() => ({}))
+  const { available } = (await req.json().catch(() => null)) ?? {}
   if (typeof available !== 'boolean') return NextResponse.json({ error: 'Invalid value' }, { status: 400 })
 
   if (available) {

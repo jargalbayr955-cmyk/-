@@ -10,13 +10,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  const body = await req.json().catch(() => ({}))
+  const body = (await req.json().catch(() => null)) ?? {}
   const orderId = typeof body.order_id === 'string' ? body.order_id : ''
   const price = Number(body.price)
   const lat = Number(body.driver_lat)
   const lng = Number(body.driver_lng)
 
-  if (!orderId || !Number.isFinite(price) || price <= 0 || price > 10_000_000) {
+  if (!orderId || typeof body.price !== 'number' || !Number.isInteger(price) || price <= 0 || price > 10_000_000) {
     return NextResponse.json({ error: 'Үнийн санал буруу байна' }, { status: 400 })
   }
   if (!driver.available) return NextResponse.json({ error: 'Жолооч идэвхгүй байна' }, { status: 403 })

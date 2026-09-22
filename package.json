@@ -3,15 +3,17 @@
   "version": "5.5.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/prepare-map-assets.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/prepare-map-assets.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
-    "maplibre-gl": "5.24.0",
-    "next": "16.2.7",
+    "maplibre-gl": "6.10.0",
+    "next": "16.3.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "web-push": "^3.6.7"
@@ -23,7 +25,7 @@
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
     "eslint": "^9",
-    "eslint-config-next": "16.2.7",
+    "eslint-config-next": "16.3.6",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

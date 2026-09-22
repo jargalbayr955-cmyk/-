@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  const b = await req.json().catch(() => ({}))
+  const b = (await req.json().catch(() => null)) ?? {}
   const name = String(b.name || '').trim().slice(0, 100)
   const carType = String(b.car_type || '')
   if (b.new_pin && !/^\d{6}$/.test(String(b.new_pin))) {
@@ -43,6 +43,9 @@ export async function POST(req: NextRequest) {
   if (b.new_pin) {
     const { error: pinError } = await s.rpc('set_driver_pin_secure', { p_driver_id: driver.id, p_pin: String(b.new_pin) })
     if (pinError) return NextResponse.json({ error: 'PIN солиход алдаа гарлаа' }, { status: 500 })
+    const response = NextResponse.json({ success: true, reauthenticate: true }, { headers: { 'Cache-Control': 'no-store' } })
+    response.cookies.set('achilt_driver_session', '', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 0 })
+    return response
   }
 
   const fresh = await requireDriver(req)

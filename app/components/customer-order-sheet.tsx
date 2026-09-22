@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { BookingScreen, readBookingDraft, saveBookingDraft } from '@/lib/client/booking-draft'
+import { createRequestId } from '@/lib/client/request-id'
+import { createRequestSignal } from '@/lib/client/request-signal'
 
 type Point = { lat: number; lng: number }
 type Step = 0 | 1 | 2 | 3
@@ -28,6 +30,7 @@ export function CustomerOrderSheet({ screen, location, onNavigate, onBack, onClo
   const carMarkRef = useRef<HTMLInputElement>(null)
   const detailRef = useRef<HTMLInputElement>(null)
   const requestPending = useRef(false)
+  const bookingRequest = useRef<{ id: string; payload: string } | undefined>(undefined)
   const submittedLocation = useRef<Point | null>(null)
   const [carType, setCarType] = useState('')
   const [dest, setDest] = useState('')
@@ -41,6 +44,7 @@ export function CustomerOrderSheet({ screen, location, onNavigate, onBack, onClo
   useEffect(() => {
     const saved = readBookingDraft()
     if (saved) {
+      bookingRequest.current = saved.request
       if (saved.orderId) submittedLocation.current = saved.location
       setCarType(saved.carType); setDest(saved.dest); setCarMark(saved.carMark); setExtraAddress(saved.extraAddress); setOrderId(saved.orderId)
     }
@@ -53,7 +57,7 @@ export function CustomerOrderSheet({ screen, location, onNavigate, onBack, onClo
   }, [])
 
   useEffect(() => {
-    if (draftReady) saveBookingDraft({ carType, dest, carMark, extraAddress, location: orderId ? submittedLocation.current : location, orderId })
+    if (draftReady) saveBookingDraft({ carType, dest, carMark, extraAddress, location: orderId ? submittedLocation.current : location, orderId, request: bookingRequest.current })
   }, [carType, dest, carMark, extraAddress, location, orderId, draftReady])
 
   useEffect(() => {
@@ -118,7 +122,7 @@ export function CustomerOrderSheet({ screen, location, onNavigate, onBack, onClo
 
   async function handleSearch() {
     if (requestPending.current) return
-    if (orderId) { localStorage.setItem('current_order_id', orderId); router.push('/drivers'); return }
+    if (orderId) { try { localStorage.setItem('current_order_id', orderId) } catch {}; router.push('/drivers'); return }
     if (!carType) { goTo(0); return }
     if (!dest.trim()) { goTo(1); return }
     if (!carMark.trim()) { goTo(2); return }
@@ -130,15 +134,22 @@ export function CustomerOrderSheet({ screen, location, onNavigate, onBack, onClo
     setSubmitting(true)
     setError('')
     let created = false
+    const deadline = createRequestSignal(20_000)
     try {
-      localStorage.setItem('fromLat', String(location.lat))
-      localStorage.setItem('fromLng', String(location.lng))
-      localStorage.setItem('fromAddress', fromAddress)
-      localStorage.setItem('dest', dest.trim())
+      try {
+        localStorage.setItem('fromLat', String(location.lat))
+        localStorage.setItem('fromLng', String(location.lng))
+        localStorage.setItem('fromAddress', fromAddress)
+        localStorage.setItem('dest', dest.trim())
+      } catch { /* The booking draft also has an in-memory fallback. */ }
+      const details = { from_address: fromAddress, to_address: dest.trim(), from_lat: location.lat, from_lng: location.lng, car_type: carType, car_mark: carMark.trim() }
+      const payload = JSON.stringify(details)
+      if (bookingRequest.current?.payload !== payload) bookingRequest.current = { id: createRequestId(), payload }
+      saveBookingDraft({ carType, dest, carMark, extraAddress, location, orderId: null, request: bookingRequest.current })
       const response = await fetch('/api/order/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from_address: fromAddress, to_address: dest.trim(), from_lat: location.lat, from_lng: location.lng, car_type: carType, car_mark: carMark.trim() }),
+        body: JSON.stringify({ ...details, request_id: bookingRequest.current.id }), signal: deadline.signal,
       })
       const body = await response.json().catch(() => ({}))
       if (!response.ok || !body.order?.id) {
@@ -146,7 +157,7 @@ export function CustomerOrderSheet({ screen, location, onNavigate, onBack, onClo
         setError(body.error || 'Захиалга үүсгэхэд алдаа гарлаа. Дахин оролдоно уу.')
         return
       }
-      localStorage.setItem('current_order_id', body.order.id)
+      try { localStorage.setItem('current_order_id', body.order.id) } catch {}
       submittedLocation.current = location
       saveBookingDraft({ carType, dest, carMark, extraAddress, location, orderId: body.order.id })
       setOrderId(body.order.id)
@@ -155,6 +166,7 @@ export function CustomerOrderSheet({ screen, location, onNavigate, onBack, onClo
     } catch {
       setError('Холболтоо шалгаад дахин оролдоно уу.')
     } finally {
+      deadline.dispose()
       // Keep the button locked while a successful order opens its waiting map.
       if (!created) { requestPending.current = false; setSubmitting(false) }
     }

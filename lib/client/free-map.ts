@@ -12,6 +12,7 @@ export async function loadFreeMap(): Promise<MapLibre> {
   if (typeof window === 'undefined') throw new Error('Map is browser-only')
   if (window.maplibregl) return window.maplibregl
   loaderPromise ??= import('maplibre-gl').then(ml => {
+    ml.setWorkerUrl(`${window.location.origin}/maplibre/${ml.getVersion()}/maplibre-gl-worker.mjs`)
     window.maplibregl = ml
     return ml
   }).catch(error => {

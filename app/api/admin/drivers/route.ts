@@ -6,7 +6,8 @@ import { requireAdmin, sameOriginAdminRequest } from '@/lib/server/admin'
 
 export async function POST(req:NextRequest){
  const access=await requireAdmin(req); if(!access.ok)return NextResponse.json({error:access.error},{status:access.status})
- const {action,driver,id,order_id}=await req.json().catch(()=>({})); const s=getSupabaseAdmin()
+ if(!sameOriginAdminRequest(req))return NextResponse.json({error:'Forbidden'},{status:403})
+ const {action,driver,id,order_id}=(await req.json().catch(() => null)) ?? {}; const s=getSupabaseAdmin()
  if(action==='add'){
   const phone=normalizeMnPhone(driver?.phone); if(!phone)return NextResponse.json({error:'Утасны дугаар буруу'},{status:400})
   const pin=String(driver?.pin||crypto.randomInt(100000,1000000)); if(!/^\d{4,8}$/.test(pin))return NextResponse.json({error:'PIN буруу'},{status:400})

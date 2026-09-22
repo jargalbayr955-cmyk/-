@@ -42,8 +42,8 @@ function formHarness(options = {}) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
   }).outputText
   vm.runInNewContext(source, {
-    exports, window, console,
-    localStorage: { setItem: (key, value) => storage.set(key, value) },
+    exports, window, console, crypto: require('node:crypto').webcrypto, AbortController, setTimeout, clearTimeout,
+    localStorage: { setItem: (key, value) => { if (options.blockedStorage) throw Error('blocked'); storage.set(key, value) } },
     sessionStorage: { getItem: key => draftStorage.get(key), setItem: (key,value) => draftStorage.set(key,value), removeItem: key => draftStorage.delete(key) },
     fetch: (url, init) => new Promise(resolve => requests.push({ url, init, resolve })),
     require(name) {
@@ -235,7 +235,9 @@ test('final explicit confirmation sends one trimmed order and opens its waiting 
   void send()
   void send()
   assert.equal(h.requests.length, 1)
-  assert.deepEqual(JSON.parse(h.requests[0].init.body), {
+  const { request_id, ...details } = JSON.parse(h.requests[0].init.body)
+  assert.match(request_id, /^[a-f0-9-]{36}$/)
+  assert.deepEqual(details, {
     from_address: 'Газрын зураг дээр сонгосон цэг (47.91000, 106.92000)',
     to_address: '3-р хороолол', from_lat: 47.91, from_lng: 106.92, car_type: 'butten', car_mark: 'Toyota Prius',
   })
@@ -261,6 +263,7 @@ test('missing pickup blocks dispatch; server failure preserves details and allow
   assert.equal(h.error, 'Түр алдаа')
   void h.click('Жолооч хайх')
   assert.equal(h.requests.length, 2)
+  assert.equal(JSON.parse(h.requests[1].init.body).request_id, JSON.parse(h.requests[0].init.body).request_id)
   assert.equal(JSON.parse(h.requests[1].init.body).to_address, '3-р хороолол')
   await h.reply(1, 200, { order: { id: 'test-retry-order' } })
   assert.deepEqual(h.routes, ['/drivers'])
@@ -283,4 +286,24 @@ test('Back walks every field and keeps the draft; a sent order resumes without a
   assert.deepEqual(restored.routes,['/drivers'])
   restored.back()
   assert.equal(restored.dialog.open,false)
+})
+
+test('a lost create response and page reload preserve the idempotency key', async () => {
+  const h = formHarness(); fillToReview(h); void h.click('Жолооч хайх')
+  const first = JSON.parse(h.requests[0].init.body)
+  await h.reply(0,503,{error:'Lost response'})
+  h.unmount()
+  const restored = formHarness({screen:'review',draftStorage:h.draftStorage})
+  void restored.click('Жолооч хайх')
+  assert.equal(JSON.parse(restored.requests[0].init.body).request_id,first.request_id)
+  await restored.reply(0,200,{order:{id:'recovered-order'}})
+  assert.deepEqual(restored.routes,['/drivers'])
+})
+
+test('blocked optional browser storage does not turn a successful order into a retry', async () => {
+  const h = formHarness({blockedStorage:true}); fillToReview(h); void h.click('Жолооч хайх')
+  assert.equal(h.requests.length,1)
+  await h.reply(0,200,{order:{id:'storage-blocked-order'}})
+  assert.deepEqual(h.routes,['/drivers'])
+  assert.equal(JSON.parse(h.draftStorage.get('achilt_booking_draft')).orderId,'storage-blocked-order')
 })

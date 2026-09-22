@@ -32,7 +32,7 @@ export default function DriverProfilePage() {
         const d = body.driver
         setDriver(d)
         setForm({ name: d.name || '', car_type: d.car_type || '', car_number: d.car_number || '', photo_url: d.photo_url || '', pin: '', new_pin: '', confirm_pin: '' })
-        localStorage.setItem('driver_session', JSON.stringify(d))
+        try { localStorage.setItem('driver_session', JSON.stringify(d)) } catch {}
       } catch { if (!cancelled) router.replace('/driver') }
     })()
     return () => { cancelled = true }
@@ -50,10 +50,15 @@ export default function DriverProfilePage() {
     try {
     const res = await fetch('/api/driver/profile', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name:form.name, car_type:form.car_type, car_number:form.car_number, photo_url:form.photo_url, new_pin:form.new_pin || undefined }) })
     const body = await res.json().catch(()=>({}))
+    if (res.ok && body.reauthenticate) {
+      try { localStorage.removeItem('driver_session') } catch {}
+      router.replace('/driver')
+      return
+    }
     if (!res.ok || !body.driver) {
       setError(body.error || 'Хадгалахад алдаа гарлаа')
     } else {
-      localStorage.setItem('driver_session', JSON.stringify(body.driver))
+      try { localStorage.setItem('driver_session', JSON.stringify(body.driver)) } catch {}
       setDriver(body.driver)
       setSaved(true)
       setForm(f => ({ ...f, pin: '', new_pin: '', confirm_pin: '' }))
@@ -149,7 +154,7 @@ export default function DriverProfilePage() {
           <input type="password" placeholder="PIN дахин оруулах" maxLength={6} value={form.confirm_pin}
             onChange={e => setForm({...form, confirm_pin: e.target.value})}
             style={{...D.input}}/>
-          <p style={{color:'rgba(255,255,255,0.2)', fontSize:'11px', margin:'8px 0 0'}}>Хоосон орхивол PIN өөрчлөгдөхгүй</p>
+          <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:'8px 0 0'}}>Хоосон орхивол PIN өөрчлөгдөхгүй. PIN сольсны дараа бүх төхөөрөмж дээр шинэ PIN-ээр дахин нэвтэрнэ.</p>
         </div>
 
         {error && <p style={{color:'#ff6b6b', fontSize:'13px', textAlign:'center', marginBottom:'12px'}}>⚠️ {error}</p>}

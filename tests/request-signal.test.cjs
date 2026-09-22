@@ -55,3 +55,13 @@ test('completed requests release timers and listeners; a standalone request stil
   assert.equal(standalone.signal.aborted, true)
   assert.equal(h.timers.size, 0)
 })
+
+test('request IDs remain cryptographically random on browsers without randomUUID', () => {
+  const exports = {}
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname,'../lib/client/request-id.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText, {
+    exports,crypto:{getRandomValues:require('node:crypto').webcrypto.getRandomValues.bind(require('node:crypto').webcrypto)},
+  })
+  const a=exports.createRequestId(),b=exports.createRequestId()
+  assert.match(a,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+  assert.notEqual(a,b)
+})

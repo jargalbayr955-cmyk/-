@@ -8,7 +8,7 @@ const ts = require('typescript')
 const { NextRequest } = require('next/server')
 
 function harness({ rows = {}, driver = { id: 'driver-a', phone: '+97600000000', available: false, car_type: 'butten' }, blocked = false, env = {}, send, adminAccess = { ok: true, credential: { session_version: 'verified-admin-version' } }, rpcResult } = {}) {
-  const calls = [], cache = new Map()
+  const calls = [], cache = new Map(), afterTasks = []
   const admin = {
     from(table) {
       const query = { table, filters: [], action: 'select' }
@@ -27,6 +27,8 @@ function harness({ rows = {}, driver = { id: 'driver-a', phone: '+97600000000', 
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
     }).outputText
     vm.runInNewContext(source, { exports, Buffer, URL, Date, process: { env }, console: { error() {}, warn() {} }, require(name) {
+      if (name === 'next/server') return {...require('next/server'),after: task => afterTasks.push(task)}
+      if (name === '@/lib/server/customer') return {requireCustomer: async () => ({id:'customer-test',phone:'+97600009900'})}
       if (name === 'server-only') return {}
       if (name.endsWith('/supabase-admin')) return { getSupabaseAdmin: () => admin }
       if (name === '@/lib/server/admin') return { requireAdmin: async () => adminAccess, sameOriginAdminRequest: req => req.headers.get('origin') === req.nextUrl.origin && req.headers.get('sec-fetch-site') !== 'cross-site' }
@@ -39,7 +41,7 @@ function harness({ rows = {}, driver = { id: 'driver-a', phone: '+97600000000', 
     } }, { filename: file })
     return exports
   }
-  return { load, calls }
+  return { load, calls, afterTasks }
 }
 function request(body = {}, secret = 'test-webhook-secret') {
   return new NextRequest('https://achilt.example/api/test', { method: 'POST', headers: { origin: 'https://achilt.example', 'content-type': 'application/json', 'x-webhook-secret': secret }, body: JSON.stringify(body) })
@@ -451,4 +453,45 @@ test('pending or finished orders cannot generate a selected-driver push', async 
     assert.equal((await h.load('lib/server/push.ts').notifySelectedDriver('order-a')).sent, 0)
     assert.equal(h.calls.some(q => q.table === 'push_subscriptions'), false)
   }
+})
+
+for (const route of ['driver/location','driver/availability','driver/offer','driver/profile','payment/complete','order/create','order/accept-offer','order/tracking','order/slots','push/subscribe','push/send','admin/drivers']) test(`${route} rejects a null body without a database mutation`, async () => {
+  const h = harness()
+  const res = await h.load(`app/api/${route}/route.ts`).POST(request(null))
+  assert.equal(res.status,400)
+  assert.equal(h.calls.some(call=>call.rpc||call.action!=='select'),false)
+})
+
+const booking = {request_id:'deba2fd8-0a46-4e0a-901c-3b2b86c42d00',from_lat:47.91,from_lng:106.92,from_address:'Pickup',to_address:'Destination',car_type:'butten',car_mark:'Prius'}
+test('create rejects coerced coordinates and malformed keys before calling dispatch', async () => {
+  for (const bad of [{from_lat:false},{from_lat:[]},{from_lng:'106.92'},{request_id:null},{from_address:{text:'Pickup'}}]) {
+    const h=harness()
+    assert.equal((await h.load('app/api/order/create/route.ts').POST(request({...booking,...bad}))).status,400)
+    assert.equal(h.calls.length,0)
+  }
+})
+test('create uses the authenticated owner and stable key; a replay does not resend invitations', async () => {
+  for (const created of [true,false]) {
+    const h=harness({rpcResult:()=>({data:{order:{id:'created-order',status:'pending'},created},error:null})})
+    const res=await h.load('app/api/order/create/route.ts').POST(request({...booking,user_id:'intruder',user_phone:'bad'}))
+    assert.equal(res.status,200)
+    assert.equal(h.calls[0].rpc,'create_customer_order_atomic')
+    assert.equal(h.calls[0].args.p_customer_id,'customer-test')
+    assert.equal(h.calls[0].args.p_request_id,booking.request_id)
+    assert.equal(h.afterTasks.length,created?1:0)
+    assert.match(res.headers.get('cache-control'),/no-store/)
+  }
+})
+test('failed atomic creation returns no order or notification task', async () => {
+  const h=harness({rpcResult:()=>({data:null,error:{code:'XX000'}})})
+  const res=await h.load('app/api/order/create/route.ts').POST(request(booking))
+  assert.equal(res.status,503);assert.equal((await res.json()).order,undefined);assert.equal(h.afterTasks.length,0)
+})
+
+test('offer price must be a numeric whole tugrik amount', async () => {
+ for(const price of [true,'50000',50000.5,[],null]) {
+  const h=harness({driver:{id:'driver-a',available:true,car_type:'butten'}})
+  assert.equal((await h.load('app/api/driver/offer/route.ts').POST(request({order_id:'order-a',price}))).status,400)
+  assert.equal(h.calls.length,0)
+ }
 })

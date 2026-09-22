@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  const { order_id } = await req.json().catch(() => ({}))
+  const { order_id } = (await req.json().catch(() => null)) ?? {}
   if (!order_id) return NextResponse.json({ error: 'Missing order' }, { status: 400 })
 
   const s = getSupabaseAdmin()

@@ -10,7 +10,7 @@ function distanceKm(lat1:number,lng1:number,lat2:number,lng2:number){const R=637
 export async function POST(req:NextRequest){
  const user=await requireCustomer(req); if(!user)return NextResponse.json({error:'Unauthorized'},{status:401})
  if(!(await allowRequest(`order-slots:${user.id}`,40,60_000)))return NextResponse.json({error:'Too many requests'},{status:429})
- const {order_id}=await req.json().catch(()=>({})); if(!order_id)return NextResponse.json({error:'Missing order_id'},{status:400})
+ const {order_id}=(await req.json().catch(() => null)) ?? {}; if(!order_id)return NextResponse.json({error:'Missing order_id'},{status:400})
  const s=getSupabaseAdmin();
  const {data:order,error:orderError}=await s.from('orders').select('id,user_id,user_phone,status,from_lat,from_lng,driver_id,driver_name,final_price,bidding_expires_at,driver_invites_initialized_at').eq('id',order_id).maybeSingle()
  if(orderError)return NextResponse.json({error:'Order lookup failed'},{status:503})

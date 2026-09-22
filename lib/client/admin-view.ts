@@ -4,7 +4,7 @@ export type AdminDriver = {
 }
 export type AdminOrder = {
   id: string; created_at: string; completed_at?: string | null; from_address: string; to_address: string
-  driver_name: string; driver_phone: string; car_type: string; car_mark: string; status: string
+  driver_id?: string | null; driver_name: string; driver_phone: string; car_type: string; car_mark: string; status: string
   final_price: number; duration_minutes?: number | null
 }
 export type AdminDashboard = {

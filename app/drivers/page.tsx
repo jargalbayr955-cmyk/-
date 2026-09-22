@@ -1,11 +1,12 @@
 'use client'
+import { createRequestSignal } from '@/lib/client/request-signal'
 import { OrderVideoCall } from '../components/order-video-call'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useScreenHistory } from '@/lib/client/use-screen-history'
 import { backInApp } from '@/lib/client/navigation'
-import { clearBookingDraft, readBookingDraft, saveBookingDraft } from '@/lib/client/booking-draft'
+import { clearBookingDraft, currentOrderId, readBookingDraft, saveBookingDraft } from '@/lib/client/booking-draft'
 import { OfferMap } from '../components/offer-map'
 import { DriverSummary } from '../components/driver-summary'
 import { DriverSlot, mapOffers, offerSnapshot, PickupPoint, pickupPoint, remainingSeconds } from '@/lib/order-offers'
@@ -38,12 +39,12 @@ export default function DriversPage() {
   const selected = offers.find(slot => slot.driver_id === selectedDriverId)
 
   useEffect(() => {
+    const id = currentOrderId()
+    if (!id) { router.replace('/current'); return }
+    setOrderId(id)
     try {
-      const id = localStorage.getItem('current_order_id')
-      if (!id) { router.replace('/current'); return }
-      setOrderId(id)
       setPickup(pickupPoint(localStorage.getItem('fromLat'), localStorage.getItem('fromLng')))
-    } catch { router.replace('/current') }
+    } catch { setPickup(readBookingDraft()?.location || null) }
   }, [router])
 
   useEffect(() => {
@@ -164,14 +165,15 @@ export default function DriversPage() {
     actionPending.current = true
     setAccepting(true)
     setError('')
+    const deadline = createRequestSignal(15_000)
     try {
-      const response = await fetch('/api/order/accept-offer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_id: orderId, offer_id: selected.offer.id }), signal: AbortSignal.timeout(15_000) })
+      const response = await fetch('/api/order/accept-offer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_id: orderId, offer_id: selected.offer.id }), signal: deadline.signal })
       const body = await response.json().catch(() => ({}))
       if (!response.ok) { setError(body.error || 'Энэ саналыг сонгох боломжгүй болсон байна.'); setSelectedDriverId(null); return }
       try { localStorage.setItem('tracking_driver_id', selected.driver_id) } catch {}
       router.push('/tracking')
     } catch { setError('Сонголтыг баталгаажуулж чадсангүй. Холболтоо шалгана уу.') }
-    finally { actionPending.current = false; setAccepting(false) }
+    finally { deadline.dispose(); actionPending.current = false; setAccepting(false) }
   }
 
   const retrySearch = async () => {
@@ -179,8 +181,9 @@ export default function DriversPage() {
     actionPending.current = true
     setRetrying(true)
     setError('')
+    const deadline = createRequestSignal(15_000)
     try {
-      const response = await fetch('/api/order/retry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_id: orderId }), signal: AbortSignal.timeout(15_000) })
+      const response = await fetch('/api/order/retry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_id: orderId }), signal: deadline.signal })
       const body = await response.json().catch(() => ({}))
       if (!response.ok || !body.order?.id) { setError(body.error || 'Дахин хайлт эхлүүлж чадсангүй.'); return }
       try { localStorage.setItem('current_order_id', body.order.id) } catch {}
@@ -194,7 +197,7 @@ export default function DriversPage() {
       setExpiresAt(body.bidding_expires_at || null)
       setSecondsLeft(remainingSeconds(body.bidding_expires_at || null))
     } catch { setError('Холболтоо шалгаад дахин оролдоно уу.') }
-    finally { actionPending.current = false; setRetrying(false) }
+    finally { deadline.dispose(); actionPending.current = false; setRetrying(false) }
   }
 
   const clock = secondsLeft == null ? '--:--' : `${String(Math.floor(secondsLeft / 60)).padStart(2, '0')}:${String(secondsLeft % 60).padStart(2, '0')}`

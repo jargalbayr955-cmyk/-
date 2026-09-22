@@ -1,14 +1,16 @@
 import { CustomerIdentity, readSession } from './session'
+import { createRequestSignal } from './request-signal'
 
 export type AuthMode = 'login' | 'register'
 export type AuthResult = { ok: true; user: CustomerIdentity } | { ok: false; error: string; canLogin?: boolean }
 
 export async function authenticateCustomer(mode: AuthMode, phone: string, pin: string): Promise<AuthResult> {
   let accountCreated = false
+  let deadline = createRequestSignal(20_000)
   try {
     const response = await fetch(`/api/customer/${mode}`, {
       method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, pin }), signal: AbortSignal.timeout(20_000),
+      body: JSON.stringify({ phone, pin }), signal: deadline.signal,
     })
     const body = await response.json().catch(() => ({}))
     if (!response.ok) return {
@@ -18,7 +20,9 @@ export async function authenticateCustomer(mode: AuthMode, phone: string, pin: s
     }
     accountCreated = mode === 'register'
     // Confirm the browser accepted the HttpOnly cookie before leaving the form.
-    const session = await readSession('customer', AbortSignal.timeout(10_000))
+    deadline.dispose()
+    deadline = createRequestSignal(10_000)
+    const session = await readSession('customer', deadline.signal)
     if (!session.user || session.user.id !== body.user?.id) return {
       ok: false,
       error: 'Нэвтрэлт энэ хөтөч дээр хадгалагдсангүй. Сайтын cookie-г зөвшөөрөөд «Нэвтрэх»-ээр дахин оролдоно уу.',
@@ -33,5 +37,5 @@ export async function authenticateCustomer(mode: AuthMode, phone: string, pin: s
         : 'Хариу ирсэнгүй. Интернэт холболтоо шалгаад дахин оролдоно уу.',
       canLogin: accountCreated,
     }
-  }
+  } finally { deadline.dispose() }
 }

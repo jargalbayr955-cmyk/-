@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   const driver = await requireDriver(req)
   if (!driver) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await allowRequest(`push-subscribe:${driver.id}`, 10, 60_000))) return NextResponse.json({ error: 'Rate limited' }, { status: 429 })
-  const { subscription } = await req.json().catch(() => ({}))
+  const { subscription } = (await req.json().catch(() => null)) ?? {}
   if (!isValidPushSubscription(subscription)) return NextResponse.json({ error: 'Invalid or unsupported push subscription' }, { status: 400 })
   const supabase = getSupabaseAdmin()
   const { data: existing, error: lookupError } = await supabase.from('push_subscriptions').select('id').eq('driver_id', driver.id).limit(1).maybeSingle()

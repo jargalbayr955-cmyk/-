@@ -18,13 +18,15 @@ type DriverNotice = { ok: boolean; text: string; pin?: string; phone?: string }
 
 function OrderCard({ order, now }: { order: AdminOrder; now: number }) {
   const completed = order.status === 'completed'
+  const needsReview = !completed && !order.driver_id
   const minutes = completed ? order.duration_minutes : Math.max(0, Math.round((now - new Date(order.created_at).getTime()) / 60000))
   return <article className={styles.listCard}>
     <div className={styles.driverHeader}>
-      <div><span className={`${styles.badge} ${styles.ready}`}>{completed ? 'Дууссан' : 'Явагдаж байна'}</span><p className={styles.muted}>Үүссэн: {adminDate(order.created_at)}</p></div>
+      <div><span className={`${styles.badge} ${styles.ready}`}>{completed ? 'Дууссан' : needsReview ? 'Бүртгэлийг нягтлах' : 'Явагдаж байна'}</span><p className={styles.muted}>Үүссэн: {adminDate(order.created_at)}</p></div>
       <div><span className={styles.muted}>Тохиролцсон үнэ</span><h3>{Number(order.final_price) > 0 ? adminMoney(order.final_price) : 'Үнэ бүртгэгдээгүй'}</h3></div>
     </div>
     <h3>{order.driver_name || 'Жолоочийн нэр бүртгэгдээгүй'}</h3>
+    {needsReview && <p className={styles.notice}>Энэ хуучин захиалга баталгаажсан төлөвтэй боловч жолоочтой холбогдоогүй байна. Бодит явж буй ажил эсэхийг нягтална уу.</p>}
     <p className={styles.muted}>{order.driver_phone && <a href={`tel:${order.driver_phone}`}>{order.driver_phone}</a>} · {adminCarLabel(order.car_type)}{order.car_mark ? ` · ${order.car_mark}` : ''}</p>
     <div className={styles.orderRoute}><p><span>Хаанаас</span><strong>{order.from_address || 'Байршлаар сонгосон'}</strong></p><p><span>Хаашаа</span><strong>{order.to_address || 'Хүргэх газар оруулаагүй'}</strong></p></div>
     <p className={styles.muted}>{completed ? `Дууссан: ${adminDate(order.completed_at)}` : 'Захиалга үүссэнээс хойш'}{minutes != null && Number.isFinite(minutes) ? ` · ${minutes} минут` : ''}</p>
@@ -47,6 +49,7 @@ export default function AdminPage() {
   const heading = useRef<HTMLHeadingElement>(null), notice = useRef<HTMLDivElement>(null), previousScreen = useRef(navigation.screen)
   const { drivers, orders, activeOrders, pendingApprovalCount } = dashboard
   const availableDrivers = drivers.filter(driver => driver.active && driver.available)
+  const unlinkedOrders = activeOrders.filter(order => !order.driver_id).length
   const filteredDrivers = filterAdminDrivers(drivers, search, filter)
   const currentSection = adminSections.find(section => section.id === tab) || adminSections[0]
 
@@ -74,7 +77,11 @@ export default function AdminPage() {
       setUpdatedAt(new Date().toISOString()); setDashboardError('')
     } catch (cause) {
       if (attempt === sequence.current && !lifetime.current?.signal.aborted) setDashboardError(cause instanceof Error && cause.name !== 'AbortError' ? cause.message : 'Холболт тасарлаа. Мэдээлэл хамгийн сүүлд шинэчилсэн үеийнх байна.')
-    } finally { request.dispose(); if (attempt === sequence.current && !lifetime.current?.signal.aborted) { setLoading(false); setRefreshing(false) } }
+    } finally {
+      request.dispose()
+      if (dashboardRequest.current === controller) dashboardRequest.current = null
+      if (attempt === sequence.current && !lifetime.current?.signal.aborted) { setLoading(false); setRefreshing(false) }
+    }
   }, [sessionExpired])
   useEffect(() => {
     const controller = new AbortController(); lifetime.current = controller
@@ -96,7 +103,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!authed || mustChangePassword) return
     void fetchDashboard()
-    const refresh = () => { if (document.visibilityState === 'visible' && !pendingDriver.current) void fetchDashboard() }
+    const refresh = () => { if (document.visibilityState === 'visible' && !pendingDriver.current && !dashboardRequest.current) void fetchDashboard() }
     const timer = setInterval(refresh, 10_000)
     document.addEventListener('visibilitychange', refresh)
     return () => { clearInterval(timer); document.removeEventListener('visibilitychange', refresh); sequence.current++; dashboardRequest.current?.abort() }
@@ -185,6 +192,7 @@ export default function AdminPage() {
               <button className={styles.stat} onClick={() => setTab('history')}><span>Дууссан захиалга</span><strong>{orders.length}{orders.length >= 100 ? '+' : ''}</strong><small>Сүүлийн 24 цагт үүссэн захиалга →</small></button>
             </div>
             {(!dashboard.bankName || !dashboard.bankAccount) && <div className={styles.notice}><strong>Төлбөр авах дансаа тохируулна уу.</strong><p>Жолоочид шилжүүлэх данс харагдахын тулд банк, дансны дугаараа хадгална.</p><button type="button" onClick={() => setTab('settings')}>Банкны данс тохируулах →</button></div>}
+            {unlinkedOrders > 0 && <div className={styles.notice}><strong>Нягтлах хуучин захиалга: {unlinkedOrders}</strong><p>Дээрх захиалгын тоонд жолоочгүй боловч баталгаажсан төлөвтэй хуучин бүртгэлүүд орсон байна.</p><button type="button" onClick={() => setTab('active')}>Бүртгэлүүдийг харах →</button></div>}
             <section className={styles.panel}><h3>Та юу хийх вэ?</h3><ol className={styles.steps}>
               <li><div><strong>Шинэ жолооч бүртгэх</strong><br />Утасны дугаарыг нэмээд, үүссэн түр PIN-ийг жолоочид дамжуулна.<br /><button type="button" className={styles.linkButton} onClick={() => navigation.navigate('drivers:add')}>Жолооч бүртгэх →</button></div></li>
               <li><div><strong>Төлбөр төлсөн жолоочийн эрх нээх</strong><br />Улсын дугаар эсвэл утсаар хайж, банкны орлогын дүн, гүйлгээний кодыг тулгана.<br /><button type="button" className={styles.linkButton} onClick={() => setTab('payments')}>Төлбөр шалгах →</button></div></li>

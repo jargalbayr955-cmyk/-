@@ -25,6 +25,10 @@ function harness() {
         users.push(user)
         return { data: user.id, error: null }
       }
+      if (name === 'verify_driver_device') {
+        const row = drivers.find(u => u.phone === args.p_phone && u.pin === args.p_pin && u.active && !u.deleted_at)
+        return {data: row ? [{id:row.id,session_version:row.session_version ?? null}] : [],error:null}
+      }
       const list = name === 'verify_driver_pin' ? drivers : users
       return { data: list.find(u => u.phone === args.p_phone && u.pin === args.p_pin && u.active)?.id || null, error: null }
     },
@@ -71,7 +75,7 @@ function harness() {
     ...(body ? { body: JSON.stringify(body) } : {}),
   })
   async function call(route, body, cookie) { return load(`app/api/${route}/route.ts`)[body ? 'POST' : 'GET'](request(route, body, cookie)) }
-  return { load, call, users, state, advance: seconds => { now += seconds }, now: () => now }
+  return { load, call, users, drivers, state, advance: seconds => { now += seconds }, now: () => now }
 }
 function cookie(response) { return response.headers.get('set-cookie').split(';')[0] }
 function signed(payload) {
@@ -175,7 +179,7 @@ function destination(customerStatus, driverStatus = 401, offline = false) {
   const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../lib/client/session.ts'), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText
-  vm.runInNewContext(source, { exports, fetch: async (url, options) => {
+  vm.runInNewContext(source, { exports, require: () => ({}), fetch: async (url, options) => {
     assert.equal(options.cache, 'no-store')
     assert.equal(options.credentials, 'same-origin')
     if (offline) throw new Error('offline')
@@ -199,4 +203,21 @@ test('network and service failure preserve the retry state instead of sending us
     await assert.rejects(destination(503)(mode), /unavailable/)
     await assert.rejects(destination(401, 401, true)(mode), /offline/)
   }
+})
+
+test('PIN/security-state changes revoke old driver cookies; fresh login and renewal keep the current version', async () => {
+  const h = harness(), credentials = {phone:'00006602',pin:'664422'}
+  const old = cookie(await h.call('driver/login',credentials))
+  h.drivers[0].session_version = 'version-after-reset'
+  assert.equal((await h.call('driver/session',null,old)).status,401)
+  const loggedIn = await h.call('driver/login',credentials)
+  assert.equal(loggedIn.status,200)
+  assert.equal((await loggedIn.clone().json()).driver.session_version,undefined)
+  const fresh = cookie(loggedIn)
+  h.advance(2 * DAY)
+  const renewed = await h.call('driver/session',null,fresh)
+  assert.equal(renewed.status,200)
+  assert.equal((await h.call('driver/session',null,cookie(renewed))).status,200)
+  h.drivers[0].session_version = 'version-after-disable-enable'
+  assert.equal((await h.call('driver/session',null,cookie(renewed))).status,401)
 })

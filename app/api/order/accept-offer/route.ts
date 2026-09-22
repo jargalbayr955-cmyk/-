@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   const user = await requireCustomer(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await allowRequest(`accept-offer:${user.id}`, 12, 60_000))) return NextResponse.json({ error: 'Түр хүлээгээд дахин оролдоно уу.' }, { status: 429 })
-  const { order_id, offer_id } = await req.json().catch(() => ({}))
+  const { order_id, offer_id } = (await req.json().catch(() => null)) ?? {}
   if (!order_id || !offer_id) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
   const s = getSupabaseAdmin()
   const { data: order, error: lookupError } = await s.from('orders').select('id,user_id,user_phone,status,driver_id,final_price').eq('id', order_id).maybeSingle()

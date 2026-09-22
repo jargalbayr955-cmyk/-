@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many location updates' }, { status: 429 })
   }
 
-  const { lat, lng, available } = await req.json().catch(() => ({}))
+  const { lat, lng, available } = (await req.json().catch(() => null)) ?? {}
   const latitude = Number(lat)
   const longitude = Number(lng)
   if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {

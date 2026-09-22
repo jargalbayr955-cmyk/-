@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { backInApp } from '@/lib/client/navigation'
 import { OrderConnectionMap } from '../components/order-connection-map'
 import { DriverSummary } from '../components/driver-summary'
-import { clearBookingDraft } from '@/lib/client/booking-draft'
+import { clearBookingDraft, currentOrderId } from '@/lib/client/booking-draft'
 import { locationIsFresh, pickupPoint, pointDistance } from '@/lib/order-offers'
 
 type Tracking = {
@@ -21,8 +21,7 @@ export default function TrackingPage() {
   const [now, setNow] = useState(0)
 
   useEffect(() => {
-    let orderId: string | null = null
-    try { orderId = localStorage.getItem('current_order_id') } catch {}
+    const orderId = currentOrderId()
     if (!orderId) { router.replace('/current'); return }
     let cancelled = false, pending = false, finished = false
     let controller: AbortController | undefined

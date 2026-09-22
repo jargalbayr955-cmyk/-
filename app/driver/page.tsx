@@ -1,4 +1,5 @@
 'use client'
+import { createRequestSignal } from '@/lib/client/request-signal'
 import { OrderVideoCall } from '../components/order-video-call'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
@@ -44,6 +45,7 @@ export default function DriverPage() {
   const prevOrderIds = useRef<string[]>([])
   const ordersLoaded = useRef(false)
   const ordersLoading = useRef(false)
+  const ordersRequest = useRef<AbortController | null>(null)
   const driverRef = useRef<any>(null)
   const seenAcceptedId = useRef<string | null>(null)
   const router = useRouter()
@@ -120,9 +122,10 @@ export default function DriverPage() {
     if (!phone || !pin) return setError('Дугаар болон PIN оруулна уу')
     setLoading(true)
     setError('')
+    const deadline = createRequestSignal(20_000)
     try {
       const res = await fetch('/api/driver/login', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, pin })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, pin }), signal: deadline.signal
       })
       const body = await res.json()
       if (!res.ok || !body.driver) {
@@ -151,28 +154,34 @@ export default function DriverPage() {
       }
     } catch {
       setError('Сүлжээний алдаа. Дахин оролдоно уу.')
-    }
-    setLoading(false)
+    } finally { deadline.dispose(); setLoading(false) }
   }
 
   const fetchOrders = useCallback(async () => {
     if (ordersLoading.current) return
     ordersLoading.current = true
+    const controller = new AbortController()
+    ordersRequest.current = controller
+    const deadline = createRequestSignal(12_000, controller.signal)
     try {
-      const res = await fetch('/api/driver/orders', { cache: 'no-store', signal: AbortSignal.timeout(12_000) })
+      const res = await fetch('/api/driver/orders', { cache: 'no-store', signal: deadline.signal })
+      if (controller.signal.aborted) return
       if (res.status === 401) {
         setDriver(null); setAcceptedOrder(null); setPaymentInfo(null); setOrders([]); setPushReady(false)
         ordersLoaded.current = false; prevOrderIds.current = []
-        localStorage.removeItem('driver_session'); localStorage.removeItem('accepted_order'); localStorage.removeItem('payment_info')
+        try { localStorage.removeItem('driver_session'); localStorage.removeItem('accepted_order'); localStorage.removeItem('payment_info') } catch {}
         setError('Нэвтрэх эрх дууссан байна. Дахин нэвтэрнэ үү.')
         return
       }
       if (!res.ok) { setError('Захиалга шинэчлэхэд алдаа гарлаа. Дахин оролдоно уу.'); return }
       const body = await res.json()
+      if (controller.signal.aborted) return
       setError('')
       const data = Array.isArray(body.orders) ? body.orders : []
       if (body.active === false) {
-        setDriver(null); localStorage.removeItem('driver_session'); localStorage.removeItem('accepted_order'); localStorage.removeItem('payment_info'); return
+        setDriver(null); setAcceptedOrder(null); setPaymentInfo(null); setOrders([])
+        try { localStorage.removeItem('driver_session'); localStorage.removeItem('accepted_order'); localStorage.removeItem('payment_info') } catch {}
+        return
       }
       // The database restores work/payment state even on a new device.
       const accepted = body.acceptedOrder || null
@@ -182,7 +191,7 @@ export default function DriverPage() {
       }
       setAcceptedOrder(accepted)
       setPaymentInfo(body.pendingPayment || null)
-      localStorage.removeItem('accepted_order'); localStorage.removeItem('payment_info')
+      try { localStorage.removeItem('accepted_order'); localStorage.removeItem('payment_info') } catch {}
       if (driverRef.current && typeof body.available === 'boolean') {
         const position = body.driverLocation
         setDriver((d:any) => d ? ({ ...d, available: body.available, ...(position || {}) }) : d)
@@ -200,8 +209,11 @@ export default function DriverPage() {
       }
       ordersLoaded.current = true
       setOrders(data)
-    } catch { setError('Сүлжээ тасарсан байна. Захиалга шинэчлэгдээгүй.') }
-    finally { ordersLoading.current = false }
+    } catch { if (!controller.signal.aborted) setError('Сүлжээ тасарсан байна. Захиалга шинэчлэгдээгүй.') }
+    finally {
+      deadline.dispose()
+      if (ordersRequest.current === controller) { ordersLoading.current = false; ordersRequest.current = null }
+    }
   }, [])
 
   const startWorking = () => {
@@ -290,14 +302,15 @@ export default function DriverPage() {
     if (!driver || locating || isNativeDriver()) return
     if (!driver.available) { startWorking(); return }
     setLocating(true)
+    const deadline = createRequestSignal(12_000)
     try {
-      const res = await fetch('/api/driver/availability', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ available: false }), signal: AbortSignal.timeout(12_000) })
+      const res = await fetch('/api/driver/availability', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ available: false }), signal: deadline.signal })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body.error || 'Төлөв өөрчлөхөд алдаа гарлаа')
       setDriver((current:any) => current ? { ...current, available: false } : current)
       setLocMsg('')
     } catch (cause) { setLocMsg(cause instanceof Error ? cause.message : 'Сүлжээний алдаа. Дахин оролдоно уу.') }
-    finally { setLocating(false) }
+    finally { deadline.dispose(); setLocating(false) }
   }
 
   const sendOffer = async (order: DriverOrder, price: string) => {
@@ -305,17 +318,18 @@ export default function DriverPage() {
     const amount = Number(price)
     if (!Number.isInteger(amount) || amount <= 0 || amount > 10_000_000) return alert('Үнийн саналаа зөв оруулна уу')
     setSendingOffer(order.id)
+    const deadline = createRequestSignal(12_000)
     try {
       // The server uses the location maintained by automatic GPS updates.
       const res = await fetch('/api/driver/offer', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({ order_id: order.id, price: amount }), signal: AbortSignal.timeout(12_000)
+        body:JSON.stringify({ order_id: order.id, price: amount }), signal: deadline.signal
       })
       if (!res.ok) { const body = await res.json().catch(() => ({})); alert(body.error || 'Санал илгээхэд алдаа гарлаа'); return }
       setSentOffers(previous => ({ ...previous, [order.id]: true }))
       void fetchOrders()
     } catch { alert('Сүлжээний алдаа. Санал илгээгдээгүй байна.') }
-    finally { setSendingOffer(null) }
+    finally { deadline.dispose(); setSendingOffer(null) }
   }
 
   useEffect(() => {
@@ -330,6 +344,7 @@ export default function DriverPage() {
     window.addEventListener('achilt-new-order', onPushRefresh)
     document.addEventListener('visibilitychange', onVisible)
     return () => {
+      ordersRequest.current?.abort(); ordersRequest.current = null; ordersLoading.current = false
       clearInterval(interval)
       window.removeEventListener('achilt-new-order', onPushRefresh)
       document.removeEventListener('visibilitychange', onVisible)
@@ -413,7 +428,7 @@ export default function DriverPage() {
               <p style={{color:'white', fontSize:'18px', fontWeight:700, margin:'0 0 8px', textAlign:'center'}}>Захиалга дууссан</p>
               <p style={{color:'#ffd700', fontSize:'14px', margin:'0 0 16px', textAlign:'center'}} role="status">Дараагийн захиалга авахын тулд үйлчилгээний шимтгэлээ төлнө үү.</p>
               {Number(paymentInfo.fare_amount) > 0 && <p style={{color:'#c6c6cc', fontSize:14, textAlign:'center'}}>Тохиролцсон үнэ: {Number(paymentInfo.fare_amount).toLocaleString('mn-MN')} ₮</p>}
-              <p style={{color:'#c6c6cc', fontSize:13, textAlign:'center'}}>Үнийн 5% · хамгийн ойрын 500 ₮-өөр тоймлосон</p>
+              <p style={{color:'#c6c6cc', fontSize:13, textAlign:'center'}}>{Number(paymentInfo.fare_amount) > 0 ? 'Үнийн 5% · хамгийн ойрын 500 ₮-өөр тоймлосон' : 'Өмнөх төлбөрийн бүртгэл · дүнг админаар нягтлуулна уу'}</p>
               <p style={{color:'white', fontSize:'26px', fontWeight:800, textAlign:'center', margin:'0 0 16px'}}>Шилжүүлэх дүн: {Number(paymentInfo.amount).toLocaleString('mn-MN')} ₮</p>
               <div style={{background:'rgba(232,67,58,0.1)', border:'1px solid rgba(232,67,58,0.3)', borderRadius:'12px', padding:'14px', marginBottom:'12px', textAlign:'center'}}>
                 <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:'0 0 4px'}}>Шилжүүлэх данс</p>
@@ -432,16 +447,18 @@ export default function DriverPage() {
             </div>
           ) : (
             <button onClick={async () => {
+              ordersRequest.current?.abort(); ordersRequest.current = null; ordersLoading.current = true
               setCompleting(true)
+              const deadline = createRequestSignal(15_000)
               try {
                 const res = await fetch('/api/payment/complete', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ order_id: acceptedOrder?.id })
+                  body: JSON.stringify({ order_id: acceptedOrder?.id }), signal: deadline.signal
                 })
                 const data = await res.json()
                 if (!res.ok) { setError(data.error || 'Захиалга дуусгахад алдаа гарлаа'); return }
-                if (data.paid) { setAcceptedOrder(null); setPaymentInfo(null); await fetchOrders(); return }
+                if (data.paid) { setAcceptedOrder(null); setPaymentInfo(null); return }
                 if (data.code) {
                   const pInfo = { code: data.code, amount: data.amount, fare_amount: data.fare_amount }
                   setPaymentInfo(pInfo)
@@ -450,7 +467,7 @@ export default function DriverPage() {
                   setDriver({ ...driver, available: false })
                 }
               } catch { setError('Сүлжээний алдаа. Дахин оролдоно уу.') }
-              finally { setCompleting(false) }
+              finally { deadline.dispose(); ordersLoading.current = false; setCompleting(false); void fetchOrders() }
             }} disabled={completing} style={{width:'100%', borderRadius:'14px', padding:'13px', background: completing ? 'rgba(232,67,58,0.4)' : D.red, border:'none', color:D.text, fontSize:'14px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 15px rgba(232,67,58,0.3)'}}>
               {completing ? 'Боловсруулж байна...' : 'Захиалга дуусгах'}
             </button>

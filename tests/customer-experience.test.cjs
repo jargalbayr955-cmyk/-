@@ -30,7 +30,7 @@ function client({ responses = [], blockedStorage = false } = {}) {
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
     }).outputText
     vm.runInNewContext(code, {
-      exports, AbortSignal, Event, localStorage: mockStorage(storage), sessionStorage: mockStorage(notices),
+      exports, AbortSignal: {}, AbortController, setTimeout, clearTimeout, Event, localStorage: mockStorage(storage), sessionStorage: mockStorage(notices),
       window: { dispatchEvent: event => events.push(event.type) },
       BroadcastChannel: class { postMessage(message) { events.push(message) } close() {} },
       fetch: async (url, options) => {
@@ -41,6 +41,7 @@ function client({ responses = [], blockedStorage = false } = {}) {
         return Response.json(reply.body || {}, { status: reply.status || 200 })
       },
       require: name => {
+        if (name.startsWith('@/')) return load(name.slice(2) + '.ts')
         if (name.startsWith('./')) return load(path.join(path.dirname(file), name) + '.ts')
         throw new Error('Unexpected import: ' + name)
       },

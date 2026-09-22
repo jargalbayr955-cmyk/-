@@ -16,11 +16,11 @@ export function isSessionConfigured() {
 }
 
 export type SessionRole = 'admin' | 'driver' | 'customer'
-export type SessionPayload = { sub: string; role: SessionRole; exp: number }
+export type SessionPayload = { sub: string; role: SessionRole; exp: number; version?: string }
 
-export function signSession(sub: string, role: SessionRole) {
+export function signSession(sub: string, role: SessionRole, version?: string | null) {
   const ttl = role === 'admin' ? ADMIN_SESSION_TTL_SECONDS : DEVICE_SESSION_TTL_SECONDS
-  const payload: SessionPayload = { sub, role, exp: Math.floor(Date.now() / 1000) + ttl }
+  const payload: SessionPayload = { sub, role, exp: Math.floor(Date.now() / 1000) + ttl, ...(version ? { version } : {}) }
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
   const sig = crypto.createHmac('sha256', getSecret()).update(body).digest('base64url')
   return `${body}.${sig}`
