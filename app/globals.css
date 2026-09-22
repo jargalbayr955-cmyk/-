@@ -323,3 +323,32 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .offers-countdown { font-size:17px; }
   .offers-alerts { font-size:12px; }
 }
+
+/* Offer profile and the shared customer / selected-driver connection. */
+.offer-selection { max-height: 53dvh; overflow-y: auto; padding-top: 24px; }
+.driver-summary-identity { display: flex; align-items: center; gap: 12px; padding-right: 16px; }
+.driver-summary-photo { flex: 0 0 62px; height: 62px; border-radius: 16px; overflow: hidden; background: #292d35; display: grid; place-items: center; font-size: 26px; font-weight: 800; }
+.driver-summary-photo img { width: 100%; height: 100%; object-fit: cover; }
+.driver-summary-identity strong { display: block; font-size: 17px; overflow-wrap: anywhere; }
+.driver-summary-identity span, .driver-summary-quote span { display: block; color: #aeb7c6; font-size: 12px; margin-top: 3px; }
+.driver-plate { display: inline-block; margin-top: 6px; border: 1px solid #505767; padding: 3px 7px; border-radius: 6px; font-size: 13px; letter-spacing: .6px; }
+.driver-summary-quote { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 14px 0; }
+.driver-summary-quote b { display: block; font-size: 24px; color: #ff837b; }
+.driver-summary-quote > div:last-child { text-align: right; }
+.driver-summary-quote strong { font-size: 15px; }
+.offer-selection-note { color: #aeb7c6; font-size: 12px; line-height: 1.5; margin: 10px 0 0; }
+.order-connection-map { position: relative; width: 100%; height: 100%; min-height: 220px; }
+.order-connection-canvas { position: absolute; inset: 0; }
+.connection-map-error { position: absolute; top: 12px; left: 12px; right: 54px; z-index: 2; padding: 12px; border-radius: 12px; background: #1d1720; color: #ffc2bd; font-size: 13px; }
+.tracking-page { height: 100dvh; min-height: 500px; display: flex; flex-direction: column; background: #090d15; color: #fff; }
+.tracking-header { flex-shrink: 0; display: flex; align-items: center; gap: 16px; padding: calc(10px + env(safe-area-inset-top)) 12px 10px; }
+.tracking-header h1 { font-size: 16px; font-weight: 800; margin: 0; }
+.tracking-map { flex: 1; min-height: 220px; }
+.tracking-details { flex-shrink: 0; padding: 16px 18px calc(16px + env(safe-area-inset-bottom)); max-height: 46dvh; overflow-y: auto; width: 100%; max-width: 600px; margin: auto; }
+.connection-status { color: #72e3a0; font-size: 13px; margin: 10px 0; line-height: 1.5; }
+.connection-warning { color: #ffd29b; font-size: 13px; margin: 10px 0; line-height: 1.5; }
+.connection-call { display: block; text-align: center; border-radius: 13px; padding: 14px 10px; background: #e8433a; color: #fff; font-size: 15px; font-weight: 800; text-decoration: none; }
+.driver-connection-details { margin-bottom: 16px; }
+.driver-connection-price { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 0; color: #fff; }
+.driver-connection-price strong { font-size: 23px; }
+.driver-connection-price span { color: #aeb7c6; font-size: 13px; }

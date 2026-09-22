@@ -7,7 +7,23 @@ export type DriverSlot = {
   lng: number | null
   distance_km: number | null
   driver_name: string | null
+  photo_url?: string | null
+  car_number?: string | null
+  car_type?: string | null
   offer: { id: string; price: number } | null
+}
+
+// Straight-line distance; this is not a road route or a travel-time estimate.
+export function pointDistance(a: PickupPoint | null, b: PickupPoint | null) {
+  if (!a || !b) return null
+  const rad = Math.PI / 180
+  const h = Math.sin((b.lat - a.lat) * rad / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin((b.lng - a.lng) * rad / 2) ** 2
+  return 6371 * 2 * Math.asin(Math.sqrt(Math.min(1, Math.max(0, h))))
+}
+
+export function locationIsFresh(updatedAt: string | null | undefined, now = Date.now()) {
+  const time = updatedAt ? Date.parse(updatedAt) : NaN
+  return Number.isFinite(time) && now - time < 120_000 && time <= now + 30_000
 }
 
 export function pickupPoint(lat: unknown, lng: unknown): PickupPoint | null {

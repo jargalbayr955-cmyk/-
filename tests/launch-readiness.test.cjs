@@ -180,3 +180,28 @@ test('driver without a vehicle type cannot go online', async () => {
     assert.equal(result.status,409); assert.equal(h.calls.length,0)
   }
 })
+
+
+test('selection push targets only the assigned driver and keeps contacts off the lock screen', async () => {
+  const sent = []
+  const h = harness({ env: { NEXT_PUBLIC_VAPID_PUBLIC_KEY: 'test', VAPID_PRIVATE_KEY: 'test' }, rows: {
+    orders: { data: { id: 'order-a', driver_id: 'driver-a', status: 'confirmed' } },
+    push_subscriptions: { data: [{ id: 'sub-a', driver_id: 'driver-a', subscription: sub('https://fcm.googleapis.com/selected') }] },
+  }, send: async (subscription, payload) => sent.push(JSON.parse(payload)) })
+  assert.equal((await h.load('lib/server/push.ts').notifySelectedDriver('order-a')).sent, 1)
+  const lookup = h.calls.find(q => q.table === 'push_subscriptions')
+  assert.ok(lookup.filters.some(f => f[0] === 'eq' && f[1] === 'driver_id' && f[2] === 'driver-a'))
+  assert.equal(sent[0].type, 'ORDER_SELECTED'); assert.equal(sent[0].url, '/driver')
+  assert.equal(sent[0].title, 'Таны саналыг сонголоо')
+  assert.equal(sent[0].phone, undefined)
+})
+
+test('pending or finished orders cannot generate a selected-driver push', async () => {
+  for (const status of ['pending','completed','cancelled']) {
+    const h = harness({ env: { NEXT_PUBLIC_VAPID_PUBLIC_KEY: 'test', VAPID_PRIVATE_KEY: 'test' }, rows: {
+      orders: { data: { id: 'order-a', driver_id: 'driver-a', status } },
+    }, send: async () => { throw new Error('Must not send') } })
+    assert.equal((await h.load('lib/server/push.ts').notifySelectedDriver('order-a')).sent, 0)
+    assert.equal(h.calls.some(q => q.table === 'push_subscriptions'), false)
+  }
+})

@@ -34,15 +34,15 @@ export async function POST(req:NextRequest){
  if(!liveInvites.length)return NextResponse.json({pickup,order_status:'pending',expired:false,bidding_expires_at:biddingExpiresAt,invited_count:invitedCount,slots:[]})
  const ids=liveInvites.map(i=>i.driver_id)
  const [{data:drivers,error:driversError},{data:offers,error:offersError}]=await Promise.all([
-   s.from('drivers').select('id,name,car_type,lat,lng,location_updated_at').in('id',ids),
+   s.from('drivers').select('id,name,car_type,car_number,photo_url,lat,lng,location_updated_at').in('id',ids),
    s.from('offers').select('id,driver_id,price,status,driver_lat,driver_lng').eq('order_id',order_id).in('driver_id',ids).eq('status','pending')
  ])
  if(driversError||offersError)return NextResponse.json({error:'Offer lookup failed'},{status:503})
  const dm=new Map((drivers||[]).map(d=>[d.id,d])),om=new Map((offers||[]).map(o=>[o.driver_id,o]))
  const slots=liveInvites.map(inv=>{
    const d=dm.get(inv.driver_id),o=om.get(inv.driver_id)
-   const point=pickupPoint(o?.driver_lat,o?.driver_lng) || pickupPoint(d?.lat,d?.lng)
-   return {invite_id:inv.id,driver_id:inv.driver_id,rank:inv.rank,invite_status:o?'offered':inv.status,invited_at:inv.invited_at,expires_at:inv.expires_at,driver_name:o?(d?.name||'Ачигч'):null,car_type:d?.car_type||null,lat:point?.lat??null,lng:point?.lng??null,distance_km:point&&pickup?Math.round(distanceKm(pickup.lat,pickup.lng,point.lat,point.lng)*10)/10:null,offer:o?{id:o.id,price:Number(o.price)}:null}
+   const point=pickupPoint(d?.lat,d?.lng) || pickupPoint(o?.driver_lat,o?.driver_lng)
+   return {invite_id:inv.id,driver_id:inv.driver_id,rank:inv.rank,invite_status:o?'offered':inv.status,invited_at:inv.invited_at,expires_at:inv.expires_at,driver_name:o?(d?.name||'Ачигч'):null,photo_url:o?(d?.photo_url||null):null,car_number:o?(d?.car_number||null):null,car_type:d?.car_type||null,lat:point?.lat??null,lng:point?.lng??null,distance_km:point&&pickup?Math.round(distanceKm(pickup.lat,pickup.lng,point.lat,point.lng)*10)/10:null,offer:o?{id:o.id,price:Number(o.price)}:null}
  })
  return NextResponse.json({pickup,order_status:'pending',expired:false,bidding_expires_at:biddingExpiresAt,invited_count:invitedCount,slots})
 }

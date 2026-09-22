@@ -3,6 +3,28 @@ import * as webpush from 'web-push'
 import { getSupabaseAdmin } from './supabase-admin'
 import { isValidPushSubscription } from './push-subscription'
 
+export async function notifySelectedDriver(orderId: string) {
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY, privateKey = process.env.VAPID_PRIVATE_KEY
+  if (!publicKey || !privateKey) return { sent: 0 }
+  const s = getSupabaseAdmin()
+  const { data: order } = await s.from('orders').select('id,driver_id,status').eq('id', orderId).maybeSingle()
+  if (order?.status !== 'confirmed' || !order.driver_id) return { sent: 0 }
+  const { data: subscriptions } = await s.from('push_subscriptions').select('id,driver_id,subscription').eq('driver_id', order.driver_id)
+  webpush.setVapidDetails('mailto:admin@achilt.mn', publicKey, privateKey)
+  // Contact details are restored on the authenticated page, never sent to the lock screen.
+  const payload = JSON.stringify({ type: 'ORDER_SELECTED', tag: `selected-${order.id}`, title: 'Таны саналыг сонголоо', body: 'Захиалгаа нээж хэрэглэгчтэй холбогдоно уу.', url: '/driver' })
+  let sent = 0
+  await Promise.allSettled((subscriptions || []).map(async sub => {
+    if (!isValidPushSubscription(sub.subscription)) return
+    try { await webpush.sendNotification(sub.subscription, payload, { timeout: 5000, TTL: 120 }); sent++ }
+    catch (error: any) {
+      if ([404, 410].includes(error?.statusCode)) await s.from('push_subscriptions').delete().eq('id', sub.id)
+      else console.warn('Selection push delivery failed', { status: error?.statusCode || 'network' })
+    }
+  }))
+  return { sent }
+}
+
 export async function notifyOrderInvites(orderId: string) {
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
   const privateKey = process.env.VAPID_PRIVATE_KEY

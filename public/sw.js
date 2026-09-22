@@ -7,6 +7,7 @@ self.addEventListener('push', function(event) {
     body: data.body || 'Шинэ захиалга ирлээ!',
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-32x32.png',
+    tag: data.tag || undefined,
     vibrate: [300, 100, 300, 100, 300, 100, 500],
     data: { url: data.url || '/driver' },
     actions: [
@@ -20,7 +21,7 @@ self.addEventListener('push', function(event) {
       // Дуу тоглуулах
       return clients.matchAll({ type: 'window' }).then(clientList => {
         clientList.forEach(client => {
-          client.postMessage({ type: 'PLAY_HORN' })
+          if (data.type !== 'ORDER_SELECTED') client.postMessage({ type: 'PLAY_HORN' })
           client.postMessage({ type: 'NEW_ORDER' })
         })
       })

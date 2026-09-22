@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { createDotMarker, createTruckMarker, freeMapStyle, loadFreeMap } from '@/lib/client/free-map'
+import { OrderConnectionMap } from '../components/order-connection-map'
+import { pickupPoint, pointDistance, offerDistance, offerPrice, locationIsFresh } from '@/lib/order-offers'
 import { isNativeDriver } from '@/lib/client/native-driver'
 import Link from 'next/link'
 
@@ -41,12 +42,7 @@ export default function DriverPage() {
   const ordersLoaded = useRef(false)
   const ordersLoading = useRef(false)
   const driverRef = useRef<any>(null)
-  const acceptedOrderRef = useRef<any>(null)
-  const mapRef = useRef<any>(null)
-  const mapInstanceRef = useRef<any>(null)
-  const driverMarkerRef = useRef<any>(null)
-  const userMarkerRef = useRef<any>(null)
-  const lineRef = useRef<any>(null)
+  const seenAcceptedId = useRef<string | null>(null)
   const router = useRouter()
   const nativeDriver = mounted && isNativeDriver()
 
@@ -72,6 +68,7 @@ export default function DriverPage() {
       playNote(220, 0, 0.4, 0.6); playNote(260, 0, 0.4, 0.4); playNote(330, 0, 0.4, 0.3)
       playNote(220, 0.5, 0.4, 0.6); playNote(260, 0.5, 0.4, 0.4); playNote(330, 0.5, 0.4, 0.3)
       playNote(220, 1.0, 0.8, 0.7); playNote(260, 1.0, 0.8, 0.5); playNote(330, 1.0, 0.8, 0.4)
+      setTimeout(() => { void ctx.close().catch(() => {}) }, 2200)
     } catch {}
   }
 
@@ -159,7 +156,7 @@ export default function DriverPage() {
     if (ordersLoading.current) return
     ordersLoading.current = true
     try {
-      const res = await fetch('/api/driver/orders', { cache: 'no-store' })
+      const res = await fetch('/api/driver/orders', { cache: 'no-store', signal: AbortSignal.timeout(12_000) })
       if (res.status === 401) {
         setDriver(null); setAcceptedOrder(null); setPaymentInfo(null); setOrders([]); setPushReady(false)
         ordersLoaded.current = false; prevOrderIds.current = []
@@ -175,18 +172,17 @@ export default function DriverPage() {
         setDriver(null); localStorage.removeItem('driver_session'); localStorage.removeItem('accepted_order'); localStorage.removeItem('payment_info'); return
       }
       // The database restores work/payment state even on a new device.
-      setAcceptedOrder(body.acceptedOrder || null)
+      const accepted = body.acceptedOrder || null
+      if (accepted && accepted.id !== seenAcceptedId.current) {
+        seenAcceptedId.current = accepted.id
+        if (!isNativeDriver()) { playHorn(); navigator.vibrate?.([300, 150, 300]) }
+      }
+      setAcceptedOrder(accepted)
       setPaymentInfo(body.pendingPayment || null)
       localStorage.removeItem('accepted_order'); localStorage.removeItem('payment_info')
       if (driverRef.current && typeof body.available === 'boolean') {
         const position = body.driverLocation
-        setDriver((d:any) => d ? ({...d, available: body.available, ...(isNativeDriver() && position ? position : {})}) : d)
-        if (isNativeDriver() && typeof position?.lat === 'number' && typeof position?.lng === 'number') {
-          driverRef.current = { ...driverRef.current, ...position }
-          driverMarkerRef.current?.setLngLat([position.lng, position.lat])
-          const order = acceptedOrderRef.current
-          if (order) mapInstanceRef.current?.getSource?.('accepted-route')?.setData?.({type:'Feature', properties:{}, geometry:{type:'LineString', coordinates:[[position.lng,position.lat],[Number(order.from_lng),Number(order.from_lat)]]}})
-        }
+        setDriver((d:any) => d ? ({ ...d, available: body.available, ...(position || {}) }) : d)
       }
       const newIds = data.map((o: any) => o.id)
       const hasNew = newIds.some((id: string) => !prevOrderIds.current.includes(id))
@@ -235,9 +231,6 @@ export default function DriverPage() {
     driverRef.current = driver
   }, [driver])
 
-  useEffect(() => {
-    acceptedOrderRef.current = acceptedOrder
-  }, [acceptedOrder])
 
 
   useEffect(() => {
@@ -309,13 +302,15 @@ export default function DriverPage() {
       if (now - lastSentAt < 15000) return
       lastSentAt = now
       driverRef.current = { ...driverRef.current, lat, lng }
-      if (driverMarkerRef.current) driverMarkerRef.current.setLngLat([lng, lat])
-      const activeOrder = acceptedOrderRef.current
-      const routeSource = mapInstanceRef.current?.getSource?.('accepted-route')
-      if (routeSource?.setData && activeOrder?.from_lat && activeOrder?.from_lng) routeSource.setData({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:[[lng,lat],[Number(activeOrder.from_lng),Number(activeOrder.from_lat)]]}})
       try {
         const response = await fetch('/api/driver/location', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lat, lng }) })
-        if (!response.ok && !cancelled) setLocMsg('Байршил серверт шинэчлэгдээгүй байна')
+        if (!cancelled) {
+          if (!response.ok) setLocMsg('Байршил серверт шинэчлэгдээгүй байна')
+          else {
+            setDriver((d:any) => d ? ({ ...d, lat, lng, location_updated_at: new Date().toISOString() }) : d)
+            setLocMsg('')
+          }
+        }
       } catch { if (!cancelled) setLocMsg('Сүлжээ тасарсан: байршил шинэчлэгдээгүй') }
     }
     const options = { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
@@ -327,50 +322,6 @@ export default function DriverPage() {
     document.addEventListener('visibilitychange', refresh)
     return () => { cancelled = true; clearInterval(heartbeat); navigator.geolocation.clearWatch(watchId); document.removeEventListener('visibilitychange', refresh) }
   }, [driver?.id])
-
-  useEffect(() => {
-    if (!acceptedOrder?.id || !mapRef.current || mapInstanceRef.current) return
-    const order=acceptedOrderRef.current
-    if(!order)return
-    let cancelled=false
-    const timer=setTimeout(()=>{
-      ;(async()=>{
-        try{
-          const ml=await loadFreeMap()
-          if(cancelled||!mapRef.current)return
-          const userLat=Number(order.from_lat),userLng=Number(order.from_lng)
-          const drvLat=Number(driverRef.current?.lat)||userLat,drvLng=Number(driverRef.current?.lng)||userLng
-          const map=new ml.Map({container:mapRef.current,style:freeMapStyle(),center:[userLng||106.9177,userLat||47.9184],zoom:13,attributionControl:{}})
-          map.addControl(new ml.NavigationControl({showCompass:false}),'top-right')
-          userMarkerRef.current=new ml.Marker({element:createDotMarker('#2563eb',18,'Хэрэглэгч')}).setLngLat([userLng,userLat]).addTo(map)
-          driverMarkerRef.current=new ml.Marker({element:createTruckMarker('Та')}).setLngLat([drvLng,drvLat]).addTo(map)
-          const routeData={type:'Feature' as const,properties:{},geometry:{type:'LineString' as const,coordinates:[[drvLng,drvLat],[userLng,userLat]]}}
-          map.on('load',()=>{
-            if(!map.getSource('accepted-route')){
-              map.addSource('accepted-route',{type:'geojson',data:routeData})
-              map.addLayer({id:'accepted-route-line',type:'line',source:'accepted-route',paint:{'line-color':'#e8433a','line-width':4,'line-opacity':.9,'line-dasharray':[2,2]}})
-            }
-          })
-          const bounds=new ml.LngLatBounds();bounds.extend([drvLng,drvLat]);bounds.extend([userLng,userLat]);map.fitBounds(bounds,{padding:60,maxZoom:16,duration:400})
-          mapInstanceRef.current=map
-          lineRef.current='accepted-route'
-        }catch(error){console.error('Map initialization failed',error)}
-      })()
-    },250)
-    return()=>{cancelled=true;clearTimeout(timer);driverMarkerRef.current?.remove?.();userMarkerRef.current?.remove?.();mapInstanceRef.current?.remove?.();mapInstanceRef.current=null;driverMarkerRef.current=null;userMarkerRef.current=null;lineRef.current=null}
-  }, [acceptedOrder?.id])
-
-  useEffect(() => {
-    if (!acceptedOrder && mapInstanceRef.current) {
-      mapInstanceRef.current.remove()
-      mapInstanceRef.current = null
-      driverMarkerRef.current?.remove?.()
-      userMarkerRef.current?.remove?.()
-      driverMarkerRef.current = null
-      userMarkerRef.current = null
-      lineRef.current = null
-    }
-  }, [acceptedOrder])
 
   const toggleAvailable = async () => {
     if (isNativeDriver()) return
@@ -415,10 +366,10 @@ export default function DriverPage() {
   useEffect(() => {
     if (!driver?.id) return
     fetchOrders()
-    // Push handles immediate delivery. This is only a low-frequency fallback if push is unavailable.
+    // Selection also restores promptly when browser push is unavailable.
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') fetchOrders()
-    }, 15_000)
+    }, 5000)
     const onPushRefresh = () => fetchOrders()
     const onVisible = () => { if (document.visibilityState === 'visible') fetchOrders() }
     window.addEventListener('achilt-new-order', onPushRefresh)
@@ -466,19 +417,22 @@ export default function DriverPage() {
   // ACCEPTED ORDER MAP эсвэл PAYMENT SCREEN
   if (acceptedOrder || paymentInfo) {
     const safeOrder = acceptedOrder || {}
+    const pickup = pickupPoint(safeOrder.from_lat, safeOrder.from_lng)
+    const position = pickupPoint(driver.lat, driver.lng)
+    const fresh = !locMsg && !error && position && locationIsFresh(driver.location_updated_at)
     return (
       <div style={{minHeight:'100vh', background:D.bg, display:'flex', flexDirection:'column'}}>
         <div style={{padding:'14px 20px', background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
           <div>
             <p style={{color:D.text, fontWeight:'700', fontSize:'15px', margin:0}}>{driver.name}</p>
-            <p style={{color:'#22c55e', fontSize:'12px', margin:'3px 0 0'}}>{paymentInfo ? 'Төлбөр хүлээгдэж байна' : 'Захиалга хүлээн авсан'}</p>
+            <p style={{color:'#22c55e', fontSize:'12px', margin:'3px 0 0'}}>{paymentInfo ? 'Төлбөр хүлээгдэж байна' : 'Таны саналыг сонголоо'}</p>
           </div>
           <div style={{display:'flex', alignItems:'center', gap:'6px', background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.3)', borderRadius:'20px', padding:'5px 12px'}}>
             <div style={{width:'6px', height:'6px', borderRadius:'50%', background:D.red, animation:'pulse 1.5s infinite'}}/>
-            <span style={{color:'#ff6b5b', fontSize:'12px', fontWeight:'700'}}>LIVE</span>
+            <span style={{color:'#ff6b5b', fontSize:'12px', fontWeight:'700'}}>{paymentInfo ? 'ТӨЛБӨР' : fresh ? 'GPS' : 'GPS ХҮЛЭЭЖ БАЙНА'}</span>
           </div>
         </div>
-        {!paymentInfo && <div ref={mapRef} style={{flex:1, minHeight:'400px'}}/>}
+        {!paymentInfo && <div style={{height:'48dvh', minHeight:280}}><OrderConnectionMap key={safeOrder.id} pickup={pickup} driver={position} driverLabel="Та" /></div>}
         <div style={{background:D.bg, borderTop:'1px solid rgba(255,255,255,0.07)', padding:'16px'}}>
           {!paymentInfo && <div style={{background:D.card, border:D.cardBorder, borderRadius:'14px', padding:'14px', marginBottom:'12px'}}>
             <div style={{display:'flex', alignItems:'flex-start', gap:'10px', marginBottom:'8px'}}>
@@ -489,6 +443,13 @@ export default function DriverPage() {
               <div style={{width:'8px', height:'8px', borderRadius:'50%', background:D.red, marginTop:'4px', flexShrink:0}}/>
               <div><p style={{color:D.muted, fontSize:'11px', margin:'0 0 2px', fontWeight:'600'}}>ХҮРГЭХ ГАЗАР</p><p style={{color:D.text, fontSize:'13px', margin:0, fontWeight:'500'}}>{(safeOrder as any).to_address || '-'}</p></div>
             </div>
+          </div>}
+          {!paymentInfo && <div className="driver-connection-details">
+            <p role="status" className="connection-status">✓ Хэрэглэгч таны үнийн саналыг сонгосон</p>
+            <div className="driver-connection-price"><strong>{offerPrice(Number(safeOrder.final_price))}</strong><span>{offerDistance(pointDistance(pickup, position))} · шулуун зай</span></div>
+            {safeOrder.user_phone ? <a className="connection-call" href={`tel:${safeOrder.user_phone}`}>☎ Хэрэглэгч рүү залгах · {safeOrder.user_phone}</a> : <p className="connection-warning">Хэрэглэгчийн утасны дугаар олдсонгүй.</p>}
+            <p className="offer-selection-note">Цэнхэр цэг — ачуулах байршил. Таны байршил хэрэглэгчийн газрын зурагт харагдана.</p>
+            {(!fresh || locMsg) && <p className="connection-warning" role="status">{locMsg || 'Байршил шинэчлэгдэхийг хүлээж байна. GPS-ээ зөвшөөрнө үү.'}</p>}
           </div>}
           {paymentInfo ? (
             <div style={{background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'16px', padding:'16px'}}>

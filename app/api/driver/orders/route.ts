@@ -6,7 +6,7 @@ import { allowRequest } from '@/lib/server/security'
 export async function GET(req: NextRequest) {
   const driver = await requireDriver(req)
   if (!driver) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!(await allowRequest(`driver-orders:${driver.id}`, 12, 60_000))) {
+  if (!(await allowRequest(`driver-orders:${driver.id}`, 36, 60_000))) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
       .limit(30),
     supabase
       .from('orders')
-      .select('id,created_at,from_address,to_address,from_lat,from_lng,status,car_type,car_mark,driver_id,driver_name,driver_phone,final_price')
+      .select('id,created_at,from_address,to_address,from_lat,from_lng,status,car_type,car_mark,driver_id,driver_name,driver_phone,user_phone,final_price')
       .eq('driver_id', driver.id)
       .eq('status', 'confirmed')
       .order('created_at', { ascending: false })
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
 
   const liveInvites = invites || []
   if (!liveInvites.length) {
-    return NextResponse.json({ orders: [], ...workState })
+    return NextResponse.json({ orders: [], ...workState }, { headers: { 'Cache-Control': 'no-store' } })
   }
 
   const orderIds = [...new Set(liveInvites.map(i => i.order_id))]
@@ -53,5 +53,5 @@ export async function GET(req: NextRequest) {
 
   if (ordersError) return NextResponse.json({ error: 'Захиалга татахад алдаа гарлаа' }, { status: 500 })
   const visibleOrders = (orders || []).map(order => ({ ...order, has_offered: inviteStatusByOrder.get(order.id) === 'offered' }))
-  return NextResponse.json({ orders: visibleOrders, ...workState })
+  return NextResponse.json({ orders: visibleOrders, ...workState }, { headers: { 'Cache-Control': 'no-store' } })
 }

@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { OfferMap } from '../components/offer-map'
-import { DriverSlot, mapOffers, offerDistance, offerPrice, offerSnapshot, PickupPoint, pickupPoint, remainingSeconds } from '@/lib/order-offers'
+import { DriverSummary } from '../components/driver-summary'
+import { DriverSlot, mapOffers, offerSnapshot, PickupPoint, pickupPoint, remainingSeconds } from '@/lib/order-offers'
 
 export default function DriversPage() {
   const router = useRouter()
@@ -181,7 +182,7 @@ export default function DriversPage() {
   const clock = secondsLeft == null ? '--:--' : `${String(Math.floor(secondsLeft / 60)).padStart(2, '0')}:${String(secondsLeft % 60).padStart(2, '0')}`
 
   return <main className="offers-map-page">
-    <OfferMap pickup={pickup} offers={offers} selectedDriverId={selectedDriverId} onSelect={setSelectedDriverId} />
+    <OfferMap pickup={pickup} offers={offers} selectedDriverId={selectedDriverId} onSelect={id => { if (!actionPending.current) setSelectedDriverId(id) }} />
     <header className="offers-map-header">
       <div className="offers-status-bar">
         <button type="button" className="offers-back" onClick={() => router.replace('/current')}>← Буцах</button>
@@ -197,8 +198,9 @@ export default function DriversPage() {
 
     {selected?.offer && !expired && <section className="offer-selection" aria-label="Сонгосон жолоочийн санал">
       <button type="button" className="offer-selection-close" aria-label="Саналыг хаах" onClick={() => setSelectedDriverId(null)} disabled={accepting}>×</button>
-      <div className="offer-selection-details"><div><strong>{selected.driver_name || 'Жолооч'}</strong><span>{offerDistance(selected.distance_km)}</span></div><b>{offerPrice(selected.offer.price)}</b></div>
-      <button type="button" className="offer-select-button" disabled={accepting} onClick={() => void acceptOffer()}>{accepting ? 'Сонгож байна…' : 'Энэ жолоочийг сонгох'}</button>
+      <DriverSummary name={selected.driver_name} photo={selected.photo_url} plate={selected.car_number} carType={selected.car_type} price={selected.offer.price} distance={selected.distance_km} />
+      <button type="button" className="offer-select-button" disabled={accepting} onClick={() => void acceptOffer()}>{accepting ? 'Сонгож байна…' : 'Жолооч сонгох'}</button>
+      <p className="offer-selection-note">Сонгосны дараа та хоёрын утасны дугаар харилцан харагдана.</p>
     </section>}
 
     {expired && <div className="offers-expired"><button type="button" className="offer-select-button" disabled={retrying} onClick={() => void retrySearch()}>{retrying ? 'Дахин хайж байна…' : 'Дахин машин хайх'}</button></div>}
