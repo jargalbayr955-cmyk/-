@@ -15,7 +15,7 @@ function flow() {
   const invite = { id: 'invite-a', order_id: order.id, driver_id: driver.id, status: 'offered', rank: 1, expires_at: new Date(Date.now() + 600000).toISOString() }
   const rows = { orders: [order], drivers: [driver], offers: [offer], driver_invites: [invite], payment_codes: [] }
   const calls = [], tasks = [], notifications = [], cache = {}
-  const state = { customer, driver, dbError: null, rpcError: null }
+  const state = { customer, driver, dbError: null, rpcError: null, waiting: false, dispatchError: false }
   const admin = {
     from(table) {
       const q = { table, filters: [], columns: null, single: false, update: null }
@@ -40,6 +40,11 @@ function flow() {
     },
     async rpc(name, args) {
       calls.push({ rpc: name, args })
+      if (name === 'refresh_waiting_orders_for_driver') {
+        if (state.dispatchError) return { error: { code: 'XX000' } }
+        if (state.waiting) { rows.driver_invites.push(invite); state.waiting = false; return { data: { order_ids: [order.id] } } }
+        return { data: { order_ids: [] } }
+      }
       if (name === 'refresh_order_driver_slots') return { data: { inserted: 0, expired: false, bidding_expires_at: invite.expires_at } }
       if (state.rpcError) return { error: { message: state.rpcError } }
       if (order.status !== 'pending') return { error: { message: 'Order already selected' } }
@@ -58,7 +63,7 @@ function flow() {
       if (name.endsWith('/customer')) return { requireCustomer: async () => state.customer }
       if (name.endsWith('/driver')) return { requireDriver: async () => state.driver }
       if (name.endsWith('/security')) return { allowRequest: async () => true }
-      if (name.endsWith('/push')) return { notifyOrderInvites: async () => {}, notifySelectedDriver: async id => notifications.push(id) }
+      if (name.endsWith('/push')) return { notifyOrderInvites: async id => notifications.push('invite:' + id), notifySelectedDriver: async id => notifications.push(id) }
       if (name.startsWith('@/')) return load(name.slice(2) + '.ts')
       return require(name)
     } })
@@ -69,8 +74,33 @@ function flow() {
     const response = await load(`app/api/${route}/route.ts`)[method](req)
     return { response, body: await response.json() }
   }
-  return { state, calls, tasks, notifications, driver, customer, order, offer, call }
+  return { state, rows, calls, tasks, notifications, driver, customer, order, offer, call }
 }
+
+test('driver polling recovers a waiting order before reading invitations, then notifies after response', async () => {
+  const h = flow(); h.rows.driver_invites = []; h.state.waiting = true
+  const result = await h.call('driver/orders', {}, 'GET')
+  assert.equal(result.response.status, 200)
+  assert.equal(result.body.orders[0].id, 'order-a')
+  assert.equal(JSON.stringify(result.body).includes(h.customer.phone), false)
+  assert.equal(h.calls[0].rpc, 'refresh_waiting_orders_for_driver')
+  assert.equal(h.calls[0].args.p_driver_id, h.driver.id)
+  assert.equal(h.notifications.length, 0)
+  for (const task of h.tasks.splice(0)) await task()
+  assert.deepEqual(h.notifications, ['invite:order-a'])
+  await h.call('driver/orders', {}, 'GET')
+  assert.equal(h.tasks.length, 0)
+})
+
+test('dispatch failure is visible and offline drivers do not dispatch', async () => {
+  const h = flow(); h.state.dispatchError = true
+  assert.equal((await h.call('driver/orders', {}, 'GET')).response.status, 503)
+  assert.equal(h.tasks.length, 0)
+  h.driver.available = false
+  const count = h.calls.length
+  assert.equal((await h.call('driver/orders', {}, 'GET')).response.status, 200)
+  assert.equal(h.calls.slice(count).some(c => c.rpc), false)
+})
 
 test('offer → selection → both maps: profile before selection, phone exchange only afterward', async () => {
   const h = flow()

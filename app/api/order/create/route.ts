@@ -19,7 +19,9 @@ export async function POST(req: NextRequest) {
     from_lat: lat, from_lng: lng, car_type: b.car_type, car_mark: String(b.car_mark || '').slice(0,120), status:'pending'
   }).select('id,status,created_at').single()
   if (error || !data) return NextResponse.json({ error: 'Захиалга үүсгэхэд алдаа гарлаа' }, { status: 500 })
-  await supabase.rpc('refresh_order_driver_slots', { p_order_id: data.id })
+  const { error: dispatchError } = await supabase.rpc('refresh_order_driver_slots', { p_order_id: data.id })
+  // Keep the created order ID so polling can recover without creating a duplicate.
+  if (dispatchError) console.error('order_dispatch_failed', { orderId: data.id, code: dispatchError.code })
   await notifyOrderInvites(data.id).catch(()=>{})
   return NextResponse.json({ order: data })
 }

@@ -45,6 +45,7 @@ export default function DriverPage() {
   const seenAcceptedId = useRef<string | null>(null)
   const router = useRouter()
   const nativeDriver = mounted && isNativeDriver()
+  const locationReady = locationIsFresh(driver?.location_updated_at)
 
   // Хаазны дуу тоглуулах
   const playHorn = () => {
@@ -216,8 +217,9 @@ export default function DriverPage() {
         })
         const body = await res.json()
         if (!res.ok) { setLocMsg(body.error || 'Байршил хадгалахад алдаа гарлаа'); return }
-        setDriver((d:any) => d ? ({ ...d, lat: pos.coords.latitude, lng: pos.coords.longitude, available: body.available }) : d)
+        setDriver((d:any) => d ? ({ ...d, lat: pos.coords.latitude, lng: pos.coords.longitude, location_updated_at: new Date().toISOString(), available: body.available }) : d)
         setLocMsg('Байршил шинэчлэгдлээ!')
+        void fetchOrders()
         } catch { setLocMsg('Сүлжээний алдаа. Дахин оролдоно уу.') }
         finally { setLocating(false) }
       },
@@ -314,6 +316,7 @@ export default function DriverPage() {
 
   const toggleAvailable = async () => {
     if (isNativeDriver()) return
+    if (!driver.available) { updateLocation(); return }
     try {
     const newVal = !driver.available
     const res = await fetch('/api/driver/availability', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ available: newVal }) })
@@ -504,11 +507,11 @@ export default function DriverPage() {
       <div style={{padding:'14px 20px', background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
         <div>
           <p style={{color:D.text, fontWeight:'700', fontSize:'15px', margin:0}}>{driver.name}</p>
-          <p style={{color:D.muted, fontSize:'12px', margin:'3px 0 0'}}>{driver.car_type}</p>
+          <p style={{color:D.muted, fontSize:'12px', margin:'3px 0 0'}}>{driver.car_type === 'butten' ? 'Бүтэн ачигч' : driver.car_type === 'chiregch' ? 'Чирэгч' : 'Машины төрөл сонгоогүй'}</p>
         </div>
         <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-          {!nativeDriver && <button onClick={toggleAvailable} style={{borderRadius:'20px', padding:'7px 14px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border: driver.available ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.1)', background: driver.available ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)', color: driver.available ? '#22c55e' : D.muted}}>
-            {driver.available ? '🟢 Ажиллаж байна' : '⚫ Амарч байна'}
+          {!nativeDriver && <button onClick={toggleAvailable} disabled={locating} style={{borderRadius:'20px', padding:'7px 14px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border: driver.available ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.1)', background: driver.available ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)', color: driver.available && locationReady ? '#22c55e' : D.muted}}>
+            {locating ? 'Байршил шалгаж байна…' : driver.available ? locationReady ? '🟢 Захиалга авахад бэлэн' : '📍 Байршил шаардлагатай' : '⚫ Амарч байна'}
           </button>}
           {!nativeDriver && <button onClick={subscribeNotification} style={{
             borderRadius:'20px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer',
@@ -546,7 +549,7 @@ export default function DriverPage() {
         {orders.length === 0 ? (
           <div style={{background:D.card, border:D.cardBorder, borderRadius:'16px', padding:'40px 16px', textAlign:'center'}}>
             <div style={{fontSize:'40px', marginBottom:'12px'}}>⏳</div>
-            <p style={{color:D.muted, fontSize:'14px', margin:0}}>Одоогоор захиалга байхгүй</p>
+            <p style={{color:D.muted, fontSize:'14px', margin:0}}>{!driver.available ? 'Захиалга авахын тулд ажиллах төлөвөө асаана уу' : !locationReady ? 'Захиалга авахын тулд GPS байршлаа шинэчилнэ үү' : 'Таны машины төрөлд тохирох захиалга хүлээж байна'}</p>
           </div>
         ) : (
           <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>

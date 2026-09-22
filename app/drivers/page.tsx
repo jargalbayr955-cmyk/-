@@ -14,6 +14,7 @@ export default function DriversPage() {
   const [orderId, setOrderId] = useState<string | null>(null)
   const [pickup, setPickup] = useState<PickupPoint | null>(null)
   const [slots, setSlots] = useState<DriverSlot[]>([])
+  const [invitedCount, setInvitedCount] = useState<number | null>(null)
   const [expiresAt, setExpiresAt] = useState<string | null>(null)
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
   const [serverExpired, setServerExpired] = useState(false)
@@ -138,6 +139,7 @@ export default function DriversPage() {
         if (body.pickup) setPickup(pickupPoint(body.pickup.lat, body.pickup.lng))
         setExpiresAt(body.bidding_expires_at || null)
         setServerExpired(Boolean(body.expired))
+        setInvitedCount(Number(body.invited_count || 0))
         stopped = Boolean(body.expired)
         const snapshot = offerSnapshot(seen, next)
         seen = snapshot.seen
@@ -185,6 +187,7 @@ export default function DriversPage() {
       if (draft) saveBookingDraft({ ...draft, orderId: body.order.id })
       setOrderId(body.order.id)
       setSlots([])
+      setInvitedCount(null)
       setSelectedDriverId(null)
       setServerExpired(false)
       setExpiresAt(body.bidding_expires_at || null)
@@ -200,13 +203,14 @@ export default function DriversPage() {
     <header className="offers-map-header">
       <div className="offers-status-bar">
         <button type="button" className="offers-back" onClick={() => { if (!navigation.back()) backInApp(router, '/current') }}>← Буцах</button>
-        <h1 aria-live="polite">{finished ? 'Захиалга дууссан' : confirmed ? 'Жолооч сонгогдсон' : expired ? 'Хайлтын хугацаа дууслаа' : 'Үнийн санал хүлээж байна'}</h1>
+        <h1 aria-live="polite">{finished ? 'Захиалга дууссан' : confirmed ? 'Жолооч сонгогдсон' : expired ? 'Хайлтын хугацаа дууслаа' : invitedCount === 0 ? 'Бэлэн жолооч хайж байна' : 'Үнийн санал хүлээж байна'}</h1>
         {!confirmed && !finished && <time className="offers-countdown" aria-label={`Үлдсэн хугацаа ${clock}`}>{clock}</time>}
       </div>
       {!confirmed && !finished && <button type="button" className="offers-alerts" aria-pressed={alertsEnabled} onClick={() => void toggleAlerts()} disabled={alertsBusy}>
         {alertsBusy ? 'Дууг асааж байна…' : alertsEnabled ? '🔔 Дуу + чичиргээ асаалттай' : '🔔 Үнэ ирэхэд дуу + чичиргээ асаах'}
       </button>}
       {alertsMessage && <p className="offers-inline-message" role="status">{alertsMessage}</p>}
+      {!confirmed && !finished && !expired && invitedCount === 0 && <p className="offers-inline-message" role="status">Сонгосон төрлийн бэлэн жолооч одоогоор алга. Хугацаа дуусахаас өмнө жолооч бэлэн болбол захиалгыг автоматаар илгээнэ.</p>}
       {error && <p className="offers-inline-message offers-error" role="alert">{error}</p>}
     </header>
 

@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { requireDriver } from '@/lib/server/driver'
 import { allowRequest } from '@/lib/server/security'
+import { notifyOrderInvites } from '@/lib/server/push'
 
 export async function GET(req: NextRequest) {
   const driver = await requireDriver(req)
@@ -11,6 +12,19 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = getSupabaseAdmin()
+  // A driver can come online after a customer's first search returned no candidates.
+  // Run before reading invitations so the same poll includes the recovered order.
+  if (driver.available) {
+    const { data, error } = await supabase.rpc('refresh_waiting_orders_for_driver', { p_driver_id: driver.id })
+    if (error) {
+      console.error('driver_dispatch_failed', { code: error.code })
+      return NextResponse.json({ error: 'Захиалга шалгахад алдаа гарлаа. Дахин оролдоно уу.' }, { status: 503 })
+    }
+    const orderIds: string[] = Array.isArray(data?.order_ids) ? data.order_ids : []
+    if (orderIds.length) after(async () => {
+      await Promise.allSettled(orderIds.map(id => notifyOrderInvites(id)))
+    })
+  }
   const now = new Date().toISOString()
   const [{ data: invites, error: inviteError }, { data: acceptedOrder, error: acceptedError }, { data: pendingPayment, error: paymentError }] = await Promise.all([
     supabase
