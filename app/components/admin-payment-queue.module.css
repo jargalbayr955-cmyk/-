@@ -1,0 +1,14 @@
+.queue { margin-bottom: 20px; color: white; }
+.heading { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font-size: 18px; }
+.heading span { border-radius: 20px; background: #3b3110; color: #ffda63; padding: 3px 10px; font-size: 14px; }
+.note { margin: 0 0 12px; color: #b9bac3; font-size: 13px; line-height: 1.6; }
+.card { margin: 0 0 10px; border: 1px solid #67551b; border-radius: 16px; padding: 16px; background: #15130d; }
+.row { display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.phone { margin: 4px 0 0; color: #c6c6cc; font-size: 13px; }
+.amount { color: #ffda63; font-size: 20px; }
+.route { color: #c6c6cc; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.code { color: #c6c6cc; font-size: 13px; }
+.code strong { color: #ffda63; letter-spacing: 2px; font-size: 18px; }
+.card button { width: 100%; min-height: 46px; border: 1px solid #40945c; border-radius: 12px; background: #113821; color: #a4f2ba; font-size: 15px; font-weight: 700; cursor: pointer; }
+.card button:disabled { opacity: .55; cursor: wait; }
+.card button:focus-visible { outline: 3px solid #ffda63; outline-offset: 3px; }

@@ -116,6 +116,17 @@ test('changing the password invalidates every previous session, rejects the old 
   assert.equal(h.state.credential.password_hash.includes(NEW), false)
 })
 
+test('customer and driver cookies cannot approve a completed trip', async () => {
+  const h = await harness()
+  const body = { action:'release_payment', order_id:'00000000-0000-4000-8000-000000000123' }
+  assert.equal((await h.call('drivers','POST',body)).status,401)
+  for (const role of ['customer','driver']) {
+    const forged = 'achilt_admin_session=' + h.load('lib/server/security.ts').signSession('initial-version',role)
+    assert.equal((await h.call('drivers','POST',body,forged)).status,401)
+  }
+  assert.equal(h.state.otherTableReads,0)
+})
+
 test('password changes require a live admin session, current password, confirmation, length and same origin', async () => {
   const h = await harness()
   const saved = h.cookie(await h.login(OLD))

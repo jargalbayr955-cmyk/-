@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useScreenHistory } from '@/lib/client/use-screen-history'
 import { backInApp, readScreen } from '@/lib/client/navigation'
 import { AdminPasswordForm } from '../components/admin-password-form'
+import { AdminPaymentQueue, type PendingDriverPayment } from '../components/admin-payment-queue'
 import { createDotMarker, freeMapStyle, loadFreeMap, validCoords, ULAANBAATAR } from '@/lib/client/free-map'
 
 type Driver = {
@@ -123,6 +124,12 @@ export default function AdminPage() {
   const [bankSaved, setBankSaved] = useState(false)
   const [nowMs, setNowMs] = useState(0)
   const [dashboardError, setDashboardError] = useState('')
+  const [pendingPayments, setPendingPayments] = useState<PendingDriverPayment[]>([])
+  const [pendingApprovalCount, setPendingApprovalCount] = useState(0)
+  const [approvingId, setApprovingId] = useState<string | null>(null)
+  const [approvalMessage, setApprovalMessage] = useState('')
+  const approvalPending = React.useRef(false)
+  const dashboardSequence = React.useRef(0)
 
   useEffect(() => {
     setMounted(true)
@@ -134,31 +141,59 @@ export default function AdminPage() {
     return () => clearInterval(clock)
   }, [])
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = React.useCallback(async (refreshSettings = false) => {
+    const sequence = ++dashboardSequence.current
     try {
-    const res = await fetch('/api/admin/dashboard', { cache:'no-store' })
+    const res = await fetch('/api/admin/dashboard', { cache:'no-store', signal: AbortSignal.timeout(12_000) })
+    if (sequence !== dashboardSequence.current) return
     if (res.status === 401) { setAuthed(false); return }
     if (!res.ok) { setDashboardError('Мэдээлэл шинэчлэгдээгүй байна. Дахин оролдоно уу.'); return }
     const body = await res.json()
+    if (sequence !== dashboardSequence.current) return
     setDashboardError('')
     setDrivers(body.drivers || [])
     setActiveOrders(body.activeOrders || [])
     setOrders(body.orders || [])
-    setHeroUrl(body.heroUrl || '')
-    setBankName(body.bankName || '')
-    setBankAccount(body.bankAccount || '')
-    } catch { setDashboardError('Сүлжээ тасарсан байна. Мэдээлэл шинэчлэгдээгүй.') }
-    finally { setLoading(false) }
-  }
-  const fetchDrivers = fetchDashboard
-  const fetchActiveOrders = fetchDashboard
-  const fetchOrders = fetchDashboard
+    setPendingPayments(body.pendingPayments || [])
+    setPendingApprovalCount(body.pendingApprovalCount || 0)
+    // Background updates must not overwrite bank/account fields being edited.
+    if (refreshSettings) {
+      setHeroUrl(body.heroUrl || '')
+      setBankName(body.bankName || '')
+      setBankAccount(body.bankAccount || '')
+    }
+    } catch { if (sequence === dashboardSequence.current) setDashboardError('Сүлжээ тасарсан байна. Мэдээлэл шинэчлэгдээгүй.') }
+    finally { if (sequence === dashboardSequence.current) setLoading(false) }
+  }, [])
+  const fetchDrivers = () => fetchDashboard()
+  const fetchActiveOrders = () => fetchDashboard()
+  const fetchOrders = () => fetchDashboard()
 
   useEffect(() => {
     if (authed && !mustChangePassword) {
-      fetchDashboard()
+      void fetchDashboard(true)
+      const refresh = () => { if (document.visibilityState === 'visible') void fetchDashboard() }
+      const interval = setInterval(refresh, 10_000)
+      document.addEventListener('visibilitychange', refresh)
+      return () => { clearInterval(interval); document.removeEventListener('visibilitychange', refresh); dashboardSequence.current++ }
     }
-  }, [authed, mustChangePassword])
+  }, [authed, mustChangePassword, fetchDashboard])
+
+  const approvePayment = async (orderId: string) => {
+    if (approvalPending.current) return
+    approvalPending.current = true
+    setApprovingId(orderId); setApprovalMessage(''); setDashboardError('')
+    try {
+      const res = await fetch('/api/admin/drivers', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'release_payment',order_id:orderId}), signal:AbortSignal.timeout(12_000) })
+      const body = await res.json().catch(() => ({}))
+      if (res.status === 401) { setAuthed(false); return }
+      if (!res.ok) throw new Error(body.error || 'Зөвшөөрөл хадгалагдсангүй. Дахин оролдоно уу.')
+      setPendingPayments(current => current.filter(payment => payment.id !== orderId))
+      setApprovalMessage(body.available ? 'Зөвшөөрлөө. Жолооч дараагийн захиалга авах боломжтой.' : body.pending_payments > 0 ? 'Захиалгыг зөвшөөрлөө. Жолоочид хүлээгдэж буй өөр төлбөр байна.' : 'Захиалгыг зөвшөөрлөө. Жолоочийн бүртгэл болон ажиллах төлөвийг шалгана уу.')
+      await fetchDashboard()
+    } catch (cause) { setDashboardError(cause instanceof Error ? cause.message : 'Зөвшөөрөл хадгалагдсан эсэхийг шалгаад дахин оролдоно уу.') }
+    finally { approvalPending.current = false; setApprovingId(null) }
+  }
 
   const saveHeroUrl = async () => {
     const res = await fetch('/api/admin/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:'hero_url',value:heroUrl}) })
@@ -299,7 +334,7 @@ export default function AdminPage() {
 
   return (
     <div style={{minHeight:'100vh', background:D.bg, paddingBottom:'40px'}}>
-      {dashboardError && <div role="alert" style={{padding:'16px', color:'#ff6b6b'}}>{dashboardError} <button onClick={fetchDashboard}>Дахин ачаалах</button></div>}
+      {dashboardError && <div role="alert" style={{padding:'16px', color:'#ff6b6b'}}>{dashboardError} <button onClick={() => void fetchDashboard()}>Дахин ачаалах</button></div>}
       {/* Header */}
       <button type="button" className="offers-back" style={{margin:'12px 20px 0'}} onClick={() => { if (!navigation.back()) backInApp(router, '/start') }}>← Буцах</button>
       <div style={{padding:'16px 20px', background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap'}}>
@@ -341,6 +376,9 @@ export default function AdminPage() {
       </div>
 
       <div style={{padding:'16px', maxWidth:'700px', margin:'0 auto'}}>
+
+        {approvalMessage && <p className="admin-password-success" role="status">{approvalMessage}</p>}
+        {!loading && <AdminPaymentQueue payments={pendingPayments} total={pendingApprovalCount} approvingId={approvingId} onApprove={approvePayment} />}
 
         {/* DRIVERS TAB */}
         {tab === 'drivers' && (
@@ -415,11 +453,11 @@ export default function AdminPage() {
                       <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
                         {!d.active ? (
                           <button onClick={() => toggleDriverActive(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border:'1px solid rgba(232,67,58,0.4)', background:'rgba(232,67,58,0.12)', color:'#ff6b5b'}}>
-                            🔓 Эрх нээх
+                            Бүртгэл идэвхжүүлэх
                           </button>
                         ) : (
                           <button onClick={() => toggleDriverActive(d.id)} style={{borderRadius:'10px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border:'1px solid rgba(34,197,94,0.3)', background:'rgba(34,197,94,0.12)', color:'#22c55e'}}>
-                            ✅ Эрхтэй
+                            Бүртгэл түр хаах
                           </button>
                         )}
                         <button onClick={() => resetDriverPin(d.id)} style={{borderRadius:'10px', padding:'6px 10px', fontSize:'12px', fontWeight:'700', cursor:'pointer', background:'rgba(59,130,246,0.1)', border:'1px solid rgba(59,130,246,0.25)', color:'#60a5fa'}}>
@@ -496,44 +534,7 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* Төлбөр хүлээж байгаа захиалгууд */}
-            {activeOrders.filter(o => o.status === 'completed').length > 0 && (
-              <div style={{marginTop:'20px'}}>
-                <p style={{color:'rgba(255,200,0,0.7)', fontSize:'12px', fontWeight:'700', margin:'0 0 10px', letterSpacing:'1px'}}>💰 ТӨЛБӨР ХҮЛЭЭЖ БАЙГАА</p>
-                <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
-                  {activeOrders.filter(o => o.status === 'completed').map((o) => {
-                    const price = o.final_price || (o.offers && o.offers.length > 0 ? o.offers[0].price : 0)
-                    return (
-                      <div key={o.id} style={{background:D.card, border:'1px solid rgba(255,200,0,0.2)', borderRadius:'16px', padding:'16px'}}>
-                        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'10px'}}>
-                          <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-                            <div style={{width:'32px', height:'32px', borderRadius:'50%', background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.25)', display:'flex', alignItems:'center', justifyContent:'center', color:'#ff6b5b', fontSize:'13px', fontWeight:'800'}}>
-                              {o.driver_name?.charAt(0)}
-                            </div>
-                            <div>
-                              <p style={{color:'white', fontWeight:'700', fontSize:'13px', margin:0}}>{o.driver_name}</p>
-                              <p style={{color:D.muted, fontSize:'11px', margin:'1px 0 0'}}>{o.driver_phone}</p>
-                            </div>
-                          </div>
-                          {price > 0 && <span style={{color:'#ffd700', fontSize:'16px', fontWeight:'900'}}>₮{price.toLocaleString()}</span>}
-                        </div>
-                        <div style={{background:'rgba(255,255,255,0.03)', borderRadius:'10px', padding:'8px 10px', marginBottom:'12px'}}>
-                          <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:'0 0 4px'}}>{o.from_address}</p>
-                          <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:0}}>→ {o.to_address}</p>
-                        </div>
-                        <button onClick={async () => {
-                          const res = await fetch('/api/admin/drivers', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'release_payment',order_id:o.id})})
-                          if (!res.ok) alert('Эрх нээхэд алдаа гарлаа')
-                          await fetchDashboard()
-                        }} style={{width:'100%', borderRadius:'12px', padding:'12px', background:'rgba(34,197,94,0.15)', border:'1px solid rgba(34,197,94,0.3)', color:'#22c55e', fontSize:'14px', fontWeight:'700', cursor:'pointer'}}>
-                          ✅ Төлбөр зөвшөөрөх — Эрх нээх
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+
           </div>
         )}
 

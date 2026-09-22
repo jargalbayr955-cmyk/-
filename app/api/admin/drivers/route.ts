@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { normalizeMnPhone } from '@/lib/server/security'
-import { requireAdmin } from '@/lib/server/admin'
+import { requireAdmin, sameOriginAdminRequest } from '@/lib/server/admin'
 
 export async function POST(req:NextRequest){
  const access=await requireAdmin(req); if(!access.ok)return NextResponse.json({error:access.error},{status:access.status})
@@ -24,17 +24,13 @@ export async function POST(req:NextRequest){
   if(!id)return NextResponse.json({error:'ID required'},{status:400}); const pin=String(crypto.randomInt(100000,1000000)); const {error}=await s.rpc('set_driver_pin_secure',{p_driver_id:id,p_pin:pin}); if(error)return NextResponse.json({error:'PIN reset failed'},{status:500}); return NextResponse.json({success:true,pin})
  }
  if(action==='release_payment'){
-  if(!order_id)return NextResponse.json({error:'Order required'},{status:400})
-  const {data:o}=await s.from('orders').select('id,driver_id,status').eq('id',order_id).maybeSingle()
-  if(!o?.driver_id||o.status!=='completed')return NextResponse.json({error:'Order unavailable'},{status:409})
-  const {data:payment}=await s.from('payment_codes').select('id').eq('order_id',o.id).eq('driver_id',o.driver_id).eq('used',false).order('id',{ascending:false}).limit(1).maybeSingle()
-  if(payment){
-   const {error}=await s.rpc('confirm_payment_atomic',{p_payment_id:payment.id})
-   if(error)return NextResponse.json({error:'Payment release failed'},{status:500})
-  } else {
-   return NextResponse.json({error:'Хүлээгдэж буй төлбөр олдсонгүй. Жолоочийн төлөв өөрчлөгдөөгүй.'},{status:409})
-  }
-  return NextResponse.json({success:true})
+  if(!sameOriginAdminRequest(req))return NextResponse.json({error:'Forbidden'},{status:403})
+  if(typeof order_id!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(order_id))return NextResponse.json({error:'Захиалгын дугаар буруу байна.'},{status:400})
+  const {data,error}=await s.rpc('admin_approve_driver_payment',{
+   p_order_id:order_id,p_session_version:access.credential.session_version,
+  })
+  if(error)return NextResponse.json({error:error.code==='42501'?'Админаар дахин нэвтэрнэ үү.':'Зөвшөөрөл хадгалагдсангүй. Мэдээллээ шинэчлээд дахин оролдоно уу.'},{status:error.code==='42501'?401:409})
+  return NextResponse.json({success:true,...data},{headers:{'Cache-Control':'no-store'}})
  }
  return NextResponse.json({error:'Unknown action'},{status:400})
 }

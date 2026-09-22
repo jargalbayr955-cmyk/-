@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   if (Number(payment.amount) !== body.amount) return NextResponse.json({ error: 'Payment amount mismatch' }, { status: 409 })
   if (payment.used) return NextResponse.json({ success: true, already_confirmed: true })
 
-  const { error } = await supabase.rpc('confirm_payment_atomic', { p_payment_id: payment.id })
-  if (error) return NextResponse.json({ error: error.message }, { status: 409 })
-  return NextResponse.json({ success: true, driver_id: payment.driver_id, amount: payment.amount })
+  // Even a matching bank receipt cannot grant access. An administrator must
+  // explicitly approve the completed job from the authenticated dashboard.
+  return NextResponse.json({ error: 'Админы зөвшөөрөл шаардлагатай.', code: 'ADMIN_APPROVAL_REQUIRED', approval_required: true }, { status: 409 })
 }

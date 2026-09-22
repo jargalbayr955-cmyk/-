@@ -7,7 +7,7 @@ const vm = require('node:vm')
 const ts = require('typescript')
 const { NextRequest } = require('next/server')
 
-function harness({ rows = {}, driver = { id: 'driver-a', phone: '+97600000000', available: false, car_type: 'butten' }, blocked = false, env = {}, send } = {}) {
+function harness({ rows = {}, driver = { id: 'driver-a', phone: '+97600000000', available: false, car_type: 'butten' }, blocked = false, env = {}, send, adminAccess = { ok: true, credential: { session_version: 'verified-admin-version' } }, rpcResult } = {}) {
   const calls = [], cache = new Map()
   const admin = {
     from(table) {
@@ -18,7 +18,7 @@ function harness({ rows = {}, driver = { id: 'driver-a', phone: '+97600000000', 
       }
       return chain
     },
-    async rpc(name, args) { calls.push({ rpc: name, args }); return { data: true, error: null } },
+    async rpc(name, args) { calls.push({ rpc: name, args }); return rpcResult ? rpcResult(name, args) : { data: name === 'admin_pending_driver_payments' ? [] : true, error: null } },
   }
   function load(file) {
     if (cache.has(file)) return cache.get(file)
@@ -29,7 +29,7 @@ function harness({ rows = {}, driver = { id: 'driver-a', phone: '+97600000000', 
     vm.runInNewContext(source, { exports, Buffer, URL, Date, process: { env }, console: { error() {}, warn() {} }, require(name) {
       if (name === 'server-only') return {}
       if (name.endsWith('/supabase-admin')) return { getSupabaseAdmin: () => admin }
-      if (name === '@/lib/server/admin') return { requireAdmin: async () => ({ ok: true, credential: {} }) }
+      if (name === '@/lib/server/admin') return { requireAdmin: async () => adminAccess, sameOriginAdminRequest: req => req.headers.get('origin') === req.nextUrl.origin && req.headers.get('sec-fetch-site') !== 'cross-site' }
       if (name === '@/lib/server/driver') return { requireDriver: async () => driver, driverHasBlockingWork: async () => blocked }
       if (name === '@/lib/server/security') return { allowRequest: async () => true, getClientIp: () => 'test', safeEqual: (a,b) => a === b, verifySession: () => ({ sub: 'admin-a' }) }
       if (name === 'web-push') return { setVapidDetails() {}, sendNotification: send }
@@ -42,7 +42,7 @@ function harness({ rows = {}, driver = { id: 'driver-a', phone: '+97600000000', 
   return { load, calls }
 }
 function request(body = {}, secret = 'test-webhook-secret') {
-  return new NextRequest('https://achilt.example/api/test', { method: 'POST', headers: { 'content-type': 'application/json', 'x-webhook-secret': secret }, body: JSON.stringify(body) })
+  return new NextRequest('https://achilt.example/api/test', { method: 'POST', headers: { origin: 'https://achilt.example', 'content-type': 'application/json', 'x-webhook-secret': secret }, body: JSON.stringify(body) })
 }
 const receipt = { code: '123456', amount: 12500, currency: 'MNT', direction: 'credit' }
 const payment = { id: 'payment-a', driver_id: 'driver-a', amount: 12500, used: false }
@@ -71,13 +71,63 @@ test('payment secret is required before database access', async () => {
   assert.equal((await h.load('app/api/payment/verify/route.ts').POST(request(receipt, 'wrong'))).status, 401)
   assert.equal(h.calls.length, 0)
 })
-test('matching incoming payment confirms atomically and duplicate does not confirm again', async () => {
+test('matching bank receipts cannot unlock a driver; approved receipts are read-only retries', async () => {
   for (const used of [false, true]) {
     const h = harness({ env: paymentEnv, rows: { payment_codes: { data: { ...payment, used } } } })
     const result = await h.load('app/api/payment/verify/route.ts').POST(request(receipt))
-    assert.equal(result.status, 200)
-    assert.equal(h.calls.filter(x => x.rpc === 'confirm_payment_atomic').length, used ? 0 : 1)
+    assert.equal(result.status, used ? 200 : 409)
+    const body = await result.json()
+    if (!used) assert.equal(body.code, 'ADMIN_APPROVAL_REQUIRED')
+    assert.equal(h.calls.some(x => x.rpc || x.action !== 'select'), false)
   }
+})
+
+const approvalOrder = '00000000-0000-4000-8000-000000000123'
+test('payment approval requires admin authentication and the same origin before writes', async () => {
+  for (const access of [{ ok:false, status:401, error:'Unauthorized' }, { ok:false, status:403, error:'Change temporary password' }]) {
+    const h = harness({ adminAccess: access })
+    assert.equal((await h.load('app/api/admin/drivers/route.ts').POST(request({ action:'release_payment', order_id:approvalOrder }))).status, access.status)
+    assert.equal(h.calls.length, 0)
+  }
+  const h = harness(), req = request({ action:'release_payment', order_id:approvalOrder })
+  req.headers.set('origin','https://other.example')
+  assert.equal((await h.load('app/api/admin/drivers/route.ts').POST(req)).status, 403)
+  assert.equal(h.calls.length, 0)
+})
+test('approval uses the verified admin session and the selected order, ignoring forged body fields', async () => {
+  const h = harness({ rpcResult: () => ({ data: { approved:true, available:true, pending_payments:0 }, error:null }) })
+  const result = await h.load('app/api/admin/drivers/route.ts').POST(request({ action:'release_payment', order_id:approvalOrder, id:'another-driver', session_version:'forged' }))
+  assert.equal(result.status, 200)
+  assert.equal((await result.json()).available, true)
+  assert.match(result.headers.get('cache-control'), /no-store/)
+  assert.equal(h.calls.length, 1)
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls[0])), { rpc:'admin_approve_driver_payment', args: { p_order_id:approvalOrder, p_session_version:'verified-admin-version' } })
+})
+test('approval rejects invalid IDs and reports revoked sessions or database conflicts', async () => {
+  const invalid = harness()
+  assert.equal((await invalid.load('app/api/admin/drivers/route.ts').POST(request({ action:'release_payment', order_id:'bad-id' }))).status, 400)
+  assert.equal(invalid.calls.length, 0)
+  for (const [code, status] of [['42501',401],['P0001',409]]) {
+    const h = harness({ rpcResult: () => ({ data:null, error:{code} }) })
+    assert.equal((await h.load('app/api/admin/drivers/route.ts').POST(request({ action:'release_payment', order_id:approvalOrder }))).status,status)
+  }
+})
+test('manual approval stays required even when a bank webhook secret exists', async () => {
+  const h = harness({ env:paymentEnv, rows:{ settings:{data:[]} } })
+  const response = await h.load('app/api/driver/payment-settings/route.ts').GET(request())
+  const body = await response.json()
+  assert.equal(body.automatic_confirmation,false)
+  assert.equal(body.approval_required,true)
+})
+test('admin dashboard reads the unpaid queue independently from recent trip history', async () => {
+  const pending = { id:approvalOrder, code:'123456', amount:12500, total_pending:201 }
+  const h = harness({ rows:{drivers:{data:[]},orders:{data:[]},settings:{data:[]}}, rpcResult:name => ({data:name==='admin_pending_driver_payments'?[pending]:null,error:null}) })
+  const response = await h.load('app/api/admin/dashboard/route.ts').GET(request())
+  assert.equal(response.status,200)
+  const body = await response.json()
+  assert.equal(body.pendingApprovalCount,201)
+  assert.equal(body.pendingPayments[0].id,approvalOrder)
+  assert.deepEqual(body.activeOrders,[])
 })
 test('database lookup error is reported, not mistaken for an invalid payment', async () => {
   const h = harness({ env: paymentEnv, rows: { payment_codes: { error: { code: 'XX000' } } } })
