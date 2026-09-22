@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
   ])
 
   if (inviteError || acceptedError || paymentError) return NextResponse.json({ error: 'Захиалга татахад алдаа гарлаа' }, { status: 500 })
-  const workState = { acceptedOrder: acceptedOrder || null, pendingPayment: pendingPayment ? { ...pendingPayment, amount: Number(pendingPayment.amount) } : null, available: driver.available, active: true }
+  const workState = { acceptedOrder: acceptedOrder || null, pendingPayment: pendingPayment ? { ...pendingPayment, amount: Number(pendingPayment.amount) } : null, available: driver.available, active: true, driverLocation: { lat: driver.lat, lng: driver.lng, location_updated_at: driver.location_updated_at } }
 
   const liveInvites = invites || []
   if (!liveInvites.length) {

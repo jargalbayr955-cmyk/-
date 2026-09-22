@@ -1,0 +1,4 @@
+<resources>
+    <string name="work_status">%1$s%2$s</string>
+    <string name="location_age">\u0020· %1$d сек өмнө</string>
+</resources>

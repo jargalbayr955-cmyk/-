@@ -105,6 +105,21 @@ test('pending payment is recovered by driver ID without browser storage', async 
   assert.ok(lookup.filters.some(x => x[0] === 'eq' && x[1] === 'driver_id' && x[2] === 'driver-a'))
   assert.ok(lookup.filters.some(x => x[0] === 'eq' && x[1] === 'used' && x[2] === false))
 })
+test('native order polling returns only the authenticated driver location and cannot choose another driver', async () => {
+  const driver = { id: 'driver-a', available: false, lat: 47.9, lng: 106.9, location_updated_at: '2026-01-01T00:00:00Z', phone: '+97600000000', pin_hash: 'never-return' }
+  const h = harness({ driver, rows: { driver_invites: { data: [] } } })
+  const result = await h.load('app/api/driver/orders/route.ts').GET(new NextRequest('https://achilt.example/api/driver/orders?driver_id=driver-b'))
+  const body = await result.json()
+  assert.deepEqual(body.driverLocation, { lat: driver.lat, lng: driver.lng, location_updated_at: driver.location_updated_at })
+  assert.equal(JSON.stringify(body).includes('never-return'), false)
+  for (const lookup of h.calls) assert.ok(lookup.filters.some(x => x[0] === 'eq' && x[1] === 'driver_id' && x[2] === 'driver-a'))
+})
+test('driver logout expires the native shared cookie with secure attributes and no caching', async () => {
+  const result = await harness({ env: { NODE_ENV: 'production' } }).load('app/api/driver/logout/route.ts').POST()
+  assert.equal(result.status, 200)
+  assert.match(result.headers.get('cache-control'), /no-store/)
+  for (const flag of [/Max-Age=0/i, /HttpOnly/i, /Secure/i, /SameSite=lax/i, /Path=\//i]) assert.match(result.headers.get('set-cookie'), flag)
+})
 test('invalid PIN rejects profile changes before writes', async () => {
   const h = harness()
   assert.equal((await h.load('app/api/driver/profile/route.ts').POST(request({ name: 'Test', car_type: 'butten', new_pin: '1234' }))).status, 400)

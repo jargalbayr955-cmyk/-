@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createDotMarker, createTruckMarker, freeMapStyle, loadFreeMap } from '@/lib/client/free-map'
+import { isNativeDriver } from '@/lib/client/native-driver'
+import Link from 'next/link'
 
 const D = {
   bg: '#060608',
@@ -46,6 +48,7 @@ export default function DriverPage() {
   const userMarkerRef = useRef<any>(null)
   const lineRef = useRef<any>(null)
   const router = useRouter()
+  const nativeDriver = mounted && isNativeDriver()
 
   // Хаазны дуу тоглуулах
   const playHorn = () => {
@@ -85,6 +88,7 @@ export default function DriverPage() {
 
   const subscribeNotification = async () => {
     if (!driver) return
+    if (isNativeDriver()) return
     if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
       setError('Энэ browser мэдэгдэл дэмжихгүй байна. Захиалгын хуудсаа нээлттэй байлгана уу.')
       return
@@ -125,8 +129,9 @@ export default function DriverPage() {
         setError(body.error || 'Дугаар эсвэл PIN буруу байна')
       } else {
         setDriver(body.driver)
-        localStorage.setItem('driver_session', JSON.stringify(body.driver))
-        if ('serviceWorker' in navigator && 'PushManager' in window) {
+        setPin('')
+        try { localStorage.setItem('driver_session', JSON.stringify(body.driver)) } catch {}
+        if (!isNativeDriver() && 'serviceWorker' in navigator && 'PushManager' in window) {
           try {
             const permission = await Notification.requestPermission()
             if (permission === 'granted') {
@@ -174,7 +179,14 @@ export default function DriverPage() {
       setPaymentInfo(body.pendingPayment || null)
       localStorage.removeItem('accepted_order'); localStorage.removeItem('payment_info')
       if (driverRef.current && typeof body.available === 'boolean') {
-        setDriver((d:any) => d ? ({...d, available: body.available}) : d)
+        const position = body.driverLocation
+        setDriver((d:any) => d ? ({...d, available: body.available, ...(isNativeDriver() && position ? position : {})}) : d)
+        if (isNativeDriver() && typeof position?.lat === 'number' && typeof position?.lng === 'number') {
+          driverRef.current = { ...driverRef.current, ...position }
+          driverMarkerRef.current?.setLngLat([position.lng, position.lat])
+          const order = acceptedOrderRef.current
+          if (order) mapInstanceRef.current?.getSource?.('accepted-route')?.setData?.({type:'Feature', properties:{}, geometry:{type:'LineString', coordinates:[[position.lng,position.lat],[Number(order.from_lng),Number(order.from_lat)]]}})
+        }
       }
       const newIds = data.map((o: any) => o.id)
       const hasNew = newIds.some((id: string) => !prevOrderIds.current.includes(id))
@@ -182,7 +194,7 @@ export default function DriverPage() {
       if (hasNew && ordersLoaded.current) {
         setNewOrderAlert(true)
         setTimeout(() => setNewOrderAlert(false), 3000)
-        playHorn()
+        if (!isNativeDriver()) playHorn()
       }
       if (hasNew || hasRemoved || prevOrderIds.current.length === 0) {
         prevOrderIds.current = newIds
@@ -195,6 +207,7 @@ export default function DriverPage() {
 
   const updateLocation = () => {
     if (!driver) return
+    if (isNativeDriver()) return
     if (!navigator.geolocation) return setLocMsg('Энэ browser байршил дэмжихгүй байна')
     setLocating(true)
     setLocMsg('')
@@ -287,7 +300,7 @@ export default function DriverPage() {
   }, [])
 
   useEffect(() => {
-    if (!driver?.id || !navigator.geolocation) return
+    if (!driver?.id || !navigator.geolocation || isNativeDriver()) return
     let lastSentAt = 0
     let cancelled = false
     const onPosition = async (pos: GeolocationPosition) => {
@@ -360,6 +373,7 @@ export default function DriverPage() {
   }, [acceptedOrder])
 
   const toggleAvailable = async () => {
+    if (isNativeDriver()) return
     try {
     const newVal = !driver.available
     const res = await fetch('/api/driver/availability', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ available: newVal }) })
@@ -374,7 +388,7 @@ export default function DriverPage() {
     setSendingOffer(order.id)
     try {
     const getPos = (): Promise<{lat: number, lng: number} | null> => new Promise((resolve) => {
-      if (!navigator.geolocation) return resolve(null)
+      if (!navigator.geolocation || isNativeDriver()) return resolve(null)
       navigator.geolocation.getCurrentPosition((pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }), () => resolve(null), { timeout: 5000 })
     })
     const pos = await getPos()
@@ -432,6 +446,7 @@ export default function DriverPage() {
             <div style={{fontSize:'48px', marginBottom:'12px'}}>🚛</div>
             <h1 style={{color:D.text, fontSize:'24px', fontWeight:'800', margin:0}}>Ачилт</h1>
             <p style={{color:D.muted, fontSize:'14px', marginTop:'6px'}}>Жолоочийн апп</p>
+            {!nativeDriver && <Link href="/driver/app" style={{color:'#ff8078', fontSize:14}}>Android апп татах · Туршилтын хувилбар</Link>}
           </div>
           <input type="tel" placeholder="Утасны дугаар" value={phone} onChange={e => setPhone(e.target.value)}
             style={{width:'100%', borderRadius:'14px', padding:'14px 16px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:D.text, fontSize:'16px', outline:'none', marginBottom:'12px', boxSizing:'border-box'}}/>
@@ -542,17 +557,17 @@ export default function DriverPage() {
           <p style={{color:D.muted, fontSize:'12px', margin:'3px 0 0'}}>{driver.car_type}</p>
         </div>
         <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-          <button onClick={toggleAvailable} style={{borderRadius:'20px', padding:'7px 14px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border: driver.available ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.1)', background: driver.available ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)', color: driver.available ? '#22c55e' : D.muted}}>
+          {!nativeDriver && <button onClick={toggleAvailable} style={{borderRadius:'20px', padding:'7px 14px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border: driver.available ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.1)', background: driver.available ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)', color: driver.available ? '#22c55e' : D.muted}}>
             {driver.available ? '🟢 Ажиллаж байна' : '⚫ Амарч байна'}
-          </button>
-          <button onClick={subscribeNotification} style={{
+          </button>}
+          {!nativeDriver && <button onClick={subscribeNotification} style={{
             borderRadius:'20px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer',
             background: pushReady ? 'rgba(34,197,94,0.12)' : 'rgba(232,67,58,0.12)',
             border: pushReady ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(232,67,58,0.3)',
             color: pushReady ? '#22c55e' : '#ff6b5b'
           }}>
             {pushReady ? '🔔 Асаалттай' : notifStatus === 'denied' ? '🔕 Зөвшөөрөл хаалттай' : '🔕 Мэдэгдэл авах'}
-          </button>
+          </button>}
           <button onClick={() => router.push('/driver/profile')} style={{width:'36px', height:'36px', borderRadius:'50%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:D.muted, fontSize:'16px', cursor:'pointer'}}>👤</button>
         </div>
       </div>
@@ -561,15 +576,16 @@ export default function DriverPage() {
         {error && <p role="alert" style={{color:'#ff6b6b'}}>{error}</p>}
         {!driver.car_type && <button onClick={() => router.push('/driver/profile')} style={{color:'white', background:D.red, padding:'12px', marginBottom:'16px', borderRadius:'12px'}}>Эхлээд профайлдаа машины төрлөө сонгоно уу →</button>}
         {/* Байршил */}
-        <div style={{background:D.card, border:D.cardBorder, borderRadius:'16px', padding:'16px', marginBottom:'16px'}}>
+        {!nativeDriver && <div style={{background:D.card, border:D.cardBorder, borderRadius:'16px', padding:'16px', marginBottom:'16px'}}>
           <p style={{color:D.text, fontWeight:'700', fontSize:'14px', margin:'0 0 12px'}}>📍 Байршил шинэчлэх</p>
           <p style={{color:D.muted, fontSize:'12px'}}>Захиалга хүлээхдээ энэ хуудсаа нээлттэй байлгаж, GPS байршлаа зөвшөөрнө үү.</p>
+          <p><Link href="/driver/app" style={{color:'#ff8078', fontSize:13}}>Дэлгэц түгжээтэй ажиллах Android апп →</Link></p>
           <button onClick={updateLocation} disabled={locating} style={{width:'100%', borderRadius:'12px', padding:'12px', background: locating ? 'rgba(232,67,58,0.4)' : D.red, border:'none', color:D.text, fontSize:'14px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 15px rgba(232,67,58,0.3)'}}>
             {locating ? 'Байршил тогтоож байна...' : 'Одоогийн байршил илгээх'}
           </button>
           {locMsg && <p style={{color:'#22c55e', fontSize:'12px', textAlign:'center', marginTop:'8px'}}>{locMsg}</p>}
           {driver.lat && <p style={{color:D.muted, fontSize:'12px', textAlign:'center', marginTop:'4px'}}>📍 {driver.lat?.toFixed(4)}, {driver.lng?.toFixed(4)}</p>}
-        </div>
+        </div>}
 
         {/* Захиалгууд */}
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px'}}>
