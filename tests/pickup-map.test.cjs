@@ -48,6 +48,9 @@ function pickupMap() {
         useCallback: callback => callback,
         useEffect: effect => effects.push(effect),
       }
+      if (name.endsWith('use-screen-history')) return { useScreenHistory: () => ({ screen: 'map', navigate() {}, back() {}, close() {} }) }
+      if (name.endsWith('booking-draft')) return { readBookingDraft: () => null, isBookingScreen: () => true }
+      if (name.endsWith('/navigation')) return { readScreen: () => ({ value: 'map' }) }
       if (name === 'next/navigation') return { useRouter: () => ({}) }
       if (name.includes('free-map')) return {
         loadFreeMap: () => loadingMap,

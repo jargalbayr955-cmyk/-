@@ -9,7 +9,12 @@ const ts = require('typescript')
 function formHarness(options = {}) {
   const hooks = [], effects = [], elements = new Map(), requests = [], routes = [], storage = new Map()
   let cursor = 0, dirty = false, nodes = [], active, closed = 0
-  let props = { open: true, location: { lat: 47.91, lng: 106.92 }, onClose: () => { closed++; props.open = false; render() }, ...options }
+  const draftStorage = options.draftStorage || new Map()
+  let steps = ['map', options.screen || 'vehicle'], position = 1
+  let props = { screen: steps[position], location: { lat: 47.91, lng: 106.92 },
+    onNavigate: next => { if (next === steps[position]) return; steps = steps.slice(0,position+1); steps.push(next); position++; props.screen = next; dirty = true },
+    onBack: () => { if (!position) return false; props.screen = steps[--position]; render(); return true },
+    onClose: () => { closed++; steps = ['map']; position = 0; props.screen = 'map'; render() }, ...options }
   function eventTarget(values = {}) {
     const listeners = new Map()
     return { ...values, listeners,
@@ -19,7 +24,7 @@ function formHarness(options = {}) {
     }
   }
   const viewport = eventTarget({ height: 760, offsetTop: 0 })
-  const window = eventTarget({ innerHeight: 760, visualViewport: options.noVisualViewport ? undefined : viewport })
+  const window = eventTarget({ location: { pathname: '/current' }, innerHeight: 760, visualViewport: options.noVisualViewport ? undefined : viewport })
   const react = {
     useRef(value) { const index = cursor++; hooks[index] ??= { current: value }; return hooks[index] },
     useState(value) { const index = cursor++; hooks[index] ??= { value }; return [hooks[index].value, next => { hooks[index].value = typeof next === 'function' ? next(hooks[index].value) : next; dirty = true }] },
@@ -31,25 +36,31 @@ function formHarness(options = {}) {
       }
     },
   }
+  function load(file) {
   const exports = {}
-  const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../app/components/customer-order-sheet.tsx'), 'utf8'), {
+  const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
   }).outputText
   vm.runInNewContext(source, {
     exports, window, console,
     localStorage: { setItem: (key, value) => storage.set(key, value) },
+    sessionStorage: { getItem: key => draftStorage.get(key), setItem: (key,value) => draftStorage.set(key,value), removeItem: key => draftStorage.delete(key) },
     fetch: (url, init) => new Promise(resolve => requests.push({ url, init, resolve })),
     require(name) {
       if (name === 'react') return react
       if (name === 'react-dom') return { flushSync: callback => { callback(); render() } }
       if (name === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) }
       if (name === 'next/navigation') return { useRouter: () => ({ push: url => routes.push(url) }) }
+      if (name.startsWith('@/')) return load(name.slice(2) + '.ts')
       throw new Error('Unexpected import: ' + name)
     },
   })
+  return exports
+  }
+  const component = load('app/components/customer-order-sheet.tsx').CustomerOrderSheet
   function render() {
     cursor = 0; dirty = false; nodes = []
-    const view = exports.CustomerOrderSheet(props)
+    const view = component(props)
     function walk(node, parent, key = 'root') {
       if (Array.isArray(node)) { node.forEach((child, index) => walk(child, parent, key + ':' + index)); return }
       if (!node || typeof node !== 'object') return
@@ -69,6 +80,7 @@ function formHarness(options = {}) {
     }
     walk(view)
     while (effects.length) effects.shift()()
+    if (dirty) render()
   }
   function find(predicate) { const node = nodes.find(predicate); assert.ok(node, 'Expected form control'); return node }
   const text = node => typeof node === 'string' ? node : Array.isArray(node) ? node.map(text).join('') : text(node?.props?.children || '')
@@ -78,7 +90,8 @@ function formHarness(options = {}) {
   }
   render()
   return {
-    requests, routes, storage, viewport, window,
+    requests, routes, storage, draftStorage, viewport, window,
+    back() { return props.onBack() },
     get active() { return active }, get closed() { return closed },
     get dialog() { return find(node => node.type === 'dialog').element },
     get title() { return text(find(node => node.type === 'h2')) },
@@ -173,7 +186,7 @@ test('back, close, and reopening preserve entered details; review edits return d
   assert.equal(h.input('car-mark').props.value, ' Toyota Prius ')
   h.click('Хаах')
   assert.equal(h.dialog.open, false)
-  h.update({ open: true })
+  h.update({ screen: 'car' })
   assert.equal(h.active.type, 'h2')
   assert.equal(h.input('car-mark').props.value, ' Toyota Prius ')
   h.click('Болсон')
@@ -251,4 +264,23 @@ test('missing pickup blocks dispatch; server failure preserves details and allow
   assert.equal(JSON.parse(h.requests[1].init.body).to_address, '3-р хороолол')
   await h.reply(1, 200, { order: { id: 'test-retry-order' } })
   assert.deepEqual(h.routes, ['/drivers'])
+})
+
+test('Back walks every field and keeps the draft; a sent order resumes without another dispatch', async () => {
+  const h = formHarness()
+  fillToReview(h)
+  h.back(); assert.equal(h.input('car-mark').props.value, ' Toyota Prius ')
+  h.back(); assert.equal(h.input('destination').props.value, '  3-р хороолол  ')
+  h.back(); assert.equal(h.title, 'Ямар машин хэрэгтэй вэ?')
+  h.click('Бүтэн ачигч'); h.click('Болсон'); h.click('Болсон')
+  void h.click('Жолооч хайх')
+  await h.reply(0,200,{order:{id:'saved-order'}})
+  h.unmount()
+  const restored = formHarness({ screen:'review', draftStorage:h.draftStorage })
+  assert.equal(restored.title,'Захиалгаа шалгаарай')
+  void restored.click('Үнийн санал руу')
+  assert.equal(restored.requests.length,0)
+  assert.deepEqual(restored.routes,['/drivers'])
+  restored.back()
+  assert.equal(restored.dialog.open,false)
 })

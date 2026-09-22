@@ -147,3 +147,18 @@ test('failed selection or database lookup does not send a selected notification'
   h.state.dbError = { code: 'XX000' }
   for (const route of ['order/tracking','order/accept-offer']) assert.equal((await h.call(route)).response.status, 503)
 })
+
+test('returning from tracking keeps the selected offer visible without reopening bidding or sharing phones', async () => {
+  const h = flow(); await h.call('order/accept-offer')
+  const count = h.calls.filter(c => c.rpc === 'refresh_order_driver_slots').length
+  const result = await h.call('order/slots')
+  assert.equal(result.response.status,200)
+  assert.equal(result.body.order_status,'confirmed')
+  assert.equal(result.body.slots.length,1)
+  assert.equal(result.body.slots[0].driver_id,'driver-a')
+  assert.equal(result.body.slots[0].offer.price,85000)
+  assert.equal(JSON.stringify(result.body).includes(h.driver.phone),false)
+  assert.equal(h.calls.filter(c => c.rpc === 'refresh_order_driver_slots').length,count)
+  h.order.status='completed'
+  assert.equal((await h.call('order/slots')).body.slots.length,0)
+})

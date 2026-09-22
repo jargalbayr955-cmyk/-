@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createDotMarker, freeMapStyle, loadFreeMap, mapErrorMessage, ULAANBAATAR } from '@/lib/client/free-map'
 import { CustomerAccount } from '../components/customer-account'
 import { CustomerOrderSheet } from '../components/customer-order-sheet'
+import { useScreenHistory } from '@/lib/client/use-screen-history'
+import { isBookingScreen, readBookingDraft } from '@/lib/client/booking-draft'
+import { readScreen } from '@/lib/client/navigation'
 
 type LocationPoint = { lat: number; lng: number }
 
@@ -14,7 +17,7 @@ export default function CurrentPage() {
   const latestLocation = useRef<LocationPoint | null>(null)
   const gpsRequest = useRef(0)
 
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const booking = useScreenHistory('booking', 'map', isBookingScreen)
   const [location, setLocation] = useState<LocationPoint | null>(null)
   const [locating, setLocating] = useState(true)
   const [mapError, setMapError] = useState('')
@@ -98,7 +101,9 @@ export default function CurrentPage() {
   useEffect(() => {
     let mounted = true
     void initMap(() => mounted)
-    requestLocation()
+    const restored = readScreen('booking')?.value !== 'map' ? readBookingDraft()?.location : null
+    if (restored) { setMarker(restored.lat, restored.lng, true); setLocating(false) }
+    else requestLocation()
     return () => {
       mounted = false
       gpsRequest.current += 1
@@ -107,7 +112,7 @@ export default function CurrentPage() {
       mapInstanceRef.current?.remove?.()
       mapInstanceRef.current = null
     }
-  }, [initMap, requestLocation])
+  }, [initMap, requestLocation, setMarker])
 
   return (
     <main className="current-map-page">
@@ -140,14 +145,18 @@ export default function CurrentPage() {
       </button>
 
       <div className="current-cta-wrap">
-        <button className="current-search-banner" type="button" onClick={() => setSheetOpen(true)}>
+        <button className="current-search-banner" type="button" onClick={() => {
+          const draft = readBookingDraft()
+          if (draft?.orderId && draft.location) setMarker(draft.location.lat, draft.location.lng, true)
+          booking.navigate('vehicle')
+        }}>
           <span className="current-search-banner-icon">🚛</span>
           <span className="current-search-banner-copy"><strong>Жолооч хайх</strong><small>Хамгийн ойр байгаа машинуудыг санал болгоно</small></span>
           <span className="current-search-banner-arrow">→</span>
         </button>
       </div>
 
-      <CustomerOrderSheet open={sheetOpen} location={location} onClose={() => setSheetOpen(false)} />
+      <CustomerOrderSheet screen={booking.screen} location={location} onNavigate={booking.navigate} onBack={booking.back} onClose={booking.close} />
     </main>
   )
 }

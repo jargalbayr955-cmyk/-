@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useScreenHistory } from '@/lib/client/use-screen-history'
+import { backInApp } from '@/lib/client/navigation'
+import { clearBookingDraft, readBookingDraft, saveBookingDraft } from '@/lib/client/booking-draft'
 import { OfferMap } from '../components/offer-map'
 import { DriverSummary } from '../components/driver-summary'
 import { DriverSlot, mapOffers, offerSnapshot, PickupPoint, pickupPoint, remainingSeconds } from '@/lib/order-offers'
@@ -14,7 +17,11 @@ export default function DriversPage() {
   const [expiresAt, setExpiresAt] = useState<string | null>(null)
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
   const [serverExpired, setServerExpired] = useState(false)
-  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null)
+  const navigation = useScreenHistory('offers', 'map', (value): value is string => value === 'map' || /^[a-zA-Z0-9-]{1,80}$/.test(value))
+  const selectedDriverId = navigation.screen === 'map' ? null : navigation.screen
+  const setSelectedDriverId = (id: string | null) => { if (id) navigation.navigate(id); else navigation.close() }
+  const [confirmed, setConfirmed] = useState(false)
+  const [finished, setFinished] = useState(false)
   const [accepting, setAccepting] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const [error, setError] = useState('')
@@ -117,10 +124,14 @@ export default function DriversPage() {
         if (cancelled) return
         if (body.order_status && body.order_status !== 'pending') {
           stopped = true
-          if (body.selected_driver_id) {
-            try { localStorage.setItem('tracking_driver_id', body.selected_driver_id) } catch {}
-            router.replace('/tracking')
-          } else router.replace('/current')
+          setConfirmed(body.order_status === 'confirmed')
+          const ended = ['completed', 'cancelled'].includes(body.order_status)
+          stopped = ended
+          setFinished(ended)
+          if (ended) clearBookingDraft()
+          if (body.pickup) setPickup(pickupPoint(body.pickup.lat, body.pickup.lng))
+          setSlots(Array.isArray(body.slots) ? body.slots : [])
+          setExpiresAt(null); setSecondsLeft(null); setServerExpired(false); setError('')
           return
         }
         const next: DriverSlot[] = Array.isArray(body.slots) ? body.slots : []
@@ -145,6 +156,7 @@ export default function DriversPage() {
   }, [orderId, router, playOfferAlert])
 
   const acceptOffer = async () => {
+    if (confirmed) { router.push('/tracking'); return }
     if (!orderId || !selected?.offer || expired || actionPending.current) return
     actionPending.current = true
     setAccepting(true)
@@ -154,7 +166,7 @@ export default function DriversPage() {
       const body = await response.json().catch(() => ({}))
       if (!response.ok) { setError(body.error || 'Энэ саналыг сонгох боломжгүй болсон байна.'); setSelectedDriverId(null); return }
       try { localStorage.setItem('tracking_driver_id', selected.driver_id) } catch {}
-      router.replace('/tracking')
+      router.push('/tracking')
     } catch { setError('Сонголтыг баталгаажуулж чадсангүй. Холболтоо шалгана уу.') }
     finally { actionPending.current = false; setAccepting(false) }
   }
@@ -169,6 +181,8 @@ export default function DriversPage() {
       const body = await response.json().catch(() => ({}))
       if (!response.ok || !body.order?.id) { setError(body.error || 'Дахин хайлт эхлүүлж чадсангүй.'); return }
       try { localStorage.setItem('current_order_id', body.order.id) } catch {}
+      const draft = readBookingDraft()
+      if (draft) saveBookingDraft({ ...draft, orderId: body.order.id })
       setOrderId(body.order.id)
       setSlots([])
       setSelectedDriverId(null)
@@ -185,13 +199,13 @@ export default function DriversPage() {
     <OfferMap pickup={pickup} offers={offers} selectedDriverId={selectedDriverId} onSelect={id => { if (!actionPending.current) setSelectedDriverId(id) }} />
     <header className="offers-map-header">
       <div className="offers-status-bar">
-        <button type="button" className="offers-back" onClick={() => router.replace('/current')}>← Буцах</button>
-        <h1 aria-live="polite">{expired ? 'Хайлтын хугацаа дууслаа' : 'Үнийн санал хүлээж байна'}</h1>
-        <time className="offers-countdown" aria-label={`Үлдсэн хугацаа ${clock}`}>{clock}</time>
+        <button type="button" className="offers-back" onClick={() => { if (!navigation.back()) backInApp(router, '/current') }}>← Буцах</button>
+        <h1 aria-live="polite">{finished ? 'Захиалга дууссан' : confirmed ? 'Жолооч сонгогдсон' : expired ? 'Хайлтын хугацаа дууслаа' : 'Үнийн санал хүлээж байна'}</h1>
+        {!confirmed && !finished && <time className="offers-countdown" aria-label={`Үлдсэн хугацаа ${clock}`}>{clock}</time>}
       </div>
-      <button type="button" className="offers-alerts" aria-pressed={alertsEnabled} onClick={() => void toggleAlerts()} disabled={alertsBusy}>
+      {!confirmed && !finished && <button type="button" className="offers-alerts" aria-pressed={alertsEnabled} onClick={() => void toggleAlerts()} disabled={alertsBusy}>
         {alertsBusy ? 'Дууг асааж байна…' : alertsEnabled ? '🔔 Дуу + чичиргээ асаалттай' : '🔔 Үнэ ирэхэд дуу + чичиргээ асаах'}
-      </button>
+      </button>}
       {alertsMessage && <p className="offers-inline-message" role="status">{alertsMessage}</p>}
       {error && <p className="offers-inline-message offers-error" role="alert">{error}</p>}
     </header>
@@ -199,10 +213,12 @@ export default function DriversPage() {
     {selected?.offer && !expired && <section className="offer-selection" aria-label="Сонгосон жолоочийн санал">
       <button type="button" className="offer-selection-close" aria-label="Саналыг хаах" onClick={() => setSelectedDriverId(null)} disabled={accepting}>×</button>
       <DriverSummary name={selected.driver_name} photo={selected.photo_url} plate={selected.car_number} carType={selected.car_type} price={selected.offer.price} distance={selected.distance_km} />
-      <button type="button" className="offer-select-button" disabled={accepting} onClick={() => void acceptOffer()}>{accepting ? 'Сонгож байна…' : 'Жолооч сонгох'}</button>
-      <p className="offer-selection-note">Сонгосны дараа та хоёрын утасны дугаар харилцан харагдана.</p>
+      <button type="button" className="offer-select-button" disabled={accepting} onClick={() => void acceptOffer()}>{accepting ? 'Сонгож байна…' : confirmed ? 'Сонгосон жолоочтой холбогдох' : 'Жолооч сонгох'}</button>
+      <p className="offer-selection-note">{confirmed ? 'Таны сонголт баталгаажсан. Буцахад захиалга цуцлагдахгүй.' : 'Сонгосны дараа та хоёрын утасны дугаар харилцан харагдана.'}</p>
     </section>}
 
+    {confirmed && !selected && <div className="offers-expired"><button type="button" className="offer-select-button" onClick={() => router.push('/tracking')}>Сонгосон жолоочтой холбогдох</button></div>}
+    {finished && <div className="offers-expired"><button type="button" className="offer-select-button" onClick={() => router.replace('/current')}>Нүүр хуудас руу буцах</button></div>}
     {expired && <div className="offers-expired"><button type="button" className="offer-select-button" disabled={retrying} onClick={() => void retrySearch()}>{retrying ? 'Дахин хайж байна…' : 'Дахин машин хайх'}</button></div>}
   </main>
 }

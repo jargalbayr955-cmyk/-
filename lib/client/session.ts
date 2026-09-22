@@ -31,6 +31,7 @@ export const CUSTOMER_SESSION_EVENT = 'achilt:customer-session-changed'
 export const CUSTOMER_SESSION_STORAGE_KEY = 'achilt_customer_session_changed'
 
 export function clearCustomerBrowserState() {
+  try { sessionStorage.removeItem('achilt_booking_draft') } catch {}
   // Remove only customer data. Never erase driver work or unrelated preferences.
   for (const key of ['user', 'current_order_id', 'tracking_driver_id', 'fromAddress', 'from', 'fromLat', 'fromLng', 'dest', 'phone_called']) {
     try { localStorage.removeItem(key) } catch { /* Cookie auth works even when storage is blocked. */ }

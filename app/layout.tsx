@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
+import { NavigationHistory } from './components/navigation-history';
 
 export const metadata: Metadata = {
   title: "Ачилт",
@@ -39,7 +40,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Ачилт" />
       </head>
-      <body style={{fontFamily: "Arial, sans-serif"}} className="min-h-full flex flex-col">{children}</body>
+      <body style={{fontFamily: "Arial, sans-serif"}} className="min-h-full flex flex-col"><NavigationHistory />{children}</body>
     </html>
   );
 }

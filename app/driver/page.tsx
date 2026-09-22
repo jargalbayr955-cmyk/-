@@ -281,17 +281,6 @@ export default function DriverPage() {
     return () => { cancelled = true; clearTimeout(timeout); controller.abort() }
   }, [sessionAttempt])
 
-  // Browser буцах товч блоклох
-  useEffect(() => {
-    const handlePopState = () => {
-      // Буцах товч дарахад driver хуудас дээр л үлдэх
-      window.history.pushState(null, '', '/driver')
-    }
-    window.history.pushState(null, '', '/driver')
-    window.addEventListener('popstate', handlePopState)
-    return () => window.removeEventListener('popstate', handlePopState)
-  }, [])
-
   useEffect(() => {
     if (!driver?.id || !navigator.geolocation || isNativeDriver()) return
     let lastSentAt = 0

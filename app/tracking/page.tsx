@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { backInApp } from '@/lib/client/navigation'
 import { OrderConnectionMap } from '../components/order-connection-map'
 import { DriverSummary } from '../components/driver-summary'
+import { clearBookingDraft } from '@/lib/client/booking-draft'
 import { locationIsFresh, pickupPoint, pointDistance } from '@/lib/order-offers'
 
 type Tracking = {
@@ -38,6 +40,7 @@ export default function TrackingPage() {
         if (cancelled) return
         if (body.order.status === 'pending') { finished = true; router.replace('/drivers'); return }
         finished = ['completed', 'cancelled'].includes(body.order.status)
+        if (finished) clearBookingDraft()
         setData(body); setError(''); setNow(Date.now())
       } catch { if (!cancelled) setError('Холболт тасарсан. Байршлыг дахин шинэчилж байна…') }
       finally { pending = false; clearTimeout(timeout) }
@@ -60,7 +63,7 @@ export default function TrackingPage() {
   const title = !order ? 'Захиалга ачаалж байна…' : active ? 'Жолооч сонгогдлоо' : order.status === 'completed' ? 'Ачилт дууслаа' : 'Захиалга цуцлагдсан'
 
   return <main className="tracking-page">
-    <header className="tracking-header"><button type="button" className="offers-back" onClick={() => router.replace('/current')}>← Буцах</button><h1 role="status">{title}</h1></header>
+    <header className="tracking-header"><button type="button" className="offers-back" onClick={() => backInApp(router, '/drivers')}>← Буцах</button><h1 role="status">{title}</h1></header>
     <div className="tracking-map"><OrderConnectionMap pickup={pickup} driver={driverPoint} /></div>
     <section className="tracking-details" aria-label="Сонгогдсон жолооч">
       {error && <p className="connection-warning" role="alert">{error}</p>}

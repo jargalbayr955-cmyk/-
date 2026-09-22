@@ -17,7 +17,19 @@ export async function POST(req:NextRequest){
  if(!order || (order.user_id && order.user_id!==user.id) || (!order.user_id && order.user_phone!==user.phone))return NextResponse.json({error:'Order not found'},{status:404})
  if(!order.user_id) await s.from('orders').update({user_id:user.id}).eq('id',order.id).is('user_id',null)
  const pickup=pickupPoint(order.from_lat,order.from_lng)
- if(order.status!=='pending')return NextResponse.json({pickup,order_status:order.status,selected_driver_id:order.driver_id||null,selected_driver_name:order.driver_name||null,final_price:order.final_price||null,slots:[],expired:false})
+ if(order.status!=='pending') {
+   let slots: unknown[]=[]
+   if(order.status==='confirmed' && order.driver_id) {
+     const [{data:driver,error:driverError},{data:offer,error:offerError}]=await Promise.all([
+       s.from('drivers').select('id,name,car_type,car_number,photo_url,lat,lng').eq('id',order.driver_id).maybeSingle(),
+       s.from('offers').select('id').eq('order_id',order.id).eq('driver_id',order.driver_id).eq('status','accepted').maybeSingle()
+     ])
+     if(driverError||offerError)return NextResponse.json({error:'Selected driver lookup failed'},{status:503})
+     const point=pickupPoint(driver?.lat,driver?.lng)
+     if(driver && offer)slots=[{invite_id:'selected',driver_id:driver.id,rank:1,driver_name:order.driver_name||driver.name,car_type:driver.car_type,car_number:driver.car_number,photo_url:driver.photo_url,lat:point?.lat??null,lng:point?.lng??null,distance_km:point&&pickup?Math.round(distanceKm(pickup.lat,pickup.lng,point.lat,point.lng)*10)/10:null,offer:{id:offer.id,price:Number(order.final_price)}}]
+   }
+   return NextResponse.json({pickup,order_status:order.status,selected_driver_id:order.driver_id||null,selected_driver_name:order.driver_name||null,final_price:order.final_price||null,slots,expired:false},{headers:{'Cache-Control':'no-store'}})
+ }
 
  const {data:refreshResult,error:refreshError}=await s.rpc('refresh_order_driver_slots',{p_order_id:order_id});
  if(refreshError)return NextResponse.json({error:'Driver refresh failed'},{status:500})

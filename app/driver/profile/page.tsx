@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { backInApp } from '@/lib/client/navigation'
 
 const D = {
   bg: '#060608',
@@ -67,7 +68,7 @@ export default function DriverProfilePage() {
   return (
     <div style={{minHeight:'100vh', background:D.bg, paddingBottom:'40px'}}>
       <div style={{padding:'14px 20px', background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', gap:'12px'}}>
-        <button onClick={() => router.push('/driver')} style={{background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'20px', padding:'7px 14px', color:D.muted, fontSize:'13px', cursor:'pointer', fontWeight:'600'}}>← Буцах</button>
+        <button onClick={() => backInApp(router, '/driver')} style={{background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'20px', padding:'7px 14px', color:D.muted, fontSize:'13px', cursor:'pointer', fontWeight:'600'}}>← Буцах</button>
         <p style={{color:D.text, fontWeight:'700', fontSize:'15px', margin:0}}>Профайл засах</p>
       </div>
 

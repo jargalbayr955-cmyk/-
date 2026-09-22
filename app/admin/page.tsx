@@ -1,5 +1,8 @@
 'use client'
 import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useScreenHistory } from '@/lib/client/use-screen-history'
+import { backInApp, readScreen } from '@/lib/client/navigation'
 import { AdminPasswordForm } from '../components/admin-password-form'
 import { createDotMarker, freeMapStyle, loadFreeMap, validCoords, ULAANBAATAR } from '@/lib/client/free-map'
 
@@ -90,18 +93,23 @@ function MapTab({ drivers }: { drivers: any[] }) {
 }
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<'drivers'|'active'|'history'|'map'>('drivers')
+  const router = useRouter()
+  const navigation = useScreenHistory('admin', 'drivers', (value): value is string => /^(drivers|active|history|map)(:password|:add)?$/.test(value))
+  const tab = navigation.screen.split(':')[0] as 'drivers'|'active'|'history'|'map'
+  const setTab = (value: typeof tab) => navigation.navigate(value)
+  const showForm = navigation.screen.endsWith(':add')
+  const showPasswordForm = navigation.screen.endsWith(':password')
+  const setShowForm = (show: boolean) => { if (show) navigation.navigate(`${tab}:add`); else if (readScreen('admin')?.value.endsWith(':add')) navigation.back() }
+  const setShowPasswordForm = (show: boolean) => { if (show) navigation.navigate(`${tab}:password`); else if (readScreen('admin')?.value.endsWith(':password')) navigation.back() }
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [activeOrders, setActiveOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({ phone: '' })
   const [adding, setAdding] = useState(false)
-  const [showForm, setShowForm] = useState(false)
   const [password, setPassword] = useState('')
   const [authed, setAuthed] = useState(false)
   const [mustChangePassword, setMustChangePassword] = useState(false)
-  const [showPasswordForm, setShowPasswordForm] = useState(false)
   const [loginError, setLoginError] = useState('')
   const [loginBusy, setLoginBusy] = useState(false)
   const [passwordMessage, setPasswordMessage] = useState('')
@@ -293,6 +301,7 @@ export default function AdminPage() {
     <div style={{minHeight:'100vh', background:D.bg, paddingBottom:'40px'}}>
       {dashboardError && <div role="alert" style={{padding:'16px', color:'#ff6b6b'}}>{dashboardError} <button onClick={fetchDashboard}>Дахин ачаалах</button></div>}
       {/* Header */}
+      <button type="button" className="offers-back" style={{margin:'12px 20px 0'}} onClick={() => { if (!navigation.back()) backInApp(router, '/start') }}>← Буцах</button>
       <div style={{padding:'16px 20px', background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap'}}>
         <div style={{display:'flex', alignItems:'center', gap:'10px', flex:1}}>
           <span style={{fontSize:'24px'}}>🚛</span>
@@ -304,7 +313,7 @@ export default function AdminPage() {
             + Жолооч нэмэх
           </button>
         )}
-        <button className="admin-account-action" onClick={() => { setShowPasswordForm(value => !value); setPasswordMessage('') }}>Нууц үг солих</button>
+        <button className="admin-account-action" onClick={() => { setShowPasswordForm(!showPasswordForm); setPasswordMessage('') }}>Нууц үг солих</button>
         <button className="admin-account-action" onClick={logout}>Гарах</button>
       </div>
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { backInApp } from '@/lib/client/navigation'
 import { createDotMarker, freeMapStyle, loadFreeMap, mapErrorMessage, ULAANBAATAR } from '@/lib/client/free-map'
 
 type Point = { lat:number; lng:number }
@@ -87,7 +88,7 @@ export default function ManualPage() {
   return <div style={{minHeight:'100vh',background:D.bg,color:'white'}}>
     <div style={{position:'relative',height:'48vh',minHeight:340}}>
       <div ref={mapRef} style={{position:'absolute',inset:0}}/>
-      <button onClick={()=>router.back()} style={{position:'absolute',top:14,left:14,zIndex:10,borderRadius:22,padding:'8px 14px',background:'rgba(8,10,16,.86)',border:'1px solid rgba(255,255,255,.12)',color:'white',fontWeight:700}}>← Буцах</button>
+      <button onClick={()=>backInApp(router, '/current')} style={{position:'absolute',top:14,left:14,zIndex:10,borderRadius:22,padding:'8px 14px',background:'rgba(8,10,16,.86)',border:'1px solid rgba(255,255,255,.12)',color:'white',fontWeight:700}}>← Буцах</button>
       <button onClick={useMyLocation} style={{position:'absolute',right:14,bottom:18,zIndex:10,borderRadius:22,padding:'10px 14px',background:'#e8433a',border:0,color:'white',fontWeight:800}}>◎ Миний байршил</button>
       <div style={{position:'absolute',left:'50%',top:14,transform:'translateX(-50%)',zIndex:10,background:'rgba(8,10,16,.86)',border:'1px solid rgba(255,255,255,.12)',borderRadius:20,padding:'7px 12px',fontSize:12,whiteSpace:'nowrap'}}>📍 Map дээр дарж эсвэл тэмдэглэгээг чирж ачих цэгээ сонгоно</div>
       {mapError&&<div style={{position:'absolute',left:14,right:14,top:64,zIndex:9,pointerEvents:'none',background:'rgba(8,10,16,.82)',padding:24,textAlign:'center'}}>{mapError}</div>}

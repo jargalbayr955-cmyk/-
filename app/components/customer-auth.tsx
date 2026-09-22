@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useRef, useState } from 'react'
+import { useScreenHistory } from '@/lib/client/use-screen-history'
 import { authenticateCustomer, AuthMode } from '@/lib/client/customer-auth'
 import { clearCustomerBrowserState, notifyCustomerSessionChanged, phoneInput } from '@/lib/client/session'
 import { SessionGate } from './session-gate'
@@ -11,7 +12,8 @@ export function CustomerAuth({ initialMode = 'login' }: { initialMode?: AuthMode
 }
 
 function AuthForm({ initialMode }: { initialMode: AuthMode }) {
-  const [mode, setMode] = useState(initialMode)
+  const navigation = useScreenHistory('customer-auth', initialMode, (value): value is AuthMode => value === 'login' || value === 'register')
+  const mode = navigation.screen
   const [phone, setPhone] = useState('')
   const [pin, setPin] = useState('')
   const [confirmPin, setConfirmPin] = useState('')
@@ -35,9 +37,13 @@ function AuthForm({ initialMode }: { initialMode: AuthMode }) {
     } catch {}
   }, [])
 
+  useEffect(() => {
+    setPin(''); setConfirmPin(''); setShowPin(false); setError(''); setCanLogin(false)
+  }, [mode])
+
   const switchMode = (next: AuthMode) => {
     if (pending.current) return
-    setMode(next)
+    navigation.navigate(next)
     setPin('')
     setConfirmPin('')
     setShowPin(false)
