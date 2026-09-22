@@ -179,18 +179,18 @@ function destination(customerStatus, driverStatus = 401, offline = false) {
     assert.equal(options.cache, 'no-store')
     assert.equal(options.credentials, 'same-origin')
     if (offline) throw new Error('offline')
-    return new Response(null, { status: url.includes('/driver/') ? driverStatus : customerStatus })
+    return Response.json({ user: { id: 'customer-a', phone: '+97600006601' } }, { status: url.includes('/driver/') ? driverStatus : customerStatus })
   } })
-  return exports.sessionDestination
+  return async mode => (await exports.readSession(mode)).destination
 }
 
 test('returning customer skips both authentication forms and entry; new device sees the forms', async () => {
   assert.equal(await destination(200)('entry'), '/home')
   assert.equal(await destination(200)('guest'), '/home')
   assert.equal(await destination(200)('customer'), null)
-  assert.equal(await destination(401)('entry'), '/register')
+  assert.equal(await destination(401)('entry'), '/start')
   assert.equal(await destination(401)('guest'), null)
-  assert.equal(await destination(401)('customer'), '/login')
+  assert.equal(await destination(401)('customer'), '/start')
   assert.equal(await destination(401, 200)('entry'), '/driver')
 })
 
