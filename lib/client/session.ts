@@ -13,7 +13,7 @@ export async function readSession(mode: SessionGateMode, signal?: AbortSignal): 
   if (customer.ok) {
     const { user } = await customer.json()
     if (typeof user?.id !== 'string' || !user.id || !/^\+976\d{8}$/.test(user?.phone)) throw new Error('Invalid session response')
-    return { destination: mode === 'customer' ? null : '/home', user: { id: user.id, phone: user.phone } }
+    return { destination: mode === 'customer' ? null : '/current', user: { id: user.id, phone: user.phone } }
   }
   if (customer.status !== 401 || (driver && driver.status !== 401)) throw new Error('Session service unavailable')
   return { destination: mode === 'guest' ? null : '/start', user: null }

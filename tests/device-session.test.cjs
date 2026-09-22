@@ -184,9 +184,9 @@ function destination(customerStatus, driverStatus = 401, offline = false) {
   return async mode => (await exports.readSession(mode)).destination
 }
 
-test('returning customer skips both authentication forms and entry; new device sees the forms', async () => {
-  assert.equal(await destination(200)('entry'), '/home')
-  assert.equal(await destination(200)('guest'), '/home')
+test('returning customer opens the pickup map directly; new device sees the forms', async () => {
+  assert.equal(await destination(200)('entry'), '/current')
+  assert.equal(await destination(200)('guest'), '/current')
   assert.equal(await destination(200)('customer'), null)
   assert.equal(await destination(401)('entry'), '/start')
   assert.equal(await destination(401)('guest'), null)

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createDotMarker, freeMapStyle, loadFreeMap, mapErrorMessage, ULAANBAATAR } from '@/lib/client/free-map'
+import { AdminAccess, BrandAccess } from '../components/access-shortcuts'
+import { CustomerAccount } from '../components/customer-account'
 
 type LocationPoint = { lat: number; lng: number }
 type FieldErrors = { dest?: boolean; carType?: boolean; carMark?: boolean }
@@ -17,6 +19,8 @@ export default function CurrentPage() {
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<any>(null)
   const markerRef = useRef<any>(null)
+  const latestLocation = useRef<LocationPoint | null>(null)
+  const gpsRequest = useRef(0)
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const [location, setLocation] = useState<LocationPoint | null>(null)
@@ -31,6 +35,8 @@ export default function CurrentPage() {
   const [submitting, setSubmitting] = useState(false)
 
   const setMarker = useCallback((lat: number, lng: number, fly = false) => {
+    latestLocation.current = { lat, lng }
+    setLocation({ lat, lng })
     const map = mapInstanceRef.current
     const ml = window.maplibregl
     if (!map || !ml) return
@@ -41,13 +47,16 @@ export default function CurrentPage() {
         .addTo(map)
       markerRef.current.on('dragend', () => {
         const pos = markerRef.current.getLngLat()
+        gpsRequest.current += 1
+        setLocating(false)
+        setGpsError(false)
+        latestLocation.current = { lat: pos.lat, lng: pos.lng }
         setLocation({ lat: pos.lat, lng: pos.lng })
       })
     } else {
       markerRef.current.setLngLat([lng, lat])
     }
 
-    setLocation({ lat, lng })
     if (fly) map.easeTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 15), duration: 600 })
   }, [])
 
@@ -65,19 +74,25 @@ export default function CurrentPage() {
       })
       map.addControl(new ml.NavigationControl({ showCompass: false }), 'top-right')
       map.on('click', (e: any) => {
+        // A late GPS response must never replace a pickup chosen on the map.
+        gpsRequest.current += 1
+        setLocating(false)
         setMarker(e.lngLat.lat, e.lngLat.lng)
         setGpsError(false)
       })
       map.on('error', () => setMapError('Газрын зураг ачаалахад түр алдаа гарлаа'))
       map.on('idle', () => setMapError(''))
       mapInstanceRef.current = map
+      if (latestLocation.current) setMarker(latestLocation.current.lat, latestLocation.current.lng, true)
     } catch (error) {
+      if (!isMounted()) return
       console.error('Map initialization failed', error)
       setMapError(mapErrorMessage(error))
     }
   }, [setMarker])
 
   const requestLocation = useCallback(() => {
+    const request = ++gpsRequest.current
     if (!navigator.geolocation) {
       setGpsError(true)
       setLocating(false)
@@ -86,11 +101,13 @@ export default function CurrentPage() {
     setLocating(true)
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        if (request !== gpsRequest.current) return
         setGpsError(false)
         setLocating(false)
         setMarker(pos.coords.latitude, pos.coords.longitude, true)
       },
       () => {
+        if (request !== gpsRequest.current) return
         setGpsError(true)
         setLocating(false)
       },
@@ -100,12 +117,11 @@ export default function CurrentPage() {
 
   useEffect(() => {
     let mounted = true
-    ;(async () => {
-      await initMap(() => mounted)
-      if (mounted) requestLocation()
-    })()
+    void initMap(() => mounted)
+    requestLocation()
     return () => {
       mounted = false
+      gpsRequest.current += 1
       markerRef.current?.remove?.()
       markerRef.current = null
       mapInstanceRef.current?.remove?.()
@@ -177,21 +193,28 @@ export default function CurrentPage() {
       <div ref={mapRef} className="current-map-canvas" aria-label="Ачих байршлын газрын зураг" />
       <div className="current-map-vignette" />
 
+      <header className="current-map-header">
+        <div className="current-brand-row">
+          <div className="brand-wrap"><BrandAccess /><div className="brand-name">Ачилт</div></div>
+          <AdminAccess />
+        </div>
+        <CustomerAccount />
+        <div className="current-map-instructions">
+          <h1>Ачуулах байршлаа газрын зураг дээр сонгоно уу.</h1>
+          <p>Хамгийн ойр байгаа машинуудыг санал болгоно.</p>
+        </div>
+      </header>
+
       {mapError && <div className="current-map-error">{mapError}</div>}
 
       {!location && (
-        <div className="current-location-state" role="status">
-          <div className="current-location-state-card">
-            <span className="current-location-pulse" />
+        <div className="current-location-status" role="status">
             <strong>{locating ? 'Таны байршлыг тогтоож байна' : 'Газрын зураг дээр ачих цэгээ сонгоно уу'}</strong>
-            <span>{locating ? 'Хэдхэн секунд хүлээнэ үү' : 'Map дээр дарж цэг тавина. GPS зөвшөөрвөл байршил автоматаар гарна.'}</span>
-            {!locating && <button type="button" onClick={requestLocation}>GPS дахин оролдох</button>}
-          </div>
+            <span>{locating ? 'Байршлын зөвшөөрөл асуувал зөвшөөрнө үү. Эсвэл газрын зураг дээр дарж цэгээ сонгоорой.' : 'GPS байршил олдсонгүй. Газрын зураг дээр дарж эсвэл байршлын товчоор дахин оролдоно уу.'}</span>
         </div>
       )}
 
-      <button className="current-back-btn" type="button" onClick={() => router.back()} aria-label="Буцах">← Буцах</button>
-      <button className="current-recenter-btn" type="button" onClick={requestLocation} aria-label="Миний байршил руу очих">
+      <button className="current-recenter-btn" type="button" onClick={requestLocation} aria-label="Миний байршил руу очих" aria-busy={locating}>
         <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
           <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
         </svg>
@@ -208,7 +231,7 @@ export default function CurrentPage() {
         <div className="current-cta-wrap">
           <button className="current-search-banner" type="button" onClick={() => setSheetOpen(true)}>
             <span className="current-search-banner-icon">🚛</span>
-            <span className="current-search-banner-copy"><strong>Жолооч хайх</strong><small>Хүрэх газар, машины мэдээллээ оруулна</small></span>
+            <span className="current-search-banner-copy"><strong>Жолооч хайх</strong><small>Хамгийн ойр байгаа машинуудыг санал болгоно</small></span>
             <span className="current-search-banner-arrow">→</span>
           </button>
         </div>
@@ -216,7 +239,7 @@ export default function CurrentPage() {
 
       {sheetOpen && <button className="current-sheet-backdrop" aria-label="Хаах" onClick={() => setSheetOpen(false)} />}
 
-      <section className={`current-order-sheet ${sheetOpen ? 'is-open' : ''}`} aria-hidden={!sheetOpen}>
+      <section className={`current-order-sheet ${sheetOpen ? 'is-open' : ''}`} aria-hidden={!sheetOpen} inert={!sheetOpen}>
         <div className="current-sheet-handle" />
         <div className="current-sheet-head">
           <div><span className="current-sheet-kicker">АЧИЛТЫН ЗАХИАЛГА</span><h1>Жолооч хайх</h1></div>
@@ -228,7 +251,7 @@ export default function CurrentPage() {
             <div className="current-field-label"><span className="blue-dot"/>АЧИХ ЦЭГ</div>
             <strong>{address}</strong>
             <input value={extraAddress} onChange={(e) => setExtraAddress(e.target.value)} placeholder="Ойролцоох байр, орц, тайлбар (заавал биш)" />
-            {gpsError && <p className="current-map-note">GPS зөвшөөрөөгүй бол map дээр дарж ачих цэгээ сонгоно уу.</p>}
+            {gpsError && <p className="current-map-note">GPS зөвшөөрөөгүй бол газрын зураг дээр дарж ачих цэгээ сонгоно уу.</p>}
           </div>
 
           <div id="field-dest" className={`current-input-card ${errors.dest ? 'has-error' : ''}`}>
