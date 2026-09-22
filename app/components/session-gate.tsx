@@ -3,6 +3,7 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CUSTOMER_SESSION_EVENT, CUSTOMER_SESSION_STORAGE_KEY, CustomerIdentity, readSession, SessionGateMode } from '@/lib/client/session'
+import { DriverAppLink } from './driver-app-link'
 
 const CustomerContext = createContext<CustomerIdentity | null>(null)
 export function useCustomerIdentity() {
@@ -72,6 +73,7 @@ export function SessionGate({ mode, children }: { mode: SessionGateMode; childre
     <div className="session-status">
       <p role={state === 'error' ? 'alert' : 'status'}>{state === 'error' ? 'Нэвтрэлтийг шалгаж чадсангүй. Интернэт холболтоо шалгаад дахин оролдоно уу.' : 'Нэвтрэлтийг шалгаж байна...'}</p>
       {state === 'error' && <button className="auth-submit" onClick={() => setAttempt(value => value + 1)}>Дахин оролдох</button>}
+      <DriverAppLink />
     </div>
   </main>
 }

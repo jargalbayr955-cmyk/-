@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { SessionGate } from '../components/session-gate'
 import { CustomerAccount } from '../components/customer-account'
+import { DriverAppLink } from '../components/driver-app-link'
 
 export default function HomePage() {
   return <SessionGate mode="customer"><HomeContent /></SessionGate>
@@ -108,7 +109,7 @@ function HomeContent() {
           <span>🚛</span>
           <div><strong>Тавцан · Чирэгч · Аварийн тусламж</strong><small>Үнэ ирсний дараа жолоочоо өөрөө сонгоно.</small></div>
         </div>
-
+        <DriverAppLink />
       </section>
     </main>
   )

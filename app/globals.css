@@ -76,6 +76,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .helper-card strong { font-size:12px; }
 .helper-card small { color:var(--muted); margin-top:3px; font-size:11px; }
 
+.driver-app-link { display:flex; align-items:center; gap:12px; min-height:76px; margin:18px 0 22px; padding:14px; border:1px solid rgba(77,141,255,.35); border-radius:16px; background:rgba(77,141,255,.08); color:var(--text); text-align:left; text-decoration:none; }
+.driver-app-link:hover { background:rgba(77,141,255,.15); }
+.driver-app-link:focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
+.driver-app-link-icon { flex:0 0 36px; height:36px; display:grid; place-items:center; border-radius:10px; background:rgba(77,141,255,.16); color:#9dc1ff; font-size:24px; }
+.driver-app-link-copy { flex:1; min-width:0; }
+.driver-app-link-copy strong, .driver-app-link-copy small { display:block; }
+.driver-app-link-copy strong { font-size:14px; line-height:1.4; }
+.driver-app-link-copy small { margin-top:4px; color:#aeb8c5; font-size:11px; line-height:1.5; }
+
 @media (min-width: 681px) { .app-shell { box-shadow:0 0 0 1px rgba(255,255,255,.05), var(--shadow); } }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration:.01ms!important; transition-duration:.01ms!important; } }
 @keyframes heroIn { from{opacity:.55;transform:scale(1.1)} to{opacity:1;transform:scale(1.04)} }
