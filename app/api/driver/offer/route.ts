@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Үнийн санал буруу байна' }, { status: 400 })
   }
   if (!driver.available) return NextResponse.json({ error: 'Жолооч идэвхгүй байна' }, { status: 403 })
+  if (!['butten', 'chiregch'].includes(driver.car_type || '')) return NextResponse.json({ error: 'Профайл хэсэгт машины төрлөө сонгоно уу' }, { status: 409 })
 
   const { data, error } = await getSupabaseAdmin().rpc('submit_driver_offer_atomic', {
     p_order_id: orderId,

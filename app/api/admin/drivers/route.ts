@@ -31,8 +31,7 @@ export async function POST(req:NextRequest){
    const {error}=await s.rpc('confirm_payment_atomic',{p_payment_id:payment.id})
    if(error)return NextResponse.json({error:'Payment release failed'},{status:500})
   } else {
-   const {error}=await s.from('drivers').update({available:true}).eq('id',o.driver_id).eq('active',true).is('deleted_at',null)
-   if(error)return NextResponse.json({error:'Driver release failed'},{status:500})
+   return NextResponse.json({error:'Хүлээгдэж буй төлбөр олдсонгүй. Жолоочийн төлөв өөрчлөгдөөгүй.'},{status:409})
   }
   return NextResponse.json({success:true})
  }

@@ -8,5 +8,5 @@ export async function GET(req: NextRequest) {
   const { data, error } = await getSupabaseAdmin().from('settings').select('key,value').in('key', ['bank_name', 'bank_account'])
   if (error) return NextResponse.json({ error: 'Settings unavailable' }, { status: 500 })
   const settings = Object.fromEntries((data || []).map(x => [x.key, x.value]))
-  return NextResponse.json({ bank_name: settings.bank_name || '', bank_account: settings.bank_account || '' }, { headers: { 'Cache-Control': 'no-store' } })
+  return NextResponse.json({ bank_name: settings.bank_name || '', bank_account: settings.bank_account || '', automatic_confirmation: Boolean(process.env.PAYMENT_WEBHOOK_SECRET) }, { headers: { 'Cache-Control': 'no-store' } })
 }

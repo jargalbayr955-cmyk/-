@@ -14,6 +14,9 @@ export async function POST(req: NextRequest) {
   if (typeof available !== 'boolean') return NextResponse.json({ error: 'Invalid value' }, { status: 400 })
 
   if (available) {
+    if (!['butten', 'chiregch'].includes(driver.car_type || '')) {
+      return NextResponse.json({ error: 'Профайл хэсэгт машины төрлөө сонгоно уу' }, { status: 409 })
+    }
     try {
       if (await driverHasBlockingWork(driver.id)) {
         return NextResponse.json({ error: 'Идэвхтэй ажил эсвэл төлбөр хүлээгдэж байгаа үед онлайн болох боломжгүй' }, { status: 409 })

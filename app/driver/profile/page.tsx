@@ -46,6 +46,7 @@ export default function DriverProfilePage() {
     setSaving(true)
     setError('')
 
+    try {
     const res = await fetch('/api/driver/profile', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name:form.name, car_type:form.car_type, car_number:form.car_number, photo_url:form.photo_url, new_pin:form.new_pin || undefined }) })
     const body = await res.json().catch(()=>({}))
     if (!res.ok || !body.driver) {
@@ -57,7 +58,8 @@ export default function DriverProfilePage() {
       setForm(f => ({ ...f, pin: '', new_pin: '', confirm_pin: '' }))
       setTimeout(() => setSaved(false), 2000)
     }
-    setSaving(false)
+    } catch { setError('Сүлжээний алдаа. Дахин оролдоно уу.') }
+    finally { setSaving(false) }
   }
 
   if (!driver) return <div style={{minHeight:'100vh', background:D.bg}}/>
@@ -140,7 +142,7 @@ export default function DriverProfilePage() {
         {/* PIN солих */}
         <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'14px', marginBottom:'20px'}}>
           <p style={{color:D.muted, fontSize:'11px', fontWeight:'700', letterSpacing:'1px', margin:'0 0 12px'}}>PIN КОД СОЛИХ</p>
-          <input type="password" placeholder="Шинэ PIN (4 оронтой)" maxLength={6} value={form.new_pin}
+          <input type="password" placeholder="Шинэ PIN (6 оронтой)" inputMode="numeric" maxLength={6} value={form.new_pin}
             onChange={e => setForm({...form, new_pin: e.target.value})}
             style={{...D.input, marginBottom:'8px'}}/>
           <input type="password" placeholder="PIN дахин оруулах" maxLength={6} value={form.confirm_pin}

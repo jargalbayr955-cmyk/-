@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
   const supabase = getSupabaseAdmin()
   const now = new Date().toISOString()
-  const [{ data: invites, error: inviteError }, { data: acceptedOrder, error: acceptedError }] = await Promise.all([
+  const [{ data: invites, error: inviteError }, { data: acceptedOrder, error: acceptedError }, { data: pendingPayment, error: paymentError }] = await Promise.all([
     supabase
       .from('driver_invites')
       .select('order_id,status,expires_at,rank')
@@ -29,13 +29,17 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase.from('payment_codes').select('code,amount,order_id')
+      .eq('driver_id', driver.id).eq('used', false)
+      .order('id', { ascending: false }).limit(1).maybeSingle(),
   ])
 
-  if (inviteError || acceptedError) return NextResponse.json({ error: 'Захиалга татахад алдаа гарлаа' }, { status: 500 })
+  if (inviteError || acceptedError || paymentError) return NextResponse.json({ error: 'Захиалга татахад алдаа гарлаа' }, { status: 500 })
+  const workState = { acceptedOrder: acceptedOrder || null, pendingPayment: pendingPayment ? { ...pendingPayment, amount: Number(pendingPayment.amount) } : null, available: driver.available, active: true }
 
   const liveInvites = invites || []
   if (!liveInvites.length) {
-    return NextResponse.json({ orders: [], acceptedOrder: acceptedOrder || null, available: driver.available, active: true })
+    return NextResponse.json({ orders: [], ...workState })
   }
 
   const orderIds = [...new Set(liveInvites.map(i => i.order_id))]
@@ -49,5 +53,5 @@ export async function GET(req: NextRequest) {
 
   if (ordersError) return NextResponse.json({ error: 'Захиалга татахад алдаа гарлаа' }, { status: 500 })
   const visibleOrders = (orders || []).map(order => ({ ...order, has_offered: inviteStatusByOrder.get(order.id) === 'offered' }))
-  return NextResponse.json({ orders: visibleOrders, acceptedOrder: acceptedOrder || null, available: driver.available, active: true })
+  return NextResponse.json({ orders: visibleOrders, ...workState })
 }

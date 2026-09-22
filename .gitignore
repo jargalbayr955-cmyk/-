@@ -40,3 +40,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Supabase CLI cache
+/supabase/.temp/
+
+# Private operational audit artifacts
+/LAUNCH_AUDIT.md
+/audit/

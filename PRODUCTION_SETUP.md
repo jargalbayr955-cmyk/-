@@ -91,3 +91,31 @@ Run `npm ci`, `npm run lint`, `npx tsc --noEmit`, and `npm run build` with the V
 The connected `achilt` database already has `20260920175500_v5_5_pin_auth` and `20260920175800_v5_5_db_hardening` applied. The included PIN migration is a source copy; do not reapply it as a new migration to that project.
 
 Promote only after reviewing the Preview verification results. Device GPS, push delivery, sound/vibration and bank webhook delivery still need their actual devices/providers.
+
+## 9) Payment webhook contract (launch-audit branch; deploy with the sender)
+
+Automatic confirmation is disabled when `PAYMENT_WEBHOOK_SECRET` is absent. Until the bank adapter is configured and verified, the driver UI directs the driver to the administrator for confirmation after the administrator checks the bank receipt.
+
+The trusted bank adapter must validate an actual incoming transfer to the configured receiving account before calling `POST /api/payment/verify`. Send the secret only in `x-webhook-secret`, and use `Content-Type: application/json`:
+
+```json
+{
+  "code": "123456",
+  "amount": 12500,
+  "currency": "MNT",
+  "direction": "credit"
+}
+```
+
+This is an example, not a real payment. `code` is the exact six-digit payment reference. `amount` is a positive integer in MNT and must equal the amount stored for that payment. An already confirmed code returns success without releasing the driver again. Do not send a balance, outgoing transfer, guessed amount or unverified user message. The endpoint deliberately rejects the old raw `sms`/`message`/`text` payload: there is no verified bank SMS format available in this repository. Update and test any MacroDroid/bank adapter before enabling this endpoint. Never place the webhook secret in a browser or a `NEXT_PUBLIC_*` variable.
+
+The HTTP completion guard prevents retries of already completed trips from generating another payment. Apply the accompanying payment-locking migration before deploying this branch. It serializes completion and confirmation and guards online availability. Run `tests/payment-database.sql` through an authorized database connection; fixtures roll back.
+
+## 10) Driver devices and notification support
+
+The launch-audit branch restores pending payment from the server, maintains fresh foreground GPS on stationary devices, and requires a vehicle type before a driver goes online. Drivers should keep the page open while accepting work. Background GPS is subject to the mobile browser/OS and is not guaranteed.
+
+Push subscriptions accept HTTPS endpoints for FCM, Mozilla, Apple and Windows push services only. New providers require an explicit allow-list review in `lib/server/push-subscription.ts`. A successful provider response is not proof that an actual phone displayed or sounded the notification. Failed deliveries remain unmarked, but a durable automatic retry queue is not implemented; the existing authenticated push-send endpoint can retry while the invitation is active, and foreground order polling remains a fallback.
+
+Regression tests: `node --test tests/*.test.cjs`. These isolate database/push I/O; they do not replace live PostgreSQL transactions or actual bank/device testing.
+

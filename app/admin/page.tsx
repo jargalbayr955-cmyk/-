@@ -107,6 +107,7 @@ export default function AdminPage() {
   const [heroSaved, setHeroSaved] = useState(false)
   const [bankSaved, setBankSaved] = useState(false)
   const [nowMs, setNowMs] = useState(0)
+  const [dashboardError, setDashboardError] = useState('')
 
   useEffect(() => {
     setMounted(true)
@@ -119,16 +120,20 @@ export default function AdminPage() {
   }, [])
 
   const fetchDashboard = async () => {
+    try {
     const res = await fetch('/api/admin/dashboard', { cache:'no-store' })
-    if (!res.ok) { setLoading(false); return }
+    if (res.status === 401) { setAuthed(false); return }
+    if (!res.ok) { setDashboardError('Мэдээлэл шинэчлэгдээгүй байна. Дахин оролдоно уу.'); return }
     const body = await res.json()
+    setDashboardError('')
     setDrivers(body.drivers || [])
     setActiveOrders(body.activeOrders || [])
     setOrders(body.orders || [])
     setHeroUrl(body.heroUrl || '')
     setBankName(body.bankName || '')
     setBankAccount(body.bankAccount || '')
-    setLoading(false)
+    } catch { setDashboardError('Сүлжээ тасарсан байна. Мэдээлэл шинэчлэгдээгүй.') }
+    finally { setLoading(false) }
   }
   const fetchDrivers = fetchDashboard
   const fetchActiveOrders = fetchDashboard
@@ -249,6 +254,7 @@ export default function AdminPage() {
 
   return (
     <div style={{minHeight:'100vh', background:D.bg, paddingBottom:'40px'}}>
+      {dashboardError && <div role="alert" style={{padding:'16px', color:'#ff6b6b'}}>{dashboardError} <button onClick={fetchDashboard}>Дахин ачаалах</button></div>}
       {/* Header */}
       <div style={{padding:'16px 20px', background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', gap:'12px'}}>
         <div style={{display:'flex', alignItems:'center', gap:'10px', flex:1}}>

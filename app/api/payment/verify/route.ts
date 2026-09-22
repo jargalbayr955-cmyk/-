@@ -8,16 +8,21 @@ export async function POST(req: NextRequest) {
   if (!secret || !provided || !safeEqual(secret, provided)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await allowRequest(`payment-webhook:${getClientIp(req)}`, 120, 60_000))) return NextResponse.json({ error: 'Rate limited' }, { status: 429 })
 
-  const body = await req.json().catch(() => ({}))
-  const smsText = String(body.sms || body.message || body.text || '')
-  const utga = smsText.match(/[Uu]tga[:\s]*(\d{6})/)
-  const plain = smsText.match(/\b(\d{6})\b/)
-  const code = (utga || plain)?.[1]
-  if (!code) return NextResponse.json({ error: 'Code not found' }, { status: 400 })
+  // The trusted bank adapter must send a verified incoming transaction. Raw SMS
+  // is ambiguous (balance, account digits and outgoing transfers are not proof).
+  const body = await req.json().catch(() => null)
+  if (!body || typeof body.code !== 'string' || !/^\d{6}$/.test(body.code)
+    || typeof body.amount !== 'number' || !Number.isSafeInteger(body.amount) || body.amount <= 0
+    || body.currency !== 'MNT' || body.direction !== 'credit') {
+    return NextResponse.json({ error: 'Expected code, positive integer amount, currency MNT and direction credit' }, { status: 400 })
+  }
 
   const supabase = getSupabaseAdmin()
-  const { data: payment } = await supabase.from('payment_codes').select('id,driver_id,amount,used').eq('code', code).eq('used', false).maybeSingle()
-  if (!payment) return NextResponse.json({ error: 'Invalid or used code' }, { status: 404 })
+  const { data: payment, error: lookupError } = await supabase.from('payment_codes').select('id,driver_id,amount,used').eq('code', body.code).maybeSingle()
+  if (lookupError) return NextResponse.json({ error: 'Payment lookup unavailable' }, { status: 503 })
+  if (!payment) return NextResponse.json({ error: 'Invalid code' }, { status: 404 })
+  if (Number(payment.amount) !== body.amount) return NextResponse.json({ error: 'Payment amount mismatch' }, { status: 409 })
+  if (payment.used) return NextResponse.json({ success: true, already_confirmed: true })
 
   const { error } = await supabase.rpc('confirm_payment_atomic', { p_payment_id: payment.id })
   if (error) return NextResponse.json({ error: error.message }, { status: 409 })

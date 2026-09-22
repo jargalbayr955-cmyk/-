@@ -13,6 +13,9 @@ export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => ({}))
   const name = String(b.name || '').trim().slice(0, 100)
   const carType = String(b.car_type || '')
+  if (b.new_pin && !/^\d{6}$/.test(String(b.new_pin))) {
+    return NextResponse.json({ error: 'PIN 6 оронтой байна' }, { status: 400 })
+  }
   if (!name || !['butten', 'chiregch'].includes(carType)) {
     return NextResponse.json({ error: 'Мэдээлэл буруу байна' }, { status: 400 })
   }
@@ -38,9 +41,6 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: 'Хадгалахад алдаа гарлаа' }, { status: 500 })
 
   if (b.new_pin) {
-    if (!/^\d{6}$/.test(String(b.new_pin))) {
-      return NextResponse.json({ error: 'PIN 6 оронтой байна' }, { status: 400 })
-    }
     const { error: pinError } = await s.rpc('set_driver_pin_secure', { p_driver_id: driver.id, p_pin: String(b.new_pin) })
     if (pinError) return NextResponse.json({ error: 'PIN солиход алдаа гарлаа' }, { status: 500 })
   }

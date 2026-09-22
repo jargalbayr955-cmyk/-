@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   const { lat, lng, available } = await req.json().catch(() => ({}))
   const latitude = Number(lat)
   const longitude = Number(lng)
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+  if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
     return NextResponse.json({ error: 'Invalid coordinates' }, { status: 400 })
   }
 
@@ -24,6 +24,9 @@ export async function POST(req: NextRequest) {
   }
 
   if (available === true) {
+    if (!['butten', 'chiregch'].includes(driver.car_type || '')) {
+      return NextResponse.json({ error: 'Профайл хэсэгт машины төрлөө сонгоно уу' }, { status: 409 })
+    }
     try {
       if (!(await driverHasBlockingWork(driver.id))) update.available = true
     } catch {
@@ -41,5 +44,5 @@ export async function POST(req: NextRequest) {
     .is('deleted_at', null)
 
   if (error) return NextResponse.json({ error: 'Location update failed' }, { status: 500 })
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, available: update.available ?? driver.available })
 }

@@ -1,12 +1,13 @@
 self.addEventListener('push', function(event) {
-  const data = event.data ? event.data.json() : {}
+  let data = {}
+  try { data = event.data ? event.data.json() : {} } catch { /* Still show a notification for a malformed payload. */ }
+  if (!data || typeof data !== 'object') data = {}
   const title = data.title || 'Ачилт'
   const options = {
     body: data.body || 'Шинэ захиалга ирлээ!',
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-32x32.png',
     vibrate: [300, 100, 300, 100, 300, 100, 500],
-    sound: '/horn.mp3',
     data: { url: data.url || '/driver' },
     actions: [
       { action: 'open', title: 'Нээх' },

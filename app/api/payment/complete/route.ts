@@ -25,6 +25,15 @@ export async function POST(req: NextRequest) {
   }
 
   const amount = Number(order.final_price)
+  // A completed and paid trip must never create a new debt on a retry.
+  if (order.status === 'completed') {
+    const { data: payment, error: paymentError } = await s.from('payment_codes')
+      .select('code,amount,used').eq('order_id', order.id).eq('driver_id', driver.id)
+      .order('id', { ascending: false }).limit(1).maybeSingle()
+    if (paymentError) return NextResponse.json({ error: 'Payment lookup unavailable' }, { status: 503 })
+    if (!payment) return NextResponse.json({ error: 'Төлбөрийн мэдээлэл олдсонгүй. Админтай холбогдоно уу.' }, { status: 409 })
+    return NextResponse.json({ success: true, code: payment.code, amount: Number(payment.amount), paid: payment.used })
+  }
   const duration = Math.max(0, Math.round((Date.now() - new Date(order.created_at).getTime()) / 60000))
   const { data, error } = await s.rpc('complete_order_and_issue_payment', {
     p_order_id: order.id,
