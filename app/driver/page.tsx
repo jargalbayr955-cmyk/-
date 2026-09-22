@@ -1,4 +1,5 @@
 'use client'
+import { OrderVideoCall } from '../components/order-video-call'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { OrderConnectionMap } from '../components/order-connection-map'
@@ -376,6 +377,7 @@ export default function DriverPage() {
     const fresh = !locMsg && !error && position && locationIsFresh(driver.location_updated_at)
     return (
       <div style={{minHeight:'100vh', background:D.bg, display:'flex', flexDirection:'column'}}>
+        {acceptedOrder && !paymentInfo && <OrderVideoCall key={safeOrder.id} orderId={safeOrder.id} role="driver" phone={safeOrder.user_phone} />}
         <div style={{padding:'14px 20px', background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
           <div>
             <p style={{color:D.text, fontWeight:'700', fontSize:'15px', margin:0}}>{driver.name}</p>

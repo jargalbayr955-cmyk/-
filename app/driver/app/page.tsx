@@ -13,8 +13,9 @@ export default function DriverAppDownload() {
       <h1 style={{fontSize:32}}>Ачилт Жолооч</h1>
       <p style={{lineHeight:1.7, color:'#c4c4cc'}}>Ажиллаж байх үед дэлгэц түгжээтэй ч байршлаа илгээж, захиалгын мэдэгдэл авах зориулалттай апп.</p>
       <p style={{lineHeight:1.7, color:'#c4c4cc'}}>Татахад бүртгэл, нэвтрэлт шаардахгүй. Аппыг ашиглахдаа админы бүртгэсэн жолоочийн утас, PIN-ээр нэвтэрнэ.</p>
-      <a href="/downloads/AchiltDriver-5.5.1-preview.apk" download style={{display:'block', textAlign:'center', background:'#e8433a', color:'white', padding:18, borderRadius:14, textDecoration:'none', fontWeight:700, margin:'24px 0'}}>Android апп татах · APK</a>
+      <a href="/downloads/AchiltDriver-5.5.2-preview.apk" download style={{display:'block', textAlign:'center', background:'#e8433a', color:'white', padding:18, borderRadius:14, textDecoration:'none', fontWeight:700, margin:'24px 0'}}>Android апп татах · 5.5.2 · APK</a>
       <p style={{color:'#aaa', fontSize:14}}>Android 8 болон түүнээс дээш. iPhone-д суухгүй.</p>
+      <p style={{lineHeight:1.7, color:'#c4c4cc'}}>Видео дуудлагын камер, микрофоны зөвшөөрөл энэ хувилбарт нэмэгдсэн. Зөвхөн дуудлага хийх, авах үед асууна. Хоёр тал холбогдсон захиалгын хуудсаа нээлттэй байлгана; видео үйлчилгээ идэвхжсэн үед ашиглана.</p>
       <ol style={{paddingLeft:24, lineHeight:1.9}}>
         <li>Татсан APK файлаа нээж суулгана. Энэ файлаас суулгах зөвшөөрөл асуувал зөвшөөрнө.</li>
         <li>Админы бүртгэсэн утас, PIN-ээр нэвтэрнэ.</li>

@@ -25,6 +25,7 @@ public final class MainActivity extends Activity {
     private TextView status;
     private Button work;
     private boolean changing, visible;
+    private PermissionRequest mediaRequest;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService network = Executors.newSingleThreadExecutor();
     private final Runnable refresh = new Runnable() {
@@ -71,18 +72,25 @@ public final class MainActivity extends Activity {
         settings.setAllowFileAccess(false); settings.setAllowContentAccess(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setGeolocationEnabled(false);
-        settings.setUserAgentString(settings.getUserAgentString() + " AchiltDriverAndroid/1");
+        settings.setUserAgentString(settings.getUserAgentString() + " AchiltDriverAndroid/2");
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, false);
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
         // No JavascriptInterface, message bridge, arbitrary URL intent or certificate bypass.
         web.setWebChromeClient(new WebChromeClient() {
+            @Override public void onPermissionRequest(PermissionRequest request) {
+                runOnUiThread(() -> requestMedia(request));
+            }
+            @Override public void onPermissionRequestCanceled(PermissionRequest request) {
+                if (mediaRequest == request) mediaRequest = null;
+            }
             @Override public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
                 new AlertDialog.Builder(MainActivity.this).setMessage(message).setPositiveButton("За", (d,w) -> result.confirm()).setOnCancelListener(d -> result.cancel()).show();
                 return true;
             }
         });
         web.setWebViewClient(new WebViewClient() {
+            @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap icon) { denyMedia(); }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (!request.isForMainFrame()) return !WorkPolicy.trusted(DriverApi.ORIGIN, request.getUrl().toString());
                 Uri url = request.getUrl();
@@ -106,6 +114,37 @@ public final class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= 33)
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::navigateBack);
     }
+
+    private boolean trustedMedia(PermissionRequest request) {
+        if (!WorkPolicy.trusted(DriverApi.ORIGIN, request.getOrigin().toString()) ||
+            web.getUrl() == null || !WorkPolicy.trusted(DriverApi.ORIGIN, web.getUrl())) return false;
+        if (request.getResources().length == 0) return false;
+        for (String resource : request.getResources())
+            if (!PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource) && !PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) return false;
+        return true;
+    }
+    private void requestMedia(PermissionRequest request) {
+        if (!visible || !trustedMedia(request) || mediaRequest != null) { request.deny(); return; }
+        mediaRequest = request;
+        ArrayList<String> missing = new ArrayList<>();
+        for (String resource : request.getResources()) {
+            String permission = PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource) ? Manifest.permission.CAMERA : Manifest.permission.RECORD_AUDIO;
+            if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) missing.add(permission);
+        }
+        if (missing.isEmpty()) grantMedia();
+        else requestPermissions(missing.toArray(new String[0]), 2);
+    }
+    private void grantMedia() {
+        PermissionRequest request = mediaRequest; mediaRequest = null;
+        if (request == null) return;
+        if (!trustedMedia(request)) { request.deny(); return; }
+        for (String resource : request.getResources()) {
+            String permission = PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource) ? Manifest.permission.CAMERA : Manifest.permission.RECORD_AUDIO;
+            if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) { request.deny(); return; }
+        }
+        request.grant(request.getResources());
+    }
+    private void denyMedia() { if (mediaRequest != null) { mediaRequest.deny(); mediaRequest = null; } }
 
     private void explainAndStart() {
         new AlertDialog.Builder(this).setTitle("Байршлаа хуваалцаж ажиллах")
@@ -151,6 +190,11 @@ public final class MainActivity extends Activity {
         super.onRequestPermissionsResult(code, permissions, grants);
         boolean allowed = grants.length > 0;
         for (int result : grants) allowed &= result == PackageManager.PERMISSION_GRANTED;
+        if (code == 2) {
+            if (allowed) grantMedia();
+            else { denyMedia(); message("Видео дуудлагад камер, микрофоны зөвшөөрөл хэрэгтэй. ⋮ → Зөвшөөрөл хэсгээс өөрчилнө үү."); }
+            return;
+        }
         if (code == 1 && allowed) permissionsAndStart();
         else message("Байршлын нарийвчилсан болон мэдэгдлийн зөвшөөрөл хэрэгтэй. ⋮ → Зөвшөөрөл хэсгээс өөрчилнө үү.");
     }
@@ -206,5 +250,5 @@ public final class MainActivity extends Activity {
         if (web.getUrl() != null && web.getUrl().contains("/driver/profile")) web.loadUrl(DriverApi.ORIGIN + "/driver");
         else moveTaskToBack(true);
     }
-    @Override protected void onDestroy() { main.removeCallbacks(refresh); web.destroy(); network.shutdown(); super.onDestroy(); }
+    @Override protected void onDestroy() { denyMedia(); main.removeCallbacks(refresh); web.destroy(); network.shutdown(); super.onDestroy(); }
 }

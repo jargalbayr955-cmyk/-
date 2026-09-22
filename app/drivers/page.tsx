@@ -1,4 +1,5 @@
 'use client'
+import { OrderVideoCall } from '../components/order-video-call'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -201,6 +202,7 @@ export default function DriversPage() {
   return <main className="offers-map-page">
     <OfferMap pickup={pickup} offers={offers} selectedDriverId={selectedDriverId} onSelect={id => { if (!actionPending.current) setSelectedDriverId(id) }} />
     <header className="offers-map-header">
+      {confirmed && !finished && orderId && <OrderVideoCall key={orderId} orderId={orderId} role="customer" />}
       <div className="offers-status-bar">
         <button type="button" className="offers-back" onClick={() => { if (!navigation.back()) backInApp(router, '/current') }}>← Буцах</button>
         <h1 aria-live="polite">{finished ? 'Захиалга дууссан' : confirmed ? 'Жолооч сонгогдсон' : expired ? 'Хайлтын хугацаа дууслаа' : invitedCount === 0 ? 'Бэлэн жолооч хайж байна' : 'Үнийн санал хүлээж байна'}</h1>

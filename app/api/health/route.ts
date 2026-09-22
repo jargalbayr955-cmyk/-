@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
+import { videoIsConfigured } from '@/lib/server/video-turn'
 import { isSessionConfigured } from '@/lib/server/security'
 
 export const dynamic = 'force-dynamic'
@@ -15,7 +16,7 @@ export async function GET() {
     database = 'error'
   }
   const ok = database === 'ok' && authentication === 'ok'
-  return NextResponse.json({ ok, database, authentication, latency_ms: Date.now() - started }, {
+  return NextResponse.json({ ok, database, authentication, video: videoIsConfigured() ? 'configured' : 'not_configured', latency_ms: Date.now() - started }, {
     status: ok ? 200 : 503,
     headers: { 'Cache-Control': 'no-store' },
   })

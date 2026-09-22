@@ -1,4 +1,5 @@
 'use client'
+import { OrderVideoCall } from '../components/order-video-call'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -63,6 +64,7 @@ export default function TrackingPage() {
   const title = !order ? 'Захиалга ачаалж байна…' : active ? 'Жолооч сонгогдлоо' : order.status === 'completed' ? 'Ачилт дууслаа' : 'Захиалга цуцлагдсан'
 
   return <main className="tracking-page">
+    {active && order && <OrderVideoCall key={order.id} orderId={order.id} role="customer" phone={order.driver_phone} peerName={order.driver_name} />}
     <header className="tracking-header"><button type="button" className="offers-back" onClick={() => backInApp(router, '/drivers')}>← Буцах</button><h1 role="status">{title}</h1></header>
     <div className="tracking-map"><OrderConnectionMap pickup={pickup} driver={driverPoint} /></div>
     <section className="tracking-details" aria-label="Сонгогдсон жолооч">

@@ -8,8 +8,8 @@ android {
         applicationId 'mn.achilt.driver'
         minSdk 26
         targetSdk 36
-        versionCode 1
-        versionName '5.5.1-preview'
+        versionCode 2
+        versionName '5.5.2-preview'
         // HTTPS only. This is an app origin, never an API key or a secret.
         buildConfigField 'String', 'SITE_ORIGIN', '"https://lovat-three-54.vercel.app"'
     }

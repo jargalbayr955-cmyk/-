@@ -31,6 +31,7 @@ function componentHarness(file, name, initial = {}, replacements = {}, globals =
         if (module === './driver-orders-map') return { DriverOrdersMap: 'DriverOrdersMap' }
         if (module === 'next/link') return { default: 'a' }
         if (module === 'next/navigation') return { useRouter: () => ({ push() {} }) }
+        if (module === '../components/order-video-call') return { OrderVideoCall: 'OrderVideoCall' }
         if (module === '../components/order-connection-map') return { OrderConnectionMap: 'OrderConnectionMap' }
         if (module === '../components/driver-dispatch-view') return { DriverDispatchView: 'DriverDispatchView' }
         throw new Error('Unexpected import: ' + module)
@@ -109,15 +110,20 @@ async function pageHarness(native = false) {
 test('restored working session tracks automatically, resting stops GPS, accepted trip resumes, payment stops', async () => {
   const { h, watchers, poll } = await pageHarness()
   assert.equal(watchers.length, 1)
+  assert.equal(h.nodes().some(node => node.type === 'OrderVideoCall'), false)
   watchers[0].onLocation({ lat: 47.95, lng: 106.95, location_updated_at: new Date().toISOString(), available: true }); await h.flush()
   assert.equal(h.view.props.driver.lat, 47.95)
   await poll({ available: false })
   assert.equal(watchers[0].stopped, true)
-  await poll({ acceptedOrder: { ...order('a'), status: 'accepted', final_price: 85000 } })
+  await poll({ acceptedOrder: { ...order('a'), status: 'confirmed', final_price: 85000 } })
   assert.equal(watchers.length, 2)
   assert.match(h.text(), /Чирэгч.*Prius a/)
+  assert.equal(h.view.props.children[0].type, 'OrderVideoCall')
+  assert.equal(h.view.props.children[0].props.role, 'driver')
+  assert.equal(h.view.props.children[0].props.orderId, 'a')
   await poll({ acceptedOrder: null, pendingPayment: { code: '123456', amount: 8500 } })
   assert.equal(watchers[1].stopped, true)
+  assert.equal(h.nodes().some(node => node.type === 'OrderVideoCall'), false)
   h.unmount()
 })
 
@@ -125,5 +131,27 @@ test('native driver keeps its existing GPS service instead of starting a second 
   const { h, watchers } = await pageHarness(true)
   assert.equal(watchers.length, 0)
   assert.equal(h.view.props.nativeDriver, true)
+  h.unmount()
+})
+
+test('customer call control is first on a confirmed order and disappears after completion', async () => {
+  let status = 'confirmed'
+  const timers = [], router = { replace() {} }
+  const h = componentHarness('app/tracking/page.tsx', 'default', {}, {
+    'next/navigation': { useRouter: () => router },
+    '@/lib/client/navigation': { backInApp() {} },
+    '@/lib/client/booking-draft': { clearBookingDraft() {} },
+    '../components/driver-summary': { DriverSummary: 'DriverSummary' },
+  }, {
+    localStorage: { getItem: () => 'order-customer' },
+    setInterval(callback) { timers.push(callback); return timers.length },
+    fetch: async () => ({ ok: true, status: 200, json: async () => ({ order: { id: 'order-customer', status, driver_phone: '00000000' }, driver: null }) }),
+  })
+  await h.flush()
+  assert.equal(h.view.props.children[0].type, 'OrderVideoCall')
+  assert.equal(h.view.props.children[0].props.role, 'customer')
+  assert.equal(h.view.props.children[0].props.orderId, 'order-customer')
+  status = 'completed'; timers.forEach(fn => fn()); await h.flush()
+  assert.equal(h.nodes().some(node => node.type === 'OrderVideoCall'), false)
   h.unmount()
 })
