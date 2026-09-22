@@ -11,9 +11,10 @@ const slot = (id, price = 85000) => ({ driver_id: 'driver-' + id, driver_name: '
 function mapHarness(initial, connection = false) {
   const hooks = [], pending = [], maps = [], markers = [], clicked = []
   let cursor = 0, dirty = false, props = { pickup: point, offers: initial, selectedDriverId: null, onSelect: id => clicked.push(id) }
-  if (connection) props = { pickup: point, driver: null }
+  if (connection === true) props = { pickup: point, driver: null }
+  if (connection === 'orders') props = { driver: point, fresh: true, orders: initial, selectedId: initial[0]?.id || null, onSelect: id => clicked.push(id) }
   class Element {
-    constructor(tag) { this.tag = tag; this.children = []; this.attributes = {}; this.events = {} }
+    constructor(tag) { this.tag = tag; this.children = []; this.attributes = {}; this.events = {}; this.style = {} }
     append(...children) { this.children.push(...children) }
     setAttribute(name, value) { this.attributes[name] = value }
     addEventListener(name, callback) { this.events[name] = callback }
@@ -33,6 +34,7 @@ function mapHarness(initial, connection = false) {
   }
   class Marker {
     constructor(options) { this.element = options.element; markers.push(this) }
+    getElement() { return this.element }
     setLngLat(point) { this.point = point; return this }
     addTo() { return this }
     remove() { this.removed = true }
@@ -59,12 +61,14 @@ function mapHarness(initial, connection = false) {
       if (name === 'react') return react
       if (name === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) }
       if (name === '@/lib/order-offers') return load('lib/order-offers.ts')
+      if (name === '@/lib/driver-orders') return load('lib/driver-orders.ts')
+      if (name === './order-offers') return load('lib/order-offers.ts')
       if (name.endsWith('free-map')) return { loadFreeMap: async () => ml, freeMapStyle: () => 'test', createDotMarker: () => new Element('pickup'), createTruckMarker: () => new Element('truck'), ULAANBAATAR: point, mapErrorMessage: String }
       throw new Error('Unexpected import: ' + name)
     } })
     return exports
   }
-  const component = connection ? load('app/components/order-connection-map.tsx').OrderConnectionMap : load('app/components/offer-map.tsx').OfferMap
+  const component = connection === 'orders' ? load('app/components/driver-orders-map.tsx').DriverOrdersMap : connection ? load('app/components/order-connection-map.tsx').OrderConnectionMap : load('app/components/offer-map.tsx').OfferMap
   function render() {
     cursor = 0; dirty = false
     const view = component(props)
@@ -151,5 +155,49 @@ test('GPS updates during map loading use the newest position when the style beco
   map.loaded = true; map.events.load()
   assert.equal(JSON.stringify(map.getSource('order-connection').data.features[0].geometry.coordinates), JSON.stringify([[0.001,0],[0.01,0]]))
   assert.equal(h.maps.length, 1)
+  h.unmount()
+})
+
+const order = (id, type = 'chiregch') => ({ id, created_at: '2026-09-22T10:00:00Z', from_address: 'Сүхбаатарын талбай', to_address: 'Авто засвар', from_lat: 47.92, from_lng: 106.92, car_type: type, car_mark: 'Prius' })
+
+test('driver map shows own truck and customer pickup; both locations fit on selecting an order', async () => {
+  const h = mapHarness([order('a'), order('b', 'butten')], 'orders')
+  await h.flush()
+  const truck = h.markers.find(item => item.element.tag === 'truck')
+  assert.deepEqual(Array.from(truck.point), [106.91, 47.91])
+  assert.equal(h.driverMarkers().length, 2)
+  assert.match(h.driverMarkers()[0].element.attributes['aria-label'], /Чирэгч.*Сүхбаатарын талбай.*Авто засвар/)
+  assert.equal(h.driverMarkers()[1].element.children[1].textContent, 'Бүтэн ачигч')
+  const bounds = h.maps[0].fits[0].bounds.points
+  assert.equal(JSON.stringify(bounds), JSON.stringify([[106.91,47.91],[106.92,47.92]]))
+  h.driverMarkers()[1].element.events.click({ stopPropagation() {} })
+  assert.deepEqual(h.clicked, ['b'])
+  h.update({ selectedId: 'b' })
+  assert.equal(h.driverMarkers()[1].element.attributes['aria-pressed'], 'true')
+  assert.equal(h.maps[0].fits.length, 2)
+  h.unmount()
+})
+
+test('driver GPS moves the truck without camera jumps; expired orders remove their map points', async () => {
+  const h = mapHarness([order('a'), order('b')], 'orders')
+  await h.flush()
+  const truck = h.markers.find(item => item.element.tag === 'truck')
+  h.update({ driver: { lat: 47.93, lng: 106.94 }, fresh: false })
+  assert.deepEqual(Array.from(truck.point), [106.94, 47.93])
+  assert.equal(truck.element.style.opacity, '.55')
+  assert.equal(h.maps[0].fits.length, 1)
+  h.update({ orders: [order('b')], selectedId: 'b' })
+  assert.equal(h.driverMarkers().length, 1)
+  h.update({ orders: [], selectedId: null })
+  assert.equal(h.driverMarkers().length, 0)
+  h.unmount()
+  assert.ok(h.markers.every(marker => marker.removed))
+})
+
+test('unknown pickup coordinates never create a fabricated map point', async () => {
+  const h = mapHarness([{ ...order('a'), from_lat: null, from_lng: null }], 'orders')
+  await h.flush()
+  assert.equal(h.driverMarkers().length, 0)
+  assert.equal(h.maps[0].fits.length, 0)
   h.unmount()
 })

@@ -4,6 +4,9 @@ import { useRouter } from 'next/navigation'
 import { OrderConnectionMap } from '../components/order-connection-map'
 import { pickupPoint, pointDistance, offerDistance, offerPrice, locationIsFresh } from '@/lib/order-offers'
 import { isNativeDriver } from '@/lib/client/native-driver'
+import { saveDriverLocation, watchDriverLocation } from '@/lib/client/driver-location'
+import { DriverDispatchView } from '../components/driver-dispatch-view'
+import { vehicleLabel, type DriverOrder } from '@/lib/driver-orders'
 import Link from 'next/link'
 
 const D = {
@@ -19,12 +22,11 @@ export default function DriverPage() {
   const [phone, setPhone] = useState('')
   const [pin, setPin] = useState('')
   const [driver, setDriver] = useState<any>(null)
-  const [orders, setOrders] = useState<any[]>([])
+  const [orders, setOrders] = useState<DriverOrder[]>([])
   const [loading, setLoading] = useState(false)
   const [locating, setLocating] = useState(false)
   const [error, setError] = useState('')
   const [locMsg, setLocMsg] = useState('')
-  const offerPricesRef = useRef<{[key: string]: string}>({})
   const [sentOffers, setSentOffers] = useState<Record<string, boolean>>({})
   const [sendingOffer, setSendingOffer] = useState<string | null>(null)
   const [newOrderAlert, setNewOrderAlert] = useState(false)
@@ -45,7 +47,6 @@ export default function DriverPage() {
   const seenAcceptedId = useRef<string | null>(null)
   const router = useRouter()
   const nativeDriver = mounted && isNativeDriver()
-  const locationReady = locationIsFresh(driver?.location_updated_at)
 
   // Хаазны дуу тоглуулах
   const playHorn = () => {
@@ -202,30 +203,23 @@ export default function DriverPage() {
     finally { ordersLoading.current = false }
   }, [])
 
-  const updateLocation = () => {
-    if (!driver) return
-    if (isNativeDriver()) return
+  const startWorking = () => {
+    const driverId = driver?.id
+    if (!driverId || locating || isNativeDriver()) return
     if (!navigator.geolocation) return setLocMsg('Энэ browser байршил дэмжихгүй байна')
-    setLocating(true)
-    setLocMsg('')
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-        const res = await fetch('/api/driver/location', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude, available: true })
-        })
-        const body = await res.json()
-        if (!res.ok) { setLocMsg(body.error || 'Байршил хадгалахад алдаа гарлаа'); return }
-        setDriver((d:any) => d ? ({ ...d, lat: pos.coords.latitude, lng: pos.coords.longitude, location_updated_at: new Date().toISOString(), available: body.available }) : d)
-        setLocMsg('Байршил шинэчлэгдлээ!')
+    setLocating(true); setLocMsg('')
+    navigator.geolocation.getCurrentPosition(async pos => {
+      if (driverRef.current?.id !== driverId) { setLocating(false); return }
+      try {
+        const saved = await saveDriverLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }, true)
+        setDriver((current:any) => current?.id === driverId ? { ...current, ...saved } : current)
         void fetchOrders()
-        } catch { setLocMsg('Сүлжээний алдаа. Дахин оролдоно уу.') }
-        finally { setLocating(false) }
-      },
-      () => { setLocMsg('Байршил тогтоох боломжгүй'); setLocating(false) },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
-    )
+      } catch (cause) { setLocMsg(cause instanceof Error ? cause.message : 'Байршил хадгалахад алдаа гарлаа.') }
+      finally { setLocating(false) }
+    }, failure => {
+      setLocMsg(failure.code === 1 ? 'Байршлын зөвшөөрөл хаалттай. Утасны тохиргооноос энэ сайтын байршлыг зөвшөөрнө үү.' : 'GPS дохио олдсонгүй. Байршлын зөвшөөрлөө шалгаад ажиллаж эхлэх товчийг дахин дарна уу.')
+      setLocating(false)
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 })
   }
 
   // driverRef-г driver state-тай sync хийх
@@ -283,76 +277,44 @@ export default function DriverPage() {
     return () => { cancelled = true; clearTimeout(timeout); controller.abort() }
   }, [sessionAttempt])
 
+  const trackLocation = Boolean(driver?.id && (driver.available || acceptedOrder) && !paymentInfo)
   useEffect(() => {
-    if (!driver?.id || !navigator.geolocation || isNativeDriver()) return
-    let lastSentAt = 0
-    let cancelled = false
-    const onPosition = async (pos: GeolocationPosition) => {
-      if (cancelled) return
-      const now = Date.now(), lat = pos.coords.latitude, lng = pos.coords.longitude
-      if (now - lastSentAt < 15000) return
-      lastSentAt = now
-      driverRef.current = { ...driverRef.current, lat, lng }
-      try {
-        const response = await fetch('/api/driver/location', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lat, lng }) })
-        if (!cancelled) {
-          if (!response.ok) setLocMsg('Байршил серверт шинэчлэгдээгүй байна')
-          else {
-            setDriver((d:any) => d ? ({ ...d, lat, lng, location_updated_at: new Date().toISOString() }) : d)
-            setLocMsg('')
-          }
-        }
-      } catch { if (!cancelled) setLocMsg('Сүлжээ тасарсан: байршил шинэчлэгдээгүй') }
-    }
-    const options = { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
-    const onError = () => { if (!cancelled) setLocMsg('GPS байршлаа зөвшөөрч, дахин шинэчилнэ үү') }
-    const watchId = navigator.geolocation.watchPosition(onPosition, onError, options)
-    // Stationary drivers also need fresh GPS within the dispatch two-minute window.
-    const refresh = () => { if (document.visibilityState === 'visible') navigator.geolocation.getCurrentPosition(onPosition, onError, options) }
-    const heartbeat = setInterval(refresh, 45000)
-    document.addEventListener('visibilitychange', refresh)
-    return () => { cancelled = true; clearInterval(heartbeat); navigator.geolocation.clearWatch(watchId); document.removeEventListener('visibilitychange', refresh) }
-  }, [driver?.id])
+    if (!trackLocation || isNativeDriver()) return
+    return watchDriverLocation(saved => {
+      setDriver((current:any) => current ? { ...current, lat: saved.lat, lng: saved.lng, location_updated_at: saved.location_updated_at } : current)
+    }, setLocMsg)
+  }, [driver?.id, trackLocation])
 
   const toggleAvailable = async () => {
-    if (isNativeDriver()) return
-    if (!driver.available) { updateLocation(); return }
+    if (!driver || locating || isNativeDriver()) return
+    if (!driver.available) { startWorking(); return }
+    setLocating(true)
     try {
-    const newVal = !driver.available
-    const res = await fetch('/api/driver/availability', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ available: newVal }) })
-    if (res.ok) setDriver({ ...driver, available: newVal })
-    else { const body = await res.json().catch(()=>({})); alert(body.error || 'Төлөв өөрчлөхөд алдаа гарлаа') }
-    } catch { alert('Сүлжээний алдаа. Дахин оролдоно уу.') }
+      const res = await fetch('/api/driver/availability', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ available: false }), signal: AbortSignal.timeout(12_000) })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error || 'Төлөв өөрчлөхөд алдаа гарлаа')
+      setDriver((current:any) => current ? { ...current, available: false } : current)
+      setLocMsg('')
+    } catch (cause) { setLocMsg(cause instanceof Error ? cause.message : 'Сүлжээний алдаа. Дахин оролдоно уу.') }
+    finally { setLocating(false) }
   }
 
-  const sendOffer = async (order: any) => {
-    const price = offerPricesRef.current[order.id]
-    if (!price) return alert('Үнэ оруулна уу')
+  const sendOffer = async (order: DriverOrder, price: string) => {
+    if (sendingOffer) return
+    const amount = Number(price)
+    if (!Number.isInteger(amount) || amount <= 0 || amount > 10_000_000) return alert('Үнийн саналаа зөв оруулна уу')
     setSendingOffer(order.id)
     try {
-    const getPos = (): Promise<{lat: number, lng: number} | null> => new Promise((resolve) => {
-      if (!navigator.geolocation || isNativeDriver()) return resolve(null)
-      navigator.geolocation.getCurrentPosition((pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }), () => resolve(null), { timeout: 5000 })
-    })
-    const pos = await getPos()
-    const res = await fetch('/api/driver/offer', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ order_id: order.id, price: parseInt(price), driver_lat: pos?.lat, driver_lng: pos?.lng })
-    })
-    if (!res.ok) { const body = await res.json().catch(()=>({})); alert(body.error || 'Санал илгээхэд алдаа гарлаа'); setSendingOffer(null); return }
-    if (pos) setDriver({ ...driver, lat: pos.lat, lng: pos.lng })
-    setSentOffers(prev => ({ ...prev, [order.id]: true }))
+      // The server uses the location maintained by automatic GPS updates.
+      const res = await fetch('/api/driver/offer', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ order_id: order.id, price: amount }), signal: AbortSignal.timeout(12_000)
+      })
+      if (!res.ok) { const body = await res.json().catch(() => ({})); alert(body.error || 'Санал илгээхэд алдаа гарлаа'); return }
+      setSentOffers(previous => ({ ...previous, [order.id]: true }))
+      void fetchOrders()
     } catch { alert('Сүлжээний алдаа. Санал илгээгдээгүй байна.') }
     finally { setSendingOffer(null) }
-  }
-
-  const getDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
-    if (!lat1 || !lng1 || !lat2 || !lng2) return null
-    const R = 6371
-    const dLat = (lat2 - lat1) * Math.PI / 180
-    const dLng = (lng2 - lng1) * Math.PI / 180
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng/2) * Math.sin(dLng/2)
-    return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1)
   }
 
   useEffect(() => {
@@ -437,6 +399,7 @@ export default function DriverPage() {
             </div>
           </div>}
           {!paymentInfo && <div className="driver-connection-details">
+            <p className="offer-selection-note">{vehicleLabel(safeOrder.car_type)} · {safeOrder.car_mark || 'Машины мэдээлэл оруулаагүй'}</p>
             <p role="status" className="connection-status">✓ Хэрэглэгч таны үнийн саналыг сонгосон</p>
             <div className="driver-connection-price"><strong>{offerPrice(Number(safeOrder.final_price))}</strong><span>{offerDistance(pointDistance(pickup, position))} · шулуун зай</span></div>
             {safeOrder.user_phone ? <a className="connection-call" href={`tel:${safeOrder.user_phone}`}>☎ Хэрэглэгч рүү залгах · {safeOrder.user_phone}</a> : <p className="connection-warning">Хэрэглэгчийн утасны дугаар олдсонгүй.</p>}
@@ -494,117 +457,11 @@ export default function DriverPage() {
     )
   }
 
-  // MAIN
-  return (
-    <div style={{minHeight:'100vh', background:D.bg, paddingBottom:'24px'}}>
-      {newOrderAlert && (
-        <div style={{position:'fixed', top:'16px', left:'50%', transform:'translateX(-50%)', zIndex:50, background:D.red, color:D.text, padding:'12px 24px', borderRadius:'20px', fontSize:'14px', fontWeight:'700', boxShadow:'0 4px 20px rgba(232,67,58,0.5)', animation:'bounce 0.5s ease infinite alternate'}}>
-          🚛 Шинэ захиалга ирлээ!
-        </div>
-      )}
-
-      {/* Header */}
-      <div style={{padding:'14px 20px', background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-        <div>
-          <p style={{color:D.text, fontWeight:'700', fontSize:'15px', margin:0}}>{driver.name}</p>
-          <p style={{color:D.muted, fontSize:'12px', margin:'3px 0 0'}}>{driver.car_type === 'butten' ? 'Бүтэн ачигч' : driver.car_type === 'chiregch' ? 'Чирэгч' : 'Машины төрөл сонгоогүй'}</p>
-        </div>
-        <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-          {!nativeDriver && <button onClick={toggleAvailable} disabled={locating} style={{borderRadius:'20px', padding:'7px 14px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border: driver.available ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.1)', background: driver.available ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)', color: driver.available && locationReady ? '#22c55e' : D.muted}}>
-            {locating ? 'Байршил шалгаж байна…' : driver.available ? locationReady ? '🟢 Захиалга авахад бэлэн' : '📍 Байршил шаардлагатай' : '⚫ Амарч байна'}
-          </button>}
-          {!nativeDriver && <button onClick={subscribeNotification} style={{
-            borderRadius:'20px', padding:'6px 12px', fontSize:'12px', fontWeight:'700', cursor:'pointer',
-            background: pushReady ? 'rgba(34,197,94,0.12)' : 'rgba(232,67,58,0.12)',
-            border: pushReady ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(232,67,58,0.3)',
-            color: pushReady ? '#22c55e' : '#ff6b5b'
-          }}>
-            {pushReady ? '🔔 Асаалттай' : notifStatus === 'denied' ? '🔕 Зөвшөөрөл хаалттай' : '🔕 Мэдэгдэл авах'}
-          </button>}
-          <button onClick={() => router.push('/driver/profile')} style={{width:'36px', height:'36px', borderRadius:'50%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:D.muted, fontSize:'16px', cursor:'pointer'}}>👤</button>
-        </div>
-      </div>
-
-      <div style={{padding:'16px'}}>
-        {error && <p role="alert" style={{color:'#ff6b6b'}}>{error}</p>}
-        {!driver.car_type && <button onClick={() => router.push('/driver/profile')} style={{color:'white', background:D.red, padding:'12px', marginBottom:'16px', borderRadius:'12px'}}>Эхлээд профайлдаа машины төрлөө сонгоно уу →</button>}
-        {/* Байршил */}
-        {!nativeDriver && <div style={{background:D.card, border:D.cardBorder, borderRadius:'16px', padding:'16px', marginBottom:'16px'}}>
-          <p style={{color:D.text, fontWeight:'700', fontSize:'14px', margin:'0 0 12px'}}>📍 Байршил шинэчлэх</p>
-          <p style={{color:D.muted, fontSize:'12px'}}>Захиалга хүлээхдээ энэ хуудсаа нээлттэй байлгаж, GPS байршлаа зөвшөөрнө үү.</p>
-          <p><Link href="/driver/app" style={{color:'#ff8078', fontSize:13}}>Дэлгэц түгжээтэй ажиллах Android апп →</Link></p>
-          <button onClick={updateLocation} disabled={locating} style={{width:'100%', borderRadius:'12px', padding:'12px', background: locating ? 'rgba(232,67,58,0.4)' : D.red, border:'none', color:D.text, fontSize:'14px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 15px rgba(232,67,58,0.3)'}}>
-            {locating ? 'Байршил тогтоож байна...' : 'Одоогийн байршил илгээх'}
-          </button>
-          {locMsg && <p style={{color:'#22c55e', fontSize:'12px', textAlign:'center', marginTop:'8px'}}>{locMsg}</p>}
-          {driver.lat && <p style={{color:D.muted, fontSize:'12px', textAlign:'center', marginTop:'4px'}}>📍 {driver.lat?.toFixed(4)}, {driver.lng?.toFixed(4)}</p>}
-        </div>}
-
-        {/* Захиалгууд */}
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px'}}>
-          <p style={{color:D.text, fontWeight:'700', fontSize:'14px', margin:0}}>Захиалгууд <span style={{color:D.red}}>({orders.length})</span></p>
-          <button onClick={fetchOrders} style={{background:'transparent', border:'none', color:D.red, fontSize:'13px', cursor:'pointer', fontWeight:'600'}}>↺ Шинэчлэх</button>
-        </div>
-
-        {orders.length === 0 ? (
-          <div style={{background:D.card, border:D.cardBorder, borderRadius:'16px', padding:'40px 16px', textAlign:'center'}}>
-            <div style={{fontSize:'40px', marginBottom:'12px'}}>⏳</div>
-            <p style={{color:D.muted, fontSize:'14px', margin:0}}>{!driver.available ? 'Захиалга авахын тулд ажиллах төлөвөө асаана уу' : !locationReady ? 'Захиалга авахын тулд GPS байршлаа шинэчилнэ үү' : 'Таны машины төрөлд тохирох захиалга хүлээж байна'}</p>
-          </div>
-        ) : (
-          <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
-            {orders.map((o) => {
-              const dist = getDistance(driver.lat, driver.lng, o.from_lat, o.from_lng)
-              return (
-                <div key={o.id} style={{background:D.card, border:D.cardBorder, borderRadius:'16px', padding:'16px'}}>
-                  <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px'}}>
-                    <span style={{background:'rgba(232,67,58,0.15)', color:'#ff6b5b', borderRadius:'10px', padding:'4px 10px', fontSize:'11px', fontWeight:'700'}}>🆕 Шинэ</span>
-                    <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                      {dist && <span style={{color:'#3b82f6', fontSize:'12px', fontWeight:'600'}}>📍 {dist} км</span>}
-                      <span style={{color:D.muted, fontSize:'12px'}}>{new Date(o.created_at).toLocaleTimeString('mn-MN', {hour:'2-digit', minute:'2-digit'})}</span>
-                    </div>
-                  </div>
-                  {o.car_type && <p style={{color:'rgba(255,200,0,0.7)', fontSize:'12px', margin:'0 0 10px', fontWeight:'600'}}>
-                      🚛 {o.car_type === 'butten' ? 'Бүтэн ачигч' : o.car_type === 'chiregch' ? 'Чирэгч' : o.car_type}
-                      {o.car_mark ? ` · ${o.car_mark}` : ''}
-                    </p>}
-                  <div style={{background:'rgba(255,255,255,0.03)', borderRadius:'12px', padding:'12px', marginBottom:'12px'}}>
-                    <div style={{display:'flex', alignItems:'flex-start', gap:'8px', marginBottom:'8px'}}>
-                      <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#3b82f6', marginTop:'4px', flexShrink:0}}/>
-                      <div><p style={{color:D.muted, fontSize:'11px', margin:'0 0 2px'}}>Авах газар</p><p style={{color:D.text, fontSize:'13px', margin:0, fontWeight:'600'}}>{o.from_address || 'GPS байршил'}</p></div>
-                    </div>
-                    <div style={{display:'flex', alignItems:'flex-start', gap:'8px'}}>
-                      <div style={{width:'8px', height:'8px', borderRadius:'50%', background:D.red, marginTop:'4px', flexShrink:0}}/>
-                      <div><p style={{color:D.muted, fontSize:'11px', margin:'0 0 2px'}}>Хүргэх газар</p><p style={{color:D.text, fontSize:'13px', margin:0, fontWeight:'600'}}>{o.to_address || '-'}</p></div>
-                    </div>
-                  </div>
-                  {o.has_offered || sentOffers[o.id] ? (
-                    <div style={{background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,0.2)', borderRadius:'12px', padding:'12px', textAlign:'center'}}>
-                      <p style={{color:'#22c55e', fontSize:'14px', fontWeight:'700', margin:0}}>✅ Санал илгээгдлээ!</p>
-                    </div>
-                  ) : (
-                    <div style={{display:'flex', gap:'8px'}}>
-                      <input type="number" placeholder="Үнэ оруулна уу (₮)" defaultValue={''} onChange={e => {
-                          offerPricesRef.current[o.id] = e.target.value
-                        }}
-                        style={{flex:1, borderRadius:'12px', padding:'12px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:D.text, fontSize:'14px', outline:'none'}}/>
-                      <button onClick={() => sendOffer(o)} disabled={sendingOffer === o.id}
-                        style={{borderRadius:'12px', padding:'12px 16px', background: sendingOffer === o.id ? 'rgba(232,67,58,0.4)' : D.red, border:'none', color:D.text, fontSize:'14px', fontWeight:'700', cursor:'pointer'}}>
-                        {sendingOffer === o.id ? '...' : 'Илгээх'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-      <style>{`
-        input::placeholder{color:rgba(255,255,255,0.2);}
-        @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.7)}}
-        @keyframes bounce{from{transform:translateX(-50%) translateY(0)}to{transform:translateX(-50%) translateY(-4px)}}
-      `}</style>
-    </div>
-  )
+  return <DriverDispatchView
+    driver={driver} orders={orders} locating={locating} locationMessage={locMsg} error={error}
+    newOrderAlert={newOrderAlert} nativeDriver={nativeDriver} pushReady={pushReady}
+    notificationsDenied={notifStatus === 'denied'} sentOffers={sentOffers} sendingOffer={sendingOffer}
+    onToggleAvailable={toggleAvailable} onSubscribe={subscribeNotification}
+    onProfile={() => router.push('/driver/profile')} onOffer={sendOffer}
+  />
 }
