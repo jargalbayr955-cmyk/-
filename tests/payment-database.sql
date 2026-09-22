@@ -16,9 +16,9 @@ begin
   assert admin_version is not null,'administrator must exist';
   insert into public.drivers(id,name,phone,car_type,active,available,pin) values(d,'QA transaction only','+97600000001','butten',true,false,null);
   insert into public.orders(id,driver_id,status,final_price) values(o1,d,'confirmed',12500),(o2,d,'confirmed',18000);
-  select code into c1 from public.complete_order_and_issue_payment(o1,d,1,12);
-  assert (select amount=12500 from public.payment_codes where order_id=o1),'selected price must be authoritative';
-  select code into c2 from public.complete_order_and_issue_payment(o1,d,1,12);
+  select code into c1 from public.complete_order_and_issue_commission(o1,d,12);
+  assert (select amount=500 from public.payment_codes where order_id=o1),'commission must use the selected price';
+  select code into c2 from public.complete_order_and_issue_commission(o1,d,12);
   assert c1=c2 and (select count(*)=1 from public.payment_codes where order_id=o1),'completion must reuse payment';
   assert (select available=false from public.drivers where id=d),'completion must block driver';
   rejected:=false;
@@ -51,11 +51,11 @@ begin
   assert (select available=false from public.drivers where id=d),'another active trip must block availability';
   assert (select approved_at is not null and approved_by_session_version=admin_version from public.payment_codes where id=p1),'approval must be audited';
   assert not exists(select 1 from public.admin_pending_driver_payments() where id=o1),'approved job must leave queue';
-  select code into c2 from public.complete_order_and_issue_payment(o1,d,1,12);
+  select code into c2 from public.complete_order_and_issue_commission(o1,d,12);
   assert c1=c2 and (select count(*)=1 from public.payment_codes where order_id=o1),'paid completion retry cannot create debt';
-  select code into c2 from public.complete_order_and_issue_payment(o2,d,1,12);
+  select code into c2 from public.complete_order_and_issue_commission(o2,d,12);
   update public.orders set completed_at='1900-01-01T00:00:00Z' where id=o2;
-  assert exists(select 1 from public.admin_pending_driver_payments() where id=o2 and code=c2 and amount=18000),'old unpaid jobs must remain in approval queue';
+  assert exists(select 1 from public.admin_pending_driver_payments() where id=o2 and code=c2 and amount=1000),'old unpaid jobs must remain in approval queue';
   rejected:=false;
   begin update public.drivers set available=true where id=d;
   exception when check_violation then rejected:=true;
@@ -69,7 +69,7 @@ begin
   update public.drivers set available=false where id=d;
   perform public.admin_approve_driver_payment((select order_id from public.payment_codes where id=p2),admin_version);
   assert (select available=false from public.drivers where id=d),'duplicate receipt must preserve manual offline status';
-  perform public.complete_order_and_issue_payment(o2,d,1,12);
+  perform public.complete_order_and_issue_commission(o2,d,12);
   assert (select available=false from public.drivers where id=d),'paid completion retry must preserve manual offline status';
   -- Nine nearby test drivers, no push calls or committed invitations.
   for i in 1..9 loop
@@ -96,7 +96,7 @@ begin
   exception when raise_exception then rejected:=true;
   end;
   assert rejected,'second selection must fail';
-  select code into c1 from public.complete_order_and_issue_payment(search_id,ids[1],1,10);
+  select code into c1 from public.complete_order_and_issue_commission(search_id,ids[1],10);
   select id into p1 from public.payment_codes where order_id=search_id;
   update public.drivers set active=false,available=false where id=ids[1];
   perform public.admin_approve_driver_payment((select order_id from public.payment_codes where id=p1),admin_version);

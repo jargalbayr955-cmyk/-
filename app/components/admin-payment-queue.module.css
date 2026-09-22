@@ -27,3 +27,9 @@
 .success { padding: 12px; border-radius: 12px; background: #113821; color: #a4f2ba; font-size: 14px; line-height: 1.6; }
 .error { color: #ff9f99; font-size: 14px; line-height: 1.6; }
 .pagination { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 16px; font-size: 13px; color: #c6c6cc; flex-wrap: wrap; }
+.connection { border: 1px solid #34343d; border-radius: 14px; padding: 12px; margin: 16px 0; }
+.connection button { min-height: 44px; border: 1px solid #52525c; border-radius: 10px; background: #25252e; color: white; padding: 8px 12px; cursor: pointer; }
+.connection > div { margin-top: 14px; }
+.connection label { display: block; margin: 12px 0 6px; color: #dcdce2; font-size: 13px; }
+.connection input { width: 100%; min-width: 0; border: 1px solid #52525c; border-radius: 10px; padding: 10px; color: white; background: #16161d; font-size: 14px; }
+.connection pre { overflow-wrap: anywhere; white-space: pre-wrap; background: #16161d; padding: 12px; font-size: 12px; }

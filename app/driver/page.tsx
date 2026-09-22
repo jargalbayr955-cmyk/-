@@ -32,7 +32,7 @@ export default function DriverPage() {
   const [sendingOffer, setSendingOffer] = useState<string | null>(null)
   const [newOrderAlert, setNewOrderAlert] = useState(false)
   const [acceptedOrder, setAcceptedOrder] = useState<any>(null)
-  const [paymentInfo, setPaymentInfo] = useState<{code:string, amount:number} | null>(null)
+  const [paymentInfo, setPaymentInfo] = useState<{code:string, amount:number, fare_amount?:number} | null>(null)
   const [completing, setCompleting] = useState(false)
   const [notifStatus, setNotifStatus] = useState<'default'|'granted'|'denied'>('default')
   const [pushReady, setPushReady] = useState(false)
@@ -40,7 +40,7 @@ export default function DriverPage() {
   const [sessionError, setSessionError] = useState(false)
   const [sessionAttempt, setSessionAttempt] = useState(0)
 
-  const [bankInfo, setBankInfo] = useState({ bank_name: '', bank_account: '' })
+  const [bankInfo, setBankInfo] = useState({ bank_name: '', bank_account: '', automatic_confirmation: false })
   const prevOrderIds = useRef<string[]>([])
   const ordersLoaded = useRef(false)
   const ordersLoading = useRef(false)
@@ -234,7 +234,7 @@ export default function DriverPage() {
     if (!driver?.id) return
     fetch('/api/driver/payment-settings', { cache: 'no-store' })
       .then(async r => r.ok ? r.json() : null)
-      .then(body => { if (body) setBankInfo({ bank_name: body.bank_name || '', bank_account: body.bank_account || '' }) })
+      .then(body => { if (body) setBankInfo({ bank_name: body.bank_name || '', bank_account: body.bank_account || '', automatic_confirmation: Boolean(body.automatic_confirmation) }) })
       .catch(() => {})
   }, [driver?.id])
 
@@ -381,7 +381,7 @@ export default function DriverPage() {
         <div style={{padding:'14px 20px', background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
           <div>
             <p style={{color:D.text, fontWeight:'700', fontSize:'15px', margin:0}}>{driver.name}</p>
-            <p style={{color:'#22c55e', fontSize:'12px', margin:'3px 0 0'}}>{paymentInfo ? 'Админы зөвшөөрөл хүлээж байна' : 'Таны саналыг сонголоо'}</p>
+            <p style={{color:'#22c55e', fontSize:'12px', margin:'3px 0 0'}}>{paymentInfo ? 'Шимтгэлийн төлбөр хүлээж байна' : 'Таны саналыг сонголоо'}</p>
           </div>
           <div style={{display:'flex', alignItems:'center', gap:'6px', background:'rgba(232,67,58,0.15)', border:'1px solid rgba(232,67,58,0.3)', borderRadius:'20px', padding:'5px 12px'}}>
             <div style={{width:'6px', height:'6px', borderRadius:'50%', background:D.red, animation:'pulse 1.5s infinite'}}/>
@@ -411,7 +411,9 @@ export default function DriverPage() {
           {paymentInfo ? (
             <div style={{background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'16px', padding:'16px'}}>
               <p style={{color:'white', fontSize:'18px', fontWeight:700, margin:'0 0 8px', textAlign:'center'}}>Захиалга дууссан</p>
-              <p style={{color:'#ffd700', fontSize:'14px', margin:'0 0 16px', textAlign:'center'}} role="status">Дараагийн захиалга авахын тулд админы зөвшөөрөл хүлээнэ үү.</p>
+              <p style={{color:'#ffd700', fontSize:'14px', margin:'0 0 16px', textAlign:'center'}} role="status">Дараагийн захиалга авахын тулд үйлчилгээний шимтгэлээ төлнө үү.</p>
+              {Number(paymentInfo.fare_amount) > 0 && <p style={{color:'#c6c6cc', fontSize:14, textAlign:'center'}}>Тохиролцсон үнэ: {Number(paymentInfo.fare_amount).toLocaleString('mn-MN')} ₮</p>}
+              <p style={{color:'#c6c6cc', fontSize:13, textAlign:'center'}}>Үнийн 5% · хамгийн ойрын 500 ₮-өөр тоймлосон</p>
               <p style={{color:'white', fontSize:'26px', fontWeight:800, textAlign:'center', margin:'0 0 16px'}}>Шилжүүлэх дүн: {Number(paymentInfo.amount).toLocaleString('mn-MN')} ₮</p>
               <div style={{background:'rgba(232,67,58,0.1)', border:'1px solid rgba(232,67,58,0.3)', borderRadius:'12px', padding:'14px', marginBottom:'12px', textAlign:'center'}}>
                 <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:'0 0 4px'}}>Шилжүүлэх данс</p>
@@ -424,9 +426,9 @@ export default function DriverPage() {
                 </div>
               </div>
               <p style={{color:'rgba(255,255,255,0.5)', fontSize:'12px', textAlign:'center', margin:'0 0 12px'}}>
-                Шилжүүлсний дараа админд мэдэгдэнэ үү. Админ зөвшөөрмөгц захиалгын дэлгэц автоматаар нээгдэнэ.
+                {bankInfo.automatic_confirmation ? 'Дээрх дүн болон 6 оронтой кодыг яг тааруулж шилжүүлнэ үү. Орлого баталгаажмагц эрх автоматаар нээгдэнэ. Удааширвал админтай холбогдоно уу.' : 'Төлбөр хүлээн авах холболтыг тохируулж байна. Одоогоор админтай холбогдож төлбөрөө баталгаажуулна уу.'}
               </p>
-              <button type="button" onClick={() => void fetchOrders()} style={{width:'100%', padding:'12px', borderRadius:'12px', background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.15)', color:'white', fontSize:14, cursor:'pointer'}}>Зөвшөөрөл шалгах</button>
+              <button type="button" onClick={() => void fetchOrders()} style={{width:'100%', padding:'12px', borderRadius:'12px', background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.15)', color:'white', fontSize:14, cursor:'pointer'}}>Төлбөр шалгах</button>
             </div>
           ) : (
             <button onClick={async () => {
@@ -441,7 +443,7 @@ export default function DriverPage() {
                 if (!res.ok) { setError(data.error || 'Захиалга дуусгахад алдаа гарлаа'); return }
                 if (data.paid) { setAcceptedOrder(null); setPaymentInfo(null); await fetchOrders(); return }
                 if (data.code) {
-                  const pInfo = { code: data.code, amount: data.amount }
+                  const pInfo = { code: data.code, amount: data.amount, fare_amount: data.fare_amount }
                   setPaymentInfo(pInfo)
                   setAcceptedOrder(null)
                   // Server transaction marks the order completed and driver unavailable atomically.

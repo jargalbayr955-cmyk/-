@@ -24,25 +24,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Order not available' }, { status: 403 })
   }
 
-  const amount = Number(order.final_price)
   // A completed and paid trip must never create a new debt on a retry.
   if (order.status === 'completed') {
     const { data: payment, error: paymentError } = await s.from('payment_codes')
-      .select('code,amount,used').eq('order_id', order.id).eq('driver_id', driver.id)
+      .select('code,amount,fare_amount,used').eq('order_id', order.id).eq('driver_id', driver.id)
       .order('id', { ascending: false }).limit(1).maybeSingle()
     if (paymentError) return NextResponse.json({ error: 'Payment lookup unavailable' }, { status: 503 })
     if (!payment) return NextResponse.json({ error: 'Төлбөрийн мэдээлэл олдсонгүй. Админтай холбогдоно уу.' }, { status: 409 })
-    return NextResponse.json({ success: true, code: payment.code, amount: Number(payment.amount), paid: payment.used })
+    return NextResponse.json({ success: true, code: payment.code, amount: Number(payment.amount), fare_amount: Number(payment.fare_amount ?? order.final_price), paid: payment.used }, { headers: { 'Cache-Control': 'no-store' } })
   }
   const duration = Math.max(0, Math.round((Date.now() - new Date(order.created_at).getTime()) / 60000))
-  const { data, error } = await s.rpc('complete_order_and_issue_payment', {
+  const { data, error } = await s.rpc('complete_order_and_issue_commission', {
     p_order_id: order.id,
     p_driver_id: driver.id,
-    p_amount: amount,
     p_duration_minutes: duration,
   })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 409 })
-  const code = Array.isArray(data) ? data[0]?.code : data?.code || data
-  return NextResponse.json({ success: true, code, driver_phone: driver.phone, driver_name: driver.name, amount })
+  const payment = Array.isArray(data) ? data[0] : data
+  if (!payment?.code || !Number.isFinite(Number(payment.amount))) return NextResponse.json({ error: 'Төлбөрийн мэдээллийг шинэчлээд дахин оролдоно уу.' }, { status: 503 })
+  return NextResponse.json({ success: true, code: payment.code, driver_phone: driver.phone, driver_name: driver.name,
+    amount: Number(payment.amount), fare_amount: Number(payment.fare_amount), paid: payment.paid }, { headers: { 'Cache-Control': 'no-store' } })
 }

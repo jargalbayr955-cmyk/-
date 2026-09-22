@@ -92,22 +92,24 @@ The connected `achilt` database already has `20260920175500_v5_5_pin_auth` and `
 
 Promote only after reviewing the Preview verification results. Device GPS, push delivery, sound/vibration and bank webhook delivery still need their actual devices/providers.
 
-## 9) Payment webhook contract (launch-audit branch; deploy with the sender)
+## 9) Commission and MacroDroid webhook contract
 
-Automatic confirmation is disabled when `PAYMENT_WEBHOOK_SECRET` is absent. Until the bank adapter is configured and verified, the driver UI directs the driver to the administrator for confirmation after the administrator checks the bank receipt.
+The service fee is 5% of the agreed fare, rounded to the nearest 500 MNT. Example: 112820 × 5% = 5641 → 5500. Exact half steps round upward. The database stores the authoritative fee, so neither the browser nor MacroDroid chooses it.
+
+Current admins can copy the callback URL and dedicated key from **Эрх нээх → MacroDroid холболт тохируулах**. `PAYMENT_WEBHOOK_SECRET` overrides the default domain-separated HMAC key derived from `SESSION_SECRET`; no session secret is exposed. Set the receiving bank/account in the admin dashboard. Configure and verify the actual phone's bank SMS extraction before relying on automation; manual admin approval remains available.
 
 The trusted bank adapter must validate an actual incoming transfer to the configured receiving account before calling `POST /api/payment/verify`. Send the secret only in `x-webhook-secret`, and use `Content-Type: application/json`:
 
 ```json
 {
   "code": "123456",
-  "amount": 12500,
+  "amount": 5500,
   "currency": "MNT",
   "direction": "credit"
 }
 ```
 
-This is an example, not a real payment. `code` is the exact six-digit payment reference. `amount` is a positive integer in MNT and must equal the amount stored for that payment. An already confirmed code returns success without releasing the driver again. Do not send a balance, outgoing transfer, guessed amount or unverified user message. The endpoint deliberately rejects the old raw `sms`/`message`/`text` payload: there is no verified bank SMS format available in this repository. Update and test any MacroDroid/bank adapter before enabling this endpoint. Never place the webhook secret in a browser or a `NEXT_PUBLIC_*` variable.
+This is an example, not a real payment. `code` is the exact six-digit payment reference. `amount` is a positive integer in MNT and must equal the amount stored for that payment. An already confirmed code returns success without releasing the driver again. Do not send a balance, outgoing transfer, guessed amount or unverified user message. The endpoint deliberately rejects raw `sms`/`message`/`text` payloads: there is no verified bank SMS format available in this repository. Never put the dedicated key in public browser code, URLs or a `NEXT_PUBLIC_*` variable. Only the authenticated admin connection screen exposes it for copying into the trusted phone's private HTTP header.
 
 The HTTP completion guard prevents retries of already completed trips from generating another payment. Apply the accompanying payment-locking migration before deploying this branch. It serializes completion and confirmation and guards online availability. Run `tests/payment-database.sql` through an authorized database connection; fixtures roll back.
 
@@ -118,4 +120,3 @@ The launch-audit branch restores pending payment from the server, maintains fres
 Push subscriptions accept HTTPS endpoints for FCM, Mozilla, Apple and Windows push services only. New providers require an explicit allow-list review in `lib/server/push-subscription.ts`. A successful provider response is not proof that an actual phone displayed or sounded the notification. Failed deliveries remain unmarked, but a durable automatic retry queue is not implemented; the existing authenticated push-send endpoint can retry while the invitation is active, and foreground order polling remains a fallback.
 
 Regression tests: `node --test tests/*.test.cjs`. These isolate database/push I/O; they do not replace live PostgreSQL transactions or actual bank/device testing.
-

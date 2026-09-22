@@ -12,6 +12,7 @@ export type PendingDriverPayment = {
   to_address: string | null
   code: string
   amount: number | string
+  fare_amount?: number | string | null
 }
 
 export function AdminPaymentQueue({ payments, approvingId, disabled, onApprove }: {
@@ -26,8 +27,9 @@ export function AdminPaymentQueue({ payments, approvingId, disabled, onApprove }
             <p className={styles.plate}>Улсын дугаар: <strong>{payment.car_number || 'Бүртгээгүй'}</strong></p>
             <p className={styles.phone}>Утас: {payment.driver_phone || 'Бүртгээгүй'}</p>
           </div>
-          <strong className={styles.amount}>{Number(payment.amount).toLocaleString('mn-MN')} ₮</strong>
+          <div><p className={styles.phone}>Шилжүүлэх шимтгэл</p><strong className={styles.amount}>{Number(payment.amount).toLocaleString('mn-MN')} ₮</strong></div>
         </div>
+        {Number(payment.fare_amount) > 0 && <p className={styles.phone}>Тохиролцсон үнэ: {Number(payment.fare_amount).toLocaleString('mn-MN')} ₮ · Шимтгэл 5%</p>}
         <p className={styles.route}>{payment.from_address || 'Ачих газар'} → {payment.to_address || 'Хүргэх газар'}</p>
         <p className={styles.code}>Гүйлгээний утга: <strong>{payment.code}</strong></p>
         <button type="button" disabled={disabled || approvingId !== null} onClick={() => onApprove(payment.id)}>

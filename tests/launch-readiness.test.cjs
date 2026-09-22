@@ -62,23 +62,24 @@ for (const [name, body] of [
 })
 
 test('payment rejects incorrect amount and never releases driver', async () => {
-  const h = harness({ env: paymentEnv, rows: { payment_codes: { data: payment } } })
+  const h = harness({ env: paymentEnv, rpcResult: () => ({data:null,error:{code:'P0001'}}) })
   const result = await h.load('app/api/payment/verify/route.ts').POST(request({ ...receipt, amount: 1 }))
-  assert.equal(result.status, 409); assert.equal(h.calls.some(x => x.rpc), false)
+  assert.equal(result.status, 409); assert.equal(h.calls.length,1)
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls[0])),{rpc:'confirm_driver_commission',args:{p_code:'123456',p_amount:1}})
 })
 test('payment secret is required before database access', async () => {
   const h = harness({ env: paymentEnv })
   assert.equal((await h.load('app/api/payment/verify/route.ts').POST(request(receipt, 'wrong'))).status, 401)
   assert.equal(h.calls.length, 0)
 })
-test('matching bank receipts cannot unlock a driver; approved receipts are read-only retries', async () => {
+test('matching bank receipts confirm through the atomic RPC; duplicate receipts are idempotent', async () => {
   for (const used of [false, true]) {
-    const h = harness({ env: paymentEnv, rows: { payment_codes: { data: { ...payment, used } } } })
+    const h = harness({ env: paymentEnv, rpcResult: () => ({data:{success:true,already_confirmed:used,available:!used},error:null}) })
     const result = await h.load('app/api/payment/verify/route.ts').POST(request(receipt))
-    assert.equal(result.status, used ? 200 : 409)
+    assert.equal(result.status,200)
     const body = await result.json()
-    if (!used) assert.equal(body.code, 'ADMIN_APPROVAL_REQUIRED')
-    assert.equal(h.calls.some(x => x.rpc || x.action !== 'select'), false)
+    assert.equal(body.already_confirmed,used)
+    assert.deepEqual(JSON.parse(JSON.stringify(h.calls)),[{rpc:'confirm_driver_commission',args:{p_code:receipt.code,p_amount:receipt.amount}}])
   }
 })
 
@@ -112,12 +113,16 @@ test('approval rejects invalid IDs and reports revoked sessions or database conf
     assert.equal((await h.load('app/api/admin/drivers/route.ts').POST(request({ action:'release_payment', order_id:approvalOrder }))).status,status)
   }
 })
-test('manual approval stays required even when a bank webhook secret exists', async () => {
-  const h = harness({ env:paymentEnv, rows:{ settings:{data:[]} } })
-  const response = await h.load('app/api/driver/payment-settings/route.ts').GET(request())
-  const body = await response.json()
-  assert.equal(body.automatic_confirmation,false)
-  assert.equal(body.approval_required,true)
+test('driver payment settings report automatic matching only when key and bank settings exist', async () => {
+  for (const configured of [false,true]) {
+    const h = harness({ env:paymentEnv, rows:{settings:{data:configured?[{key:'bank_name',value:'Test bank'},{key:'bank_account',value:'0000000000'}]:[]}} })
+    const response = await h.load('app/api/driver/payment-settings/route.ts').GET(request())
+    const body = await response.json()
+    assert.equal(body.automatic_confirmation,configured)
+    assert.equal(body.approval_required,false)
+    assert.equal(body.commission_percent,5); assert.equal(body.rounding_step,500)
+    assert.equal(JSON.stringify(body).includes(paymentEnv.PAYMENT_WEBHOOK_SECRET),false)
+  }
 })
 test('admin dashboard reads the unpaid queue independently from recent trip history', async () => {
   const pending = { id:approvalOrder, code:'123456', amount:12500, total_pending:201 }
@@ -164,8 +169,35 @@ test('payment search distinguishes no matches from database failures', async () 
   }
 })
 test('database lookup error is reported, not mistaken for an invalid payment', async () => {
-  const h = harness({ env: paymentEnv, rows: { payment_codes: { error: { code: 'XX000' } } } })
+  const h = harness({ env: paymentEnv, rpcResult:() => ({data:null,error:{code:'XX000'}}) })
   assert.equal((await h.load('app/api/payment/verify/route.ts').POST(request(receipt))).status, 503)
+})
+test('unknown references and invalid receipts retain distinct errors', async () => {
+  for (const [code,status] of [['P0002',404],['22023',400]]) {
+    const h = harness({ env:paymentEnv,rpcResult:()=>({data:null,error:{code}}) })
+    assert.equal((await h.load('app/api/payment/verify/route.ts').POST(request(receipt))).status,status)
+  }
+})
+test('completion returns the database commission instead of fare or client-supplied amounts', async () => {
+  const h = harness({rows:{orders:{data:{id:approvalOrder,driver_id:'driver-a',status:'confirmed',final_price:112820,created_at:new Date().toISOString()}}},
+    rpcResult:()=>({data:[{code:'654321',amount:5500,fare_amount:112820,paid:false}],error:null})})
+  const response=await h.load('app/api/payment/complete/route.ts').POST(request({order_id:approvalOrder,amount:1,final_price:1}))
+  const body=await response.json();assert.equal(response.status,200);assert.equal(body.amount,5500);assert.equal(body.fare_amount,112820)
+  const call=h.calls.find(x=>x.rpc);assert.equal(call.rpc,'complete_order_and_issue_commission');assert.equal(call.args.p_amount,undefined)
+})
+test('webhook key remains private to current admins and is stable without exposing session secrets', async () => {
+  for (const status of [401,403]) {
+    const h=harness({env:paymentEnv,adminAccess:{ok:false,status,error:'Denied'}})
+    const response=await h.load('app/api/admin/payment-connection/route.ts').GET(request())
+    assert.equal(response.status,status);assert.equal(JSON.stringify(await response.json()).includes(paymentEnv.PAYMENT_WEBHOOK_SECRET),false)
+  }
+  const env={SESSION_SECRET:'test-only-session-secret-32-characters-or-longer'},h=harness({env})
+  const api=h.load('app/api/admin/payment-connection/route.ts')
+  const response=await api.GET(request());const body=await response.json()
+  assert.equal(response.status,200);assert.match(response.headers.get('cache-control'),/no-store/)
+  assert.match(body.secret,/^[a-f0-9]{64}$/);assert.notEqual(body.secret,env.SESSION_SECRET)
+  assert.equal(body.url,'https://achilt.example/api/payment/verify')
+  assert.equal((await (await api.GET(request())).json()).secret,body.secret)
 })
 test('completed paid order retry cannot issue a new payment or block driver', async () => {
   const h = harness({ rows: {

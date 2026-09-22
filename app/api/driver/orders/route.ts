@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase.from('payment_codes').select('code,amount,order_id')
+    supabase.from('payment_codes').select('code,amount,order_id,fare_amount')
       .eq('driver_id', driver.id).eq('used', false)
       .order('id', { ascending: false }).limit(1).maybeSingle(),
   ])
