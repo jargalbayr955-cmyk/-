@@ -1,253 +1,206 @@
 'use client'
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createDotMarker, createTruckMarker, freeMapStyle, loadFreeMap, validCoords } from '@/lib/client/free-map'
-
-type DriverSlot = {
-  invite_id: string
-  driver_id: string
-  rank: number
-  invite_status: 'active' | 'offered'
-  invited_at: string
-  expires_at: string
-  driver_name: string | null
-  car_type: string | null
-  lat: number | null
-  lng: number | null
-  distance_km: number | null
-  offer: { id: string; price: number } | null
-}
-
-type SortMode = 'nearest' | 'cheapest'
+import { OfferMap } from '../components/offer-map'
+import { DriverSlot, mapOffers, offerDistance, offerPrice, offerSnapshot, PickupPoint, pickupPoint, remainingSeconds } from '@/lib/order-offers'
 
 export default function DriversPage() {
-  const [slots, setSlots] = useState<DriverSlot[]>([])
-  const [loading, setLoading] = useState(true)
-  const [orderId, setOrderId] = useState<string | null>(null)
-  const [fromAddress, setFromAddress] = useState('')
-  const [toAddress, setToAddress] = useState('')
-  const [userLat, setUserLat] = useState<number | null>(null)
-  const [userLng, setUserLng] = useState<number | null>(null)
-  const [accepting, setAccepting] = useState<string | null>(null)
-  const [sortMode, setSortMode] = useState<SortMode>('nearest')
-  const [dots, setDots] = useState('.')
-  const [expiresAt, setExpiresAt] = useState<string | null>(null)
-  const [expired, setExpired] = useState(false)
-  const [invitedCount, setInvitedCount] = useState(0)
-  const [secondsLeft, setSecondsLeft] = useState(600)
-  const [retrying, setRetrying] = useState(false)
-  const [alertsEnabled, setAlertsEnabled] = useState(false)
-  const mapRef = useRef<HTMLDivElement | null>(null)
-  const [mapReady, setMapReady] = useState(0)
-  const mapInstanceRef = useRef<any>(null)
-  const userMarkerRef = useRef<any>(null)
-  const driverMarkersRef = useRef<Map<string, any>>(new Map())
-  const seenOfferIdsRef = useRef<Set<string>>(new Set())
-  const initialOfferSnapshotRef = useRef(false)
-  const audioContextRef = useRef<AudioContext | null>(null)
   const router = useRouter()
+  const [orderId, setOrderId] = useState<string | null>(null)
+  const [pickup, setPickup] = useState<PickupPoint | null>(null)
+  const [slots, setSlots] = useState<DriverSlot[]>([])
+  const [expiresAt, setExpiresAt] = useState<string | null>(null)
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
+  const [serverExpired, setServerExpired] = useState(false)
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null)
+  const [accepting, setAccepting] = useState(false)
+  const [retrying, setRetrying] = useState(false)
+  const [error, setError] = useState('')
+  const [alertsEnabled, setAlertsEnabled] = useState(false)
+  const [alertsBusy, setAlertsBusy] = useState(false)
+  const [alertsMessage, setAlertsMessage] = useState('')
+  const audioContext = useRef<AudioContext | null>(null)
+  const alertsActive = useRef(false)
+  const actionPending = useRef(false)
+  const expired = serverExpired || secondsLeft === 0
+  const offers = useMemo(() => expired ? [] : mapOffers(slots), [slots, expired])
+  const selected = offers.find(slot => slot.driver_id === selectedDriverId)
 
   useEffect(() => {
-    const t = setInterval(() => setDots(d => d.length >= 3 ? '.' : d + '.'), 500)
-    return () => clearInterval(t)
-  }, [])
+    try {
+      const id = localStorage.getItem('current_order_id')
+      if (!id) { router.replace('/current'); return }
+      setOrderId(id)
+      setPickup(pickupPoint(localStorage.getItem('fromLat'), localStorage.getItem('fromLng')))
+    } catch { router.replace('/current') }
+  }, [router])
 
   useEffect(() => {
-    const oid = localStorage.getItem('current_order_id')
-    setOrderId(oid)
-    setFromAddress(localStorage.getItem('fromAddress') || localStorage.getItem('from') || '')
-    setToAddress(localStorage.getItem('dest') || '')
-    const lat = Number(localStorage.getItem('fromLat'))
-    const lng = Number(localStorage.getItem('fromLng'))
-    if (Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0) {
-      setUserLat(lat); setUserLng(lng)
-    } else {
-      navigator.geolocation.getCurrentPosition(p => { setUserLat(p.coords.latitude); setUserLng(p.coords.longitude) }, () => {})
-    }
-  }, [])
-
-  useEffect(() => {
+    const tick = () => setSecondsLeft(remainingSeconds(expiresAt))
+    tick()
     if (!expiresAt) return
-    const tick = () => {
-      const left = Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 1000))
-      setSecondsLeft(left)
-      if (left <= 0) setExpired(true)
-    }
-    tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
+    const timer = setInterval(tick, 1000)
+    return () => clearInterval(timer)
   }, [expiresAt])
 
-  const playOfferAlert = useCallback(() => {
+  useEffect(() => () => { void audioContext.current?.close().catch(() => {}) }, [])
+
+  const playOfferAlert = useCallback(async () => {
+    if (!alertsActive.current) return
+    if (typeof navigator.vibrate === 'function') navigator.vibrate([250, 120, 250])
+    const ctx = audioContext.current
+    if (!ctx) return
     try {
-      if ('vibrate' in navigator) navigator.vibrate([250, 120, 250])
-      const Ctx = window.AudioContext || (window as any).webkitAudioContext
-      const ctx = audioContextRef.current || (Ctx ? new Ctx() : null)
-      if (ctx) {
-        audioContextRef.current = ctx
-        if (ctx.state === 'suspended') ctx.resume().catch(()=>{})
-        const now = ctx.currentTime
-        ;[880, 1040].forEach((freq, i) => {
-          const osc = ctx.createOscillator(); const gain = ctx.createGain()
-          osc.type = 'sine'; osc.frequency.value = freq
-          gain.gain.setValueAtTime(0.0001, now + i*0.2)
-          gain.gain.exponentialRampToValueAtTime(0.18, now + i*0.2 + 0.02)
-          gain.gain.exponentialRampToValueAtTime(0.0001, now + i*0.2 + 0.17)
-          osc.connect(gain); gain.connect(ctx.destination); osc.start(now + i*0.2); osc.stop(now + i*0.2 + 0.18)
-        })
+      if (ctx.state === 'suspended') await ctx.resume()
+      if (!alertsActive.current || ctx.state !== 'running') return
+      const now = ctx.currentTime
+      for (const [index, frequency] of [880, 1040].entries()) {
+        const oscillator = ctx.createOscillator(), gain = ctx.createGain()
+        oscillator.type = 'sine'
+        oscillator.frequency.value = frequency
+        gain.gain.setValueAtTime(0.0001, now + index * .2)
+        gain.gain.exponentialRampToValueAtTime(.18, now + index * .2 + .02)
+        gain.gain.exponentialRampToValueAtTime(.0001, now + index * .2 + .17)
+        oscillator.connect(gain)
+        gain.connect(ctx.destination)
+        oscillator.onended = () => { oscillator.disconnect(); gain.disconnect() }
+        oscillator.start(now + index * .2)
+        oscillator.stop(now + index * .2 + .18)
       }
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('🚛 Шинэ үнийн санал', { body: 'Ачигч жолооч үнийн санал илгээлээ.' })
-      }
-    } catch {}
+    } catch { setAlertsMessage('Дуу тоглосонгүй. Дууны тохиргоогоо шалгаарай.') }
   }, [])
 
-  const enableAlerts = async () => {
+  const toggleAlerts = async () => {
+    if (alertsBusy) return
+    if (alertsActive.current) {
+      alertsActive.current = false
+      setAlertsEnabled(false)
+      setAlertsMessage('')
+      return
+    }
+    setAlertsBusy(true)
+    setAlertsMessage('')
     try {
-      const Ctx = window.AudioContext || (window as any).webkitAudioContext
-      if (Ctx && !audioContextRef.current) audioContextRef.current = new Ctx()
-      if (audioContextRef.current?.state === 'suspended') await audioContextRef.current.resume()
-      if ('Notification' in window && Notification.permission === 'default') await Notification.requestPermission()
-      if ('vibrate' in navigator) navigator.vibrate(80)
+      const Ctx = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!Ctx) throw new Error('Audio unsupported')
+      audioContext.current ??= new Ctx()
+      if (audioContext.current.state === 'suspended') await audioContext.current.resume()
+      if (audioContext.current.state !== 'running') throw new Error('Audio not enabled')
+      alertsActive.current = true
       setAlertsEnabled(true)
-    } catch { setAlertsEnabled(true) }
+      await playOfferAlert()
+      if (typeof navigator.vibrate !== 'function') setAlertsMessage('Дуу асаалттай. Энэ browser чичиргээ дэмжихгүй.')
+    } catch { setAlertsMessage('Дууг асааж чадсангүй. Дахин дарж оролдоно уу.') }
+    finally { setAlertsBusy(false) }
   }
 
-  const fetchSlots = useCallback(async () => {
+  useEffect(() => {
     if (!orderId) return
+    let cancelled = false, pending = false
+    let controller: AbortController | undefined
+    let seen: Set<string> | null = null
+    let stopped = false
+    const poll = async () => {
+      if (cancelled || pending) return
+      pending = true
+      controller = new AbortController()
+      const timeout = setTimeout(() => controller?.abort(), 12_000)
+      try {
+        const response = await fetch('/api/order/slots', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_id: orderId }), cache: 'no-store', signal: controller.signal })
+        if (cancelled) return
+        if (response.status === 401) { router.replace('/start'); return }
+        if (response.status === 404) { router.replace('/current'); return }
+        if (!response.ok) throw new Error('Request failed')
+        const body = await response.json()
+        if (cancelled) return
+        if (body.order_status && body.order_status !== 'pending') {
+          stopped = true
+          if (body.selected_driver_id) {
+            try { localStorage.setItem('tracking_driver_id', body.selected_driver_id) } catch {}
+            router.replace('/tracking')
+          } else router.replace('/current')
+          return
+        }
+        const next: DriverSlot[] = Array.isArray(body.slots) ? body.slots : []
+        if (body.pickup) setPickup(pickupPoint(body.pickup.lat, body.pickup.lng))
+        setExpiresAt(body.bidding_expires_at || null)
+        setServerExpired(Boolean(body.expired))
+        stopped = Boolean(body.expired)
+        const snapshot = offerSnapshot(seen, next)
+        seen = snapshot.seen
+        if (snapshot.hasNew && !body.expired) void playOfferAlert()
+        setSlots(next)
+        setError('')
+      } catch {
+        if (!cancelled) setError('Холболт тасарлаа. Үнийн саналыг дахин шалгаж байна…')
+      } finally { clearTimeout(timeout); pending = false }
+    }
+    void poll()
+    const timer = setInterval(() => { if (!stopped && document.visibilityState === 'visible') void poll() }, 4000)
+    const onVisible = () => { if (document.visibilityState === 'visible') void poll() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { cancelled = true; controller?.abort(); clearInterval(timer); document.removeEventListener('visibilitychange', onVisible) }
+  }, [orderId, router, playOfferAlert])
+
+  const acceptOffer = async () => {
+    if (!orderId || !selected?.offer || expired || actionPending.current) return
+    actionPending.current = true
+    setAccepting(true)
+    setError('')
     try {
-      const res = await fetch('/api/order/slots', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({order_id:orderId}), cache:'no-store' })
-      if (!res.ok) return
-      const body = await res.json()
-      if (body.order_status && body.order_status !== 'pending') {
-        if (body.selected_driver_id) { localStorage.setItem('tracking_driver_id', body.selected_driver_id); router.replace('/tracking') }
-        return
-      }
-      const nextSlots: DriverSlot[] = Array.isArray(body.slots) ? body.slots : []
-      setInvitedCount(Number(body.invited_count || 0))
-      if (body.bidding_expires_at) setExpiresAt(body.bidding_expires_at)
-      setExpired(Boolean(body.expired))
-
-      const offerIds = nextSlots.filter(s=>s.offer).map(s=>s.offer!.id)
-      if (!initialOfferSnapshotRef.current) {
-        seenOfferIdsRef.current = new Set(offerIds)
-        initialOfferSnapshotRef.current = true
-      } else {
-        const hasNew = offerIds.some(id => !seenOfferIdsRef.current.has(id))
-        offerIds.forEach(id => seenOfferIdsRef.current.add(id))
-        if (hasNew && alertsEnabled) playOfferAlert()
-      }
-      setSlots(nextSlots); setLoading(false)
-    } catch {}
-  }, [orderId, router, alertsEnabled, playOfferAlert])
-
-  useEffect(() => {
-    if (!orderId || expired) return
-    fetchSlots()
-    const interval = setInterval(() => { if (document.visibilityState === 'visible') fetchSlots() }, 4_000)
-    return () => clearInterval(interval)
-  }, [orderId, fetchSlots, expired])
-
-  useEffect(() => {
-    if (!mapRef.current || userLat == null || userLng == null || mapInstanceRef.current) return
-    let cancelled=false
-    ;(async()=>{
-      try{
-        const ml=await loadFreeMap()
-        if(cancelled||!mapRef.current)return
-        const map=new ml.Map({container:mapRef.current,style:freeMapStyle(),center:[userLng,userLat],zoom:14,attributionControl:{}})
-        map.addControl(new ml.NavigationControl({showCompass:false}),'top-right')
-        userMarkerRef.current=new ml.Marker({element:createDotMarker('#2563eb',18,'Таны байршил')}).setLngLat([userLng,userLat]).addTo(map)
-        mapInstanceRef.current=map
-        setMapReady(n => n + 1)
-      }catch(error){console.error('Map initialization failed',error)}
-    })()
-    const markerStore=driverMarkersRef.current
-    return()=>{cancelled=true;userMarkerRef.current?.remove?.();userMarkerRef.current=null;for(const m of markerStore.values())m.remove?.();markerStore.clear();mapInstanceRef.current?.remove?.();mapInstanceRef.current=null}
-  },[userLat,userLng])
-
-  const offers = useMemo(() => {
-    const list=slots.filter(s=>s.offer)
-    return [...list].sort((a,b)=>sortMode==='cheapest'?(a.offer?.price||Infinity)-(b.offer?.price||Infinity):(a.distance_km??Infinity)-(b.distance_km??Infinity))
-  },[slots,sortMode])
-
-  useEffect(() => {
-    const map=mapInstanceRef.current
-    const ml=window.maplibregl
-    if(!map||!ml)return
-    const liveIds=new Set<string>()
-    const bounds=new ml.LngLatBounds()
-    let hasBounds=false
-    if(userLat!=null&&userLng!=null){bounds.extend([userLng,userLat]);hasBounds=true}
-    offers.forEach(slot=>{
-      if(!validCoords(slot.lat,slot.lng)||slot.lat==null||slot.lng==null||!slot.offer)return
-      liveIds.add(slot.driver_id);bounds.extend([slot.lng,slot.lat]);hasBounds=true
-      const label=`₮${slot.offer.price.toLocaleString()}${slot.distance_km!=null?` · ${slot.distance_km} км`:''}`
-      const existing=driverMarkersRef.current.get(slot.driver_id)
-      if(existing){existing.setLngLat([slot.lng,slot.lat]);const el=existing.getElement?.();if(el){const tag=el.lastElementChild as HTMLElement|null;if(tag)tag.textContent=label}}
-      else{
-        const marker=new ml.Marker({element:createTruckMarker(label)}).setLngLat([slot.lng,slot.lat]).addTo(map)
-        driverMarkersRef.current.set(slot.driver_id,marker)
-      }
-    })
-    for(const [driverId,marker] of driverMarkersRef.current.entries())if(!liveIds.has(driverId)){marker.remove?.();driverMarkersRef.current.delete(driverId)}
-    if(hasBounds&&offers.length>0)map.fitBounds(bounds,{padding:55,maxZoom:15,duration:500})
-  },[offers,userLat,userLng,mapReady])
-
-  const acceptOffer=async(slot:DriverSlot)=>{
-    if(!orderId||!slot.offer||expired)return
-    setAccepting(slot.offer.id)
-    try{
-      const res=await fetch('/api/order/accept-offer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order_id:orderId,offer_id:slot.offer.id})})
-      const body=await res.json().catch(()=>({}))
-      if(!res.ok){alert(body.error||'Энэ санал сонгох боломжгүй болсон байна');await fetchSlots();return}
-      localStorage.setItem('tracking_driver_id',slot.driver_id);router.push('/tracking')
-    }finally{setAccepting(null)}
+      const response = await fetch('/api/order/accept-offer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_id: orderId, offer_id: selected.offer.id }), signal: AbortSignal.timeout(15_000) })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) { setError(body.error || 'Энэ саналыг сонгох боломжгүй болсон байна.'); setSelectedDriverId(null); return }
+      try { localStorage.setItem('tracking_driver_id', selected.driver_id) } catch {}
+      router.replace('/tracking')
+    } catch { setError('Сонголтыг баталгаажуулж чадсангүй. Холболтоо шалгана уу.') }
+    finally { actionPending.current = false; setAccepting(false) }
   }
 
-  const retrySearch=async()=>{
-    if(!orderId||retrying)return
+  const retrySearch = async () => {
+    if (!orderId || actionPending.current) return
+    actionPending.current = true
     setRetrying(true)
-    try{
-      const res=await fetch('/api/order/retry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order_id:orderId})})
-      const body=await res.json().catch(()=>({}))
-      if(!res.ok){alert(body.error||'Дахин хайлт эхлүүлэхэд алдаа гарлаа');return}
-      const newId=body.order?.id
-      if(!newId)return
-      localStorage.setItem('current_order_id',newId)
-      setOrderId(newId); setSlots([]); setExpired(false); setInvitedCount(Number(body.invited_count||0)); setExpiresAt(body.bidding_expires_at||null); setLoading(true); setSecondsLeft(600)
-      seenOfferIdsRef.current.clear(); initialOfferSnapshotRef.current=false
-    }finally{setRetrying(false)}
+    setError('')
+    try {
+      const response = await fetch('/api/order/retry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_id: orderId }), signal: AbortSignal.timeout(15_000) })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok || !body.order?.id) { setError(body.error || 'Дахин хайлт эхлүүлж чадсангүй.'); return }
+      try { localStorage.setItem('current_order_id', body.order.id) } catch {}
+      setOrderId(body.order.id)
+      setSlots([])
+      setSelectedDriverId(null)
+      setServerExpired(false)
+      setExpiresAt(body.bidding_expires_at || null)
+      setSecondsLeft(remainingSeconds(body.bidding_expires_at || null))
+    } catch { setError('Холболтоо шалгаад дахин оролдоно уу.') }
+    finally { actionPending.current = false; setRetrying(false) }
   }
 
-  const mm=String(Math.floor(secondsLeft/60)).padStart(2,'0'), ss=String(secondsLeft%60).padStart(2,'0')
+  const clock = secondsLeft == null ? '--:--' : `${String(Math.floor(secondsLeft / 60)).padStart(2, '0')}:${String(secondsLeft % 60).padStart(2, '0')}`
 
-  return <div style={{minHeight:'100vh',background:'#07090d',color:'white'}}>
-    <div style={{padding:'14px 16px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid rgba(255,255,255,.08)'}}>
-      <button onClick={()=>router.back()} style={{background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.1)',borderRadius:20,padding:'7px 12px',color:'white'}}>← Буцах</button>
-      <div style={{flex:1}}><div style={{fontWeight:800}}>Ойрын 8 ачигч</div><div style={{fontSize:12,color:'rgba(255,255,255,.45)',marginTop:2}}>{expired?'10 минутын хайлт дууссан':offers.length?`${offers.length} үнийн санал ирсэн`:`Үнийн санал хүлээж байна${dots}`}</div></div>
-      <div style={{textAlign:'right'}}><div style={{fontSize:13,color:expired?'#ff7a70':'white',fontWeight:900}}>{expired?'ДУУССАН':`${mm}:${ss}`}</div><div style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>{invitedCount}/8 жолооч</div></div>
-    </div>
-
-    <div ref={mapRef} style={{height:'45vh',minHeight:320,background:'#111'}}/>
-
-    <div style={{padding:16}}>
-      {!alertsEnabled && !expired && <button onClick={enableAlerts} style={{width:'100%',marginBottom:12,borderRadius:12,padding:'11px 12px',border:'1px solid rgba(59,130,246,.35)',background:'rgba(59,130,246,.12)',color:'white',fontWeight:800}}>🔔 Үнэ ирэхэд дуу + чичиргээ асаах</button>}
-
-      <div style={{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.07)',borderRadius:18,padding:'14px 15px',marginBottom:14}}>
-        <div style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>АВАХ ГАЗАР</div><div style={{fontSize:13,marginTop:3}}>{fromAddress||'GPS байршил'}</div>
-        <div style={{fontSize:11,color:'rgba(255,255,255,.4)',marginTop:9}}>ХҮРЭХ ГАЗАР</div><div style={{fontSize:13,marginTop:3}}>{toAddress||'-'}</div>
+  return <main className="offers-map-page">
+    <OfferMap pickup={pickup} offers={offers} selectedDriverId={selectedDriverId} onSelect={setSelectedDriverId} />
+    <header className="offers-map-header">
+      <div className="offers-status-bar">
+        <button type="button" className="offers-back" onClick={() => router.replace('/current')}>← Буцах</button>
+        <h1 aria-live="polite">{expired ? 'Хайлтын хугацаа дууслаа' : 'Үнийн санал хүлээж байна'}</h1>
+        <time className="offers-countdown" aria-label={`Үлдсэн хугацаа ${clock}`}>{clock}</time>
       </div>
+      <button type="button" className="offers-alerts" aria-pressed={alertsEnabled} onClick={() => void toggleAlerts()} disabled={alertsBusy}>
+        {alertsBusy ? 'Дууг асааж байна…' : alertsEnabled ? '🔔 Дуу + чичиргээ асаалттай' : '🔔 Үнэ ирэхэд дуу + чичиргээ асаах'}
+      </button>
+      {alertsMessage && <p className="offers-inline-message" role="status">{alertsMessage}</p>}
+      {error && <p className="offers-inline-message offers-error" role="alert">{error}</p>}
+    </header>
 
-      {expired ? <div style={{background:'rgba(232,67,58,.08)',border:'1px solid rgba(232,67,58,.25)',borderRadius:16,padding:18,textAlign:'center'}}>
-        <div style={{fontWeight:900,fontSize:16}}>10 минутын хайлт дууслаа</div>
-        <div style={{fontSize:13,color:'rgba(255,255,255,.55)',marginTop:7}}>Шинэ хайлт эхлүүлэхэд тухайн үеийн хамгийн ойр 8 жолоочид дахин мэдээлэл очно.</div>
-        <button onClick={retrySearch} disabled={retrying} style={{width:'100%',marginTop:14,border:0,borderRadius:12,padding:13,background:'linear-gradient(135deg,#ef473d,#db3129)',color:'white',fontWeight:900,opacity:retrying ? .65 : 1}}>{retrying?'Дахин хайж байна...':'🔄 Дахин машин хайх'}</button>
-      </div> : <>
-        <div style={{display:'flex',gap:8,marginBottom:12}}>
-          <button onClick={()=>setSortMode('nearest')} style={{flex:1,borderRadius:12,padding:'10px 8px',border:sortMode==='nearest'?'1px solid #e8433a':'1px solid rgba(255,255,255,.08)',background:sortMode==='nearest'?'rgba(232,67,58,.14)':'rgba(255,255,255,.04)',color:'white',fontWeight:700}}>📍 Хамгийн ойр</button>
-          <button onClick={()=>setSortMode('cheapest')} style={{flex:1,borderRadius:12,padding:'10px 8px',border:sortMode==='cheapest'?'1px solid #e8433a':'1px solid rgba(255,255,255,.08)',background:sortMode==='cheapest'?'rgba(232,67,58,.14)':'rgba(255,255,255,.04)',color:'white',fontWeight:700}}>₮ Хамгийн хямд</button>
-        </div>
-        {loading?<div style={{textAlign:'center',padding:30,color:'rgba(255,255,255,.45)'}}>Ойрын жолооч нарыг хайж байна{dots}</div>:offers.length===0?<div style={{background:'rgba(255,255,255,.03)',borderRadius:14,padding:18,textAlign:'center',color:'rgba(255,255,255,.5)',fontSize:13}}>Тухайн үеийн хамгийн ойр {invitedCount} жолоочид мэдээлэл очсон. 10 минутын дотор үнэ ирвэл газрын зураг дээр үнэ, км, жолоочийн мэдээлэл гарна.</div>:<div style={{display:'flex',flexDirection:'column',gap:10}}>{offers.map((slot,idx)=><div key={slot.driver_id} style={{background:'rgba(255,255,255,.045)',border:'1px solid rgba(255,255,255,.08)',borderRadius:20,padding:16}}><div style={{display:'flex',alignItems:'center',gap:12}}><div style={{fontSize:32}}>🚛</div><div style={{flex:1}}><div style={{fontSize:14,fontWeight:800}}>{slot.driver_name||`Ачигч ${idx+1}`}</div><div style={{fontSize:12,color:'rgba(255,255,255,.45)',marginTop:3}}>📍 {slot.distance_km??'-'} км зайтай</div></div><div style={{fontSize:19,fontWeight:900}}>₮{slot.offer!.price.toLocaleString()}</div></div><button disabled={!!accepting} onClick={()=>acceptOffer(slot)} style={{width:'100%',marginTop:12,border:0,borderRadius:12,padding:12,background:'#e8433a',color:'white',fontWeight:800,cursor:'pointer',opacity:accepting ? .65 : 1}}>{accepting===slot.offer!.id?'Сонгож байна...':'Энэ ачигчийг сонгох'}</button></div>)}</div>}
-      </>}
-    </div>
-  </div>
+    {selected?.offer && !expired && <section className="offer-selection" aria-label="Сонгосон жолоочийн санал">
+      <button type="button" className="offer-selection-close" aria-label="Саналыг хаах" onClick={() => setSelectedDriverId(null)} disabled={accepting}>×</button>
+      <div className="offer-selection-details"><div><strong>{selected.driver_name || 'Жолооч'}</strong><span>{offerDistance(selected.distance_km)}</span></div><b>{offerPrice(selected.offer.price)}</b></div>
+      <button type="button" className="offer-select-button" disabled={accepting} onClick={() => void acceptOffer()}>{accepting ? 'Сонгож байна…' : 'Энэ жолоочийг сонгох'}</button>
+    </section>}
+
+    {expired && <div className="offers-expired"><button type="button" className="offer-select-button" disabled={retrying} onClick={() => void retrySearch()}>{retrying ? 'Дахин хайж байна…' : 'Дахин машин хайх'}</button></div>}
+  </main>
 }

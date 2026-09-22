@@ -252,3 +252,41 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .current-map-header { left:18px; width:400px; transform:none; }
   .current-map-canvas .maplibregl-ctrl-top-right { top:12px; }
 }
+
+/* Offer waiting: one full-screen map with essential controls. */
+.offers-map-page { position:fixed; inset:0; color:var(--text); background:var(--bg); isolation:isolate; }
+.offers-map-canvas { position:absolute; inset:0; background:#11151b; }
+.offers-map-canvas .maplibregl-ctrl-attrib { font-size:9px; }
+.offers-map-header { position:absolute; z-index:5; top:calc(12px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); width:min(600px,calc(100% - 24px)); display:grid; gap:8px; pointer-events:none; }
+.offers-map-header > * { pointer-events:auto; }
+.offers-status-bar { display:flex; align-items:center; gap:10px; padding:10px; border:1px solid rgba(255,255,255,.16); border-radius:18px; background:rgba(7,9,13,.95); box-shadow:var(--shadow); }
+.offers-back { flex-shrink:0; min-height:44px; padding:8px 10px; border:1px solid var(--line); border-radius:12px; color:white; background:rgba(255,255,255,.06); font-size:12px; font-weight:750; cursor:pointer; }
+.offers-status-bar h1 { flex:1; min-width:0; margin:0; font-size:14px; font-weight:850; line-height:1.4; }
+.offers-countdown { flex-shrink:0; color:#ffaaa4; font-size:19px; font-weight:900; font-variant-numeric:tabular-nums; }
+.offers-alerts { min-height:46px; width:100%; padding:11px 12px; border:1px solid #36517a; border-radius:14px; color:#e9f1ff; background:rgba(16,33,55,.96); font-size:13px; font-weight:750; cursor:pointer; }
+.offers-alerts[aria-pressed="true"] { border-color:#35654d; background:rgba(15,42,29,.96); color:#b5edce; }
+.offers-inline-message { margin:0; padding:10px 12px; border-radius:12px; background:rgba(7,9,13,.94); color:#c8d1de; font-size:12px; line-height:1.5; }
+.offers-error { background:#351513; color:#ffd0cd; }
+.offers-map-error { position:absolute; z-index:6; left:12px; right:12px; bottom:calc(20px + env(safe-area-inset-bottom)); padding:12px; border-radius:12px; background:#351513; color:#ffd0cd; font-size:12px; }
+.offer-map-marker { display:flex; flex-direction:column; align-items:center; min-width:112px; min-height:72px; padding:5px 10px 8px; border:2px solid #f6f8fc; border-radius:16px; color:white; background:#b82923; box-shadow:0 6px 20px rgba(0,0,0,.4); cursor:pointer; }
+.offer-map-marker[aria-pressed="true"] { z-index:2; background:#174e9c; border-color:#b7d5ff; }
+.offer-map-marker:focus-visible { outline:3px solid #72acff; outline-offset:3px; }
+.offer-map-truck { font-size:25px; line-height:1.15; }
+.offer-map-marker strong { font-size:15px; font-weight:900; line-height:1.4; white-space:nowrap; }
+.offer-map-distance { font-size:11px; white-space:nowrap; line-height:1.4; }
+.offer-selection, .offers-expired { position:absolute; z-index:7; bottom:calc(24px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); width:min(420px,calc(100% - 24px)); }
+.offer-selection { padding:18px; border:1px solid rgba(255,255,255,.2); border-radius:22px; background:rgba(10,13,18,.98); box-shadow:var(--shadow); }
+.offer-selection-close { position:absolute; right:6px; top:2px; width:40px; height:40px; border:0; border-radius:12px; background:transparent; color:#bbc4d1; font-size:24px; cursor:pointer; }
+.offer-selection-details { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:14px 0; padding-right:4px; }
+.offer-selection-details strong, .offer-selection-details span { display:block; }
+.offer-selection-details strong { font-size:15px; }
+.offer-selection-details span { margin-top:4px; color:#b5beca; font-size:12px; }
+.offer-selection-details b { font-size:22px; white-space:nowrap; }
+.offer-select-button { width:100%; min-height:48px; padding:12px; border:0; border-radius:14px; color:white; background:var(--brand); font-weight:850; cursor:pointer; }
+.offer-select-button:disabled, .offers-alerts:disabled { opacity:.65; cursor:wait; }
+@media (max-width:360px) {
+  .offers-status-bar { gap:7px; padding:8px; }
+  .offers-status-bar h1 { font-size:12px; }
+  .offers-countdown { font-size:17px; }
+  .offers-alerts { font-size:12px; }
+}
