@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   if (!isSessionConfigured()) return NextResponse.json({ error: 'Нэвтрэх үйлчилгээ түр боломжгүй байна. Дахин оролдоно уу.' }, { status: 503 })
   const ip = getClientIp(req)
   if (!(await allowRequest(`driver-login:${ip}`, 12, 10 * 60_000))) return NextResponse.json({ error: 'Олон удаа буруу оролдлоо. Түр хүлээнэ үү.' }, { status: 429 })
-  const { phone, pin } = await req.json().catch(() => ({}))
+  const { phone, pin } = (await req.json().catch(() => null)) ?? {}
   const normalized = normalizeMnPhone(phone)
   if (!normalized || !/^\d{4,8}$/.test(String(pin || ''))) return NextResponse.json({ error: 'Дугаар эсвэл PIN буруу байна' }, { status: 400 })
   const s = getSupabaseAdmin()

@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   }
   const ip = getClientIp(req)
   if (!(await allowRequest(`customer-register:${ip}`, 6, 10 * 60_000))) return NextResponse.json({ error: 'Түр хүлээгээд дахин оролдоно уу' }, { status: 429 })
-  const { phone, pin } = await req.json().catch(() => ({}))
+  const { phone, pin } = (await req.json().catch(() => null)) ?? {}
   const normalized = normalizeMnPhone(phone)
   if (!normalized || !/^\d{4,8}$/.test(String(pin || ''))) return NextResponse.json({ error: 'Утас эсвэл PIN буруу байна' }, { status: 400 })
   const admin = getSupabaseAdmin()

@@ -99,3 +99,15 @@ test('health passes only with database and session signing ready', async () => {
   assert.equal(response.status, 200)
   assert.equal((await response.json()).authentication, 'ok')
 })
+
+for (const route of ['customer/register', 'customer/login', 'driver/login']) {
+  test(`${route} rejects null and malformed payloads without creating a session`, async () => {
+    for (const body of ['null', '[]', '{invalid']) {
+      const h = harness('x'.repeat(32))
+      const response = await h.load(`app/api/${route}/route.ts`).POST(new NextRequest('https://achilt.example/api/test', {method:'POST', body}))
+      assert.equal(response.status,400)
+      assert.equal(response.headers.get('set-cookie'),null)
+      assert.deepEqual(h.calls,['consume_rate_limit'])
+    }
+  })
+}
