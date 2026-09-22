@@ -5,12 +5,15 @@ unavailable, and opens the payment screen. New work stays blocked until an
 administrator approves the specific job. Reloading or using another device
 restores the same pending payment from the database.
 
-The admin dashboard's **Жолоочийн эрх нээх** section shows unpaid completed jobs,
-including older jobs outside recent history. Each card shows the driver's name,
-phone, route, amount and payment reference. **Зөвшөөрөх · Эрх нээх** approves only
-that job. The queue shows the oldest 200 entries and the total pending count;
-more entries appear as approvals remove earlier entries. The visible dashboard
-refreshes every ten seconds without overwriting bank settings being edited.
+The admin dashboard has a separate **Эрх нээх** tab for unpaid completed jobs,
+including older jobs outside recent history. Search by car plate or driver phone,
+including partial numbers. Spaces, hyphens and letter case are ignored. Search
+runs over the whole queue before pagination (50 results per page), rather than
+only the dashboard's first 200 rows. Clearing the search restores all pending jobs.
+Each card shows the driver's name, plate, phone, route, amount and payment reference.
+**Зөвшөөрөх · Эрх нээх** approves only that job and keeps the current search.
+The visible queue refreshes every ten seconds; it stops when another tab is open.
+The main dashboard also refreshes without overwriting bank settings being edited.
 
 Driver polling refreshes every five seconds while the screen is visible. Once
 approved, the payment screen closes. Existing eligibility rules still apply:
@@ -30,7 +33,10 @@ Automatic payment verification cannot unlock drivers: the bank webhook returns
 Previously approved payments and payment amounts are unchanged.
 
 Verification: `node --test tests/*.test.cjs`, `npm run lint -- --quiet`,
-`npm run build`, and rollback-only `tests/payment-database.sql`.
+`npm run build`, and rollback-only `tests/payment-database.sql` and
+`tests/admin-payment-search.sql`.
 The database script verifies completion/retry, manual approval, stale admin
 sessions, role grants, old payment rejection, the unpaid queue, other blocking
 work and disabled drivers. It rolls back every fixture and credential change.
+Search verification covers phone formatting, Cyrillic plates, paging through
+206 fixtures, wildcard input and finding a matching job after the first 200.

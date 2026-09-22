@@ -129,6 +129,40 @@ test('admin dashboard reads the unpaid queue independently from recent trip hist
   assert.equal(body.pendingPayments[0].id,approvalOrder)
   assert.deepEqual(body.activeOrders,[])
 })
+test('payment search rejects anonymous, expired and temporary admin sessions before reading data', async () => {
+  for (const status of [401, 403, 503]) {
+    const h = harness({ adminAccess: { ok:false, status, error:'Denied' } })
+    const result = await h.load('app/api/admin/payments/route.ts').GET(new NextRequest('https://achilt.example/api/admin/payments?q=99112233'))
+    assert.equal(result.status,status); assert.equal(h.calls.length,0)
+    assert.match(result.headers.get('cache-control'),/no-store/)
+  }
+})
+test('payment search sends plate/phone terms and pagination as RPC parameters without exposing secrets', async () => {
+  for (const q of ['1234 уба', '+976 9911-2233', '12%34', "x');drop table drivers;--"]) {
+    const pending = { id:approvalOrder, car_number:'1234 УБА', driver_phone:'+97699112233', amount:12500 }
+    const h = harness({ rpcResult:() => ({ data:{payments:[pending],total:205}, error:null }) })
+    const response = await h.load('app/api/admin/payments/route.ts').GET(new NextRequest(`https://achilt.example/api/admin/payments?q=${encodeURIComponent(q)}&offset=200`))
+    assert.equal(response.status,200); assert.match(response.headers.get('cache-control'),/no-store/)
+    assert.deepEqual(await response.json(),{payments:[pending],total:205})
+    assert.deepEqual(JSON.parse(JSON.stringify(h.calls)),[{rpc:'admin_search_driver_payments',args:{p_search:q,p_offset:200}}])
+  }
+})
+test('payment search rejects oversized terms and invalid pagination before reaching the database', async () => {
+  for (const query of ['q='+'a'.repeat(41),'offset=-1','offset=1.5','offset=abc','offset=1000001']) {
+    const h = harness()
+    assert.equal((await h.load('app/api/admin/payments/route.ts').GET(new NextRequest(`https://achilt.example/api/admin/payments?${query}`))).status,400)
+    assert.equal(h.calls.length,0)
+  }
+})
+test('payment search distinguishes no matches from database failures', async () => {
+  for (const [rpcResult,status] of [
+    [()=>({data:{payments:[],total:0},error:null}),200],
+    [()=>({data:null,error:{code:'XX000'}}),503],
+  ]) {
+    const h = harness({rpcResult})
+    assert.equal((await h.load('app/api/admin/payments/route.ts').GET(new NextRequest('https://achilt.example/api/admin/payments'))).status,status)
+  }
+})
 test('database lookup error is reported, not mistaken for an invalid payment', async () => {
   const h = harness({ env: paymentEnv, rows: { payment_codes: { error: { code: 'XX000' } } } })
   assert.equal((await h.load('app/api/payment/verify/route.ts').POST(request(receipt))).status, 503)

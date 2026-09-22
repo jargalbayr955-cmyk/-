@@ -12,3 +12,18 @@
 .card button { width: 100%; min-height: 46px; border: 1px solid #40945c; border-radius: 12px; background: #113821; color: #a4f2ba; font-size: 15px; font-weight: 700; cursor: pointer; }
 .card button:disabled { opacity: .55; cursor: wait; }
 .card button:focus-visible { outline: 3px solid #ffda63; outline-offset: 3px; }
+.plate { margin: 10px 0 4px; font-size: 14px; color: #dcdce2; }
+.plate strong { color: white; }
+.search { margin: 20px 0; }
+.search label { display: block; margin-bottom: 8px; font-size: 14px; color: #dcdce2; }
+.searchRow { display: flex; gap: 8px; }
+.search input { flex: 1; min-width: 0; min-height: 48px; border: 1px solid #52525c; border-radius: 12px; padding: 12px; background: #16161d; color: white; font-size: 16px; }
+.search input::placeholder { color: #9696a3; font-size: 13px; }
+.search button, .pagination button, .error button { min-height: 44px; padding: 8px 14px; border: 1px solid #52525c; border-radius: 12px; background: #25252e; color: white; cursor: pointer; }
+.search button[type=submit] { background: #e8433a; border-color: #e8433a; font-weight: 700; }
+.search .clear { margin-top: 8px; background: transparent; border-color: transparent; color: #c6c6cc; padding-left: 0; }
+.queue input:focus-visible, .queue button:focus-visible { outline: 3px solid #ffda63; outline-offset: 2px; }
+.queue button:disabled { opacity: .5; cursor: default; }
+.success { padding: 12px; border-radius: 12px; background: #113821; color: #a4f2ba; font-size: 14px; line-height: 1.6; }
+.error { color: #ff9f99; font-size: 14px; line-height: 1.6; }
+.pagination { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 16px; font-size: 13px; color: #c6c6cc; flex-wrap: wrap; }

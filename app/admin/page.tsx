@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useScreenHistory } from '@/lib/client/use-screen-history'
 import { backInApp, readScreen } from '@/lib/client/navigation'
 import { AdminPasswordForm } from '../components/admin-password-form'
-import { AdminPaymentQueue, type PendingDriverPayment } from '../components/admin-payment-queue'
+import { AdminPaymentPanel } from '../components/admin-payment-panel'
 import { createDotMarker, freeMapStyle, loadFreeMap, validCoords, ULAANBAATAR } from '@/lib/client/free-map'
 
 type Driver = {
@@ -95,8 +95,8 @@ function MapTab({ drivers }: { drivers: any[] }) {
 
 export default function AdminPage() {
   const router = useRouter()
-  const navigation = useScreenHistory('admin', 'drivers', (value): value is string => /^(drivers|active|history|map)(:password|:add)?$/.test(value))
-  const tab = navigation.screen.split(':')[0] as 'drivers'|'active'|'history'|'map'
+  const navigation = useScreenHistory('admin', 'drivers', (value): value is string => /^(drivers|payments|active|history|map)(:password|:add)?$/.test(value))
+  const tab = navigation.screen.split(':')[0] as 'drivers'|'payments'|'active'|'history'|'map'
   const setTab = (value: typeof tab) => navigation.navigate(value)
   const showForm = navigation.screen.endsWith(':add')
   const showPasswordForm = navigation.screen.endsWith(':password')
@@ -124,11 +124,7 @@ export default function AdminPage() {
   const [bankSaved, setBankSaved] = useState(false)
   const [nowMs, setNowMs] = useState(0)
   const [dashboardError, setDashboardError] = useState('')
-  const [pendingPayments, setPendingPayments] = useState<PendingDriverPayment[]>([])
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0)
-  const [approvingId, setApprovingId] = useState<string | null>(null)
-  const [approvalMessage, setApprovalMessage] = useState('')
-  const approvalPending = React.useRef(false)
   const dashboardSequence = React.useRef(0)
 
   useEffect(() => {
@@ -154,7 +150,6 @@ export default function AdminPage() {
     setDrivers(body.drivers || [])
     setActiveOrders(body.activeOrders || [])
     setOrders(body.orders || [])
-    setPendingPayments(body.pendingPayments || [])
     setPendingApprovalCount(body.pendingApprovalCount || 0)
     // Background updates must not overwrite bank/account fields being edited.
     if (refreshSettings) {
@@ -179,21 +174,9 @@ export default function AdminPage() {
     }
   }, [authed, mustChangePassword, fetchDashboard])
 
-  const approvePayment = async (orderId: string) => {
-    if (approvalPending.current) return
-    approvalPending.current = true
-    setApprovingId(orderId); setApprovalMessage(''); setDashboardError('')
-    try {
-      const res = await fetch('/api/admin/drivers', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'release_payment',order_id:orderId}), signal:AbortSignal.timeout(12_000) })
-      const body = await res.json().catch(() => ({}))
-      if (res.status === 401) { setAuthed(false); return }
-      if (!res.ok) throw new Error(body.error || 'Зөвшөөрөл хадгалагдсангүй. Дахин оролдоно уу.')
-      setPendingPayments(current => current.filter(payment => payment.id !== orderId))
-      setApprovalMessage(body.available ? 'Зөвшөөрлөө. Жолооч дараагийн захиалга авах боломжтой.' : body.pending_payments > 0 ? 'Захиалгыг зөвшөөрлөө. Жолоочид хүлээгдэж буй өөр төлбөр байна.' : 'Захиалгыг зөвшөөрлөө. Жолоочийн бүртгэл болон ажиллах төлөвийг шалгана уу.')
-      await fetchDashboard()
-    } catch (cause) { setDashboardError(cause instanceof Error ? cause.message : 'Зөвшөөрөл хадгалагдсан эсэхийг шалгаад дахин оролдоно уу.') }
-    finally { approvalPending.current = false; setApprovingId(null) }
-  }
+  const paymentSessionExpired = React.useCallback(() => {
+    setAuthed(false); setLoginError('Нэвтрэлт дууслаа. Дахин нэвтэрнэ үү.')
+  }, [])
 
   const saveHeroUrl = async () => {
     const res = await fetch('/api/admin/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:'hero_url',value:heroUrl}) })
@@ -358,9 +341,10 @@ export default function AdminPage() {
       </div>}
 
       {/* Tabs */}
-      <div style={{display:'flex', gap:'8px', padding:'16px 20px 0', borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
+      <div style={{display:'flex', gap:'8px', flexWrap:'wrap', padding:'16px 20px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
         {[
           {id:'drivers', label:'🚛 Жолооч'},
+          {id:'payments', label:`✓ Эрх нээх${pendingApprovalCount ? ` (${pendingApprovalCount})` : ''}`},
           {id:'active', label:'⚡ Идэвхтэй'},
           {id:'history', label:'📋 Захиалгын түүх'},
           {id:'map', label:'🗺️ Газрын зураг'}
@@ -377,8 +361,7 @@ export default function AdminPage() {
 
       <div style={{padding:'16px', maxWidth:'700px', margin:'0 auto'}}>
 
-        {approvalMessage && <p className="admin-password-success" role="status">{approvalMessage}</p>}
-        {!loading && <AdminPaymentQueue payments={pendingPayments} total={pendingApprovalCount} approvingId={approvingId} onApprove={approvePayment} />}
+        {tab === 'payments' && <AdminPaymentPanel onSessionExpired={paymentSessionExpired} onApproved={fetchDashboard} />}
 
         {/* DRIVERS TAB */}
         {tab === 'drivers' && (
