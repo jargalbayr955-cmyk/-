@@ -17,7 +17,7 @@ function server(){
  }
  }
 }
-function harness(role,server){
+function harness(role,server,{legacySignals=false}={}){
  const states=[],streams=[],peers=[],timers=new Map(),events={},docEvents={},captures=[],cache={}
  let media=null,fetcher=server.fetch.bind(server),sequence=0
  const document={visibilityState:'visible',addEventListener:(n,f)=>docEvents[n]=f,removeEventListener:n=>delete docEvents[n]}
@@ -31,13 +31,13 @@ function harness(role,server){
  }
  const navigator={mediaDevices:{getUserMedia:async constraints=>{captures.push(constraints);if(media)return media(constraints);const stream=new Stream([...(constraints.audio?[new Track('audio')]:[]),new Track('video')]);streams.push(stream);return stream}},vibrate(){}}
  function load(file){if(cache[file])return cache[file];const exports={};cache[file]=exports
-  vm.runInNewContext(compile(file),{exports,Error,Date,crypto,AbortController,AbortSignal,MediaStream:Stream,RTCPeerConnection:Peer,document,navigator,window:{addEventListener:(n,f)=>events[n]=f,removeEventListener:n=>delete events[n]},fetch:(...args)=>fetcher(...args),setTimeout:(fn,ms)=>{const id=++sequence;timers.set(id,{fn,ms});return id},clearTimeout:id=>timers.delete(id),setInterval:(fn,ms)=>{const id=++sequence;timers.set(id,{fn,ms});return id},clearInterval:id=>timers.delete(id),require:name=>{if(name==='@/lib/video-call')return load('lib/video-call.ts');throw Error(name)}});return exports
+  vm.runInNewContext(compile(file),{exports,Error,Date,crypto,AbortController,AbortSignal:legacySignals?{}:AbortSignal,MediaStream:Stream,RTCPeerConnection:Peer,document,navigator,window:{addEventListener:(n,f)=>events[n]=f,removeEventListener:n=>delete events[n]},fetch:(...args)=>fetcher(...args),setTimeout:(fn,ms)=>{const id=++sequence;timers.set(id,{fn,ms});return id},clearTimeout:id=>timers.delete(id),setInterval:(fn,ms)=>{const id=++sequence;timers.set(id,{fn,ms});return id},clearInterval:id=>timers.delete(id),require:name=>{if(name==='@/lib/video-call')return load('lib/video-call.ts');if(name==='@/lib/client/request-signal')return load('lib/client/request-signal.ts');throw Error(name)}});return exports
  }
  const session=new(load('lib/client/video-call.ts').OrderVideoSession)('order',role,value=>states.push(value))
  return {session,streams,peers,states,timers,events,docEvents,document,captures,get state(){return states.at(-1)},setMedia(fn){media=fn},setFetch(fn){fetcher=fn}}
 }
-test('two participants negotiate, mute/switch, hang up and release all media',async()=>{
- const wire=server(),a=harness('customer',wire),b=harness('driver',wire)
+for(const legacySignals of [false,true]) test(`two participants negotiate, mute/switch, hang up and release all media (legacy browser: ${legacySignals})`,async()=>{
+ const wire=server(),a=harness('customer',wire,{legacySignals}),b=harness('driver',wire,{legacySignals})
  await a.session.poll();await b.session.poll();assert.equal(a.captures.length+b.captures.length,0)
  await a.session.callPeer();assert.equal(a.state.phase,'ringing');await b.session.poll();assert.equal(b.state.phase,'incoming');assert.equal(b.captures.length,0)
  await b.session.callPeer(true);await a.session.poll();assert.equal(a.peers[0].remoteDescription.type,'answer');assert.equal(b.peers[0].remoteDescription.type,'offer')
@@ -87,4 +87,20 @@ test('lost answer response ends the call instead of leaving accepted camera capt
  const wire=server(),a=harness('customer',wire),b=harness('driver',wire)
  await a.session.callPeer();await b.session.poll();b.setFetch(async(url,opts)=>{const r=await wire.fetch(url,opts);if(JSON.parse(opts.body).action==='answer')throw Error('lost response');return r})
  await b.session.callPeer(true);assert.equal(wire.call.status,'ended');assert(b.streams[0].getTracks().every(t=>t.stopped));a.session.dispose();b.session.dispose()
+})
+test('legacy browser times out a stalled response body and can retry the video request',async()=>{
+ const wire=server(),a=harness('customer',wire,{legacySignals:true});let signal
+ a.setFetch(async(url,opts)=>{signal=opts.signal;return {ok:true,json:()=>new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}))}})
+ const pending=a.session.poll();await flush()
+ const deadline=[...a.timers.values()].find(timer=>timer.ms===15000);assert(deadline);deadline.fn();await pending
+ assert.equal(signal.aborted,true);assert.match(a.state.message,/Сүлжээгээ шалгаад/);assert.equal(a.timers.size,0)
+ a.setFetch(wire.fetch.bind(wire));await a.session.poll();assert.equal(a.state.ready,true)
+ await a.session.callPeer();assert.equal(a.state.phase,'ringing');assert.equal(a.state.message,'')
+ a.session.dispose();assert.equal(a.timers.size,0)
+})
+test('disposing a legacy browser session aborts pending requests without publishing a late error',async()=>{
+ const a=harness('customer',server(),{legacySignals:true});let signal
+ a.setFetch((url,opts)=>{signal=opts.signal;return new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}))})
+ const pending=a.session.poll();a.session.dispose();await pending
+ assert.equal(signal.aborted,true);assert.equal(a.timers.size,0);assert.equal(a.states.length,0)
 })

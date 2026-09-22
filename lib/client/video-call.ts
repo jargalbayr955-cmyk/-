@@ -1,5 +1,6 @@
 'use client'
 import { liveCall, type CallResponse, type CallRole, type VideoCall } from '@/lib/video-call'
+import { createRequestSignal } from '@/lib/client/request-signal'
 
 export type VideoState = {
   phase: 'idle' | 'preparing' | 'ringing' | 'incoming' | 'connecting' | 'connected' | 'busy'
@@ -13,6 +14,7 @@ export function mediaError(error: unknown) {
   if (name === 'NotAllowedError' || name === 'SecurityError') return 'Камер, микрофоны зөвшөөрлөө асаагаад дахин оролдоно уу.'
   if (name === 'NotFoundError') return 'Камер эсвэл микрофон олдсонгүй. Утасныхаа browser-оор нээнэ үү.'
   if (name === 'NotReadableError') return 'Камер өөр аппад ашиглагдаж байна. Түүнийг хаагаад дахин оролдоно уу.'
+  if (name === 'AbortError' || name === 'TimeoutError') return 'Дуудлагын холболт удааширлаа. Сүлжээгээ шалгаад дахин оролдоно уу.'
   return error instanceof Error ? error.message : 'Дуудлага холбогдсонгүй. Дахин оролдоно уу.'
 }
 
@@ -54,14 +56,17 @@ export class OrderVideoSession {
   private emit(next: Partial<VideoState>) { if (!this.disposed) { this.state = { ...this.state, ...next }; this.changed(this.state) } }
   private valid(generation: number) { return !this.disposed && generation === this.generation }
   private async request(action: string, extra: Record<string, unknown> = {}): Promise<CallResponse> {
-    const response = await fetch('/api/order/video', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
-      body: JSON.stringify({ order_id: this.order, role: this.role, instance_id: this.instance, action, ...extra }),
-      signal: AbortSignal.any([this.controller.signal, AbortSignal.timeout(15_000)]),
-    })
-    const body = await response.json().catch(() => ({}))
-    if (!response.ok) throw new CallError(body.error || 'Дуудлагын холболт тасарсан.', response.status)
-    return body
+    const request = createRequestSignal(15_000, this.controller.signal)
+    try {
+      const response = await fetch('/api/order/video', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
+        body: JSON.stringify({ order_id: this.order, role: this.role, instance_id: this.instance, action, ...extra }),
+        signal: request.signal,
+      })
+      const body = await response.json().catch(error => { if (request.signal.aborted) throw error; return {} })
+      if (!response.ok) throw new CallError(body.error || 'Дуудлагын холболт тасарсан.', response.status)
+      return body
+    } finally { request.dispose() }
   }
   private stopMedia() {
     const pc = this.pc; this.pc = null; pc?.close()

@@ -1,17 +1,21 @@
 'use client'
 
 import { pickupPoint, type PickupPoint } from '@/lib/order-offers'
+import { createRequestSignal } from '@/lib/client/request-signal'
 
 export type SavedDriverLocation = PickupPoint & { location_updated_at: string; available: boolean }
 export async function saveDriverLocation(point: PickupPoint, available?: boolean, signal?: AbortSignal): Promise<SavedDriverLocation> {
-  const response = await fetch('/api/driver/location', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...point, ...(available === undefined ? {} : { available }) }),
-    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(12_000)]) : AbortSignal.timeout(12_000),
-  })
-  const body = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(body.error || 'Байршил серверт шинэчлэгдсэнгүй. Холболтоо шалгана уу.')
-  return { ...point, location_updated_at: new Date().toISOString(), available: body.available }
+  const request = createRequestSignal(12_000, signal)
+  try {
+    const response = await fetch('/api/driver/location', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...point, ...(available === undefined ? {} : { available }) }),
+      signal: request.signal,
+    })
+    const body = await response.json().catch(error => { if (request.signal.aborted) throw error; return {} })
+    if (!response.ok) throw new Error(body.error || 'Байршил серверт шинэчлэгдсэнгүй. Холболтоо шалгана уу.')
+    return { ...point, location_updated_at: new Date().toISOString(), available: body.available }
+  } finally { request.dispose() }
 }
 
 // Called only while working or on an accepted trip. The native app owns its GPS service.

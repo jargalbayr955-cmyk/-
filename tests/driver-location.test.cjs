@@ -17,14 +17,14 @@ function locationHarness() {
     const exports = {}; cache[file] = exports
     const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText
     vm.runInNewContext(source, {
-      exports, Error, AbortController, AbortSignal, Date: class extends Date { static now() { return now } }, document, window,
+      exports, Error, AbortController, AbortSignal: {}, setTimeout, clearTimeout, Date: class extends Date { static now() { return now } }, document, window,
       navigator: { geolocation: {
         watchPosition: (success, error) => { watch = success; failWatch = error; return 42 },
         getCurrentPosition: (success, error) => gets.push({ success, error }), clearWatch: id => { stopped = id },
       } },
       fetch: async (url, options) => { requests.push({ url, body: JSON.parse(options.body), signal: options.signal }); return respond() },
       setInterval: (callback, ms) => { interval = { callback, ms }; return 1 }, clearInterval: () => { interval = null },
-      require: name => { if (name === '@/lib/order-offers') return load('lib/order-offers.ts'); throw new Error(name) },
+      require: name => { if (name === '@/lib/order-offers') return load('lib/order-offers.ts'); if (name === '@/lib/client/request-signal') return load('lib/client/request-signal.ts'); throw new Error(name) },
     })
     return exports
   }
