@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createDotMarker, freeMapStyle, loadFreeMap, mapErrorMessage, ULAANBAATAR } from '@/lib/client/free-map'
-import { AdminAccess, BrandAccess } from '../components/access-shortcuts'
+import { BrandAccess } from '../components/access-shortcuts'
 import { CustomerAccount } from '../components/customer-account'
 
 type LocationPoint = { lat: number; lng: number }
@@ -196,9 +196,8 @@ export default function CurrentPage() {
       <header className="current-map-header">
         <div className="current-brand-row">
           <div className="brand-wrap"><BrandAccess /><div className="brand-name">Ачилт</div></div>
-          <AdminAccess />
+          <CustomerAccount />
         </div>
-        <CustomerAccount />
         <div className="current-map-instructions">
           <h1>Ачуулах байршлаа газрын зураг дээр сонгоно уу.</h1>
           <p>Хамгийн ойр байгаа машинуудыг санал болгоно.</p>
@@ -219,13 +218,6 @@ export default function CurrentPage() {
           <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
         </svg>
       </button>
-
-      {location && !sheetOpen && (
-        <div className="current-location-chip">
-          <span className="current-location-chip-dot" />
-          <div><strong>Ачих цэг</strong><span>{address}</span><small>Тэмдэглэгээг чирэх эсвэл газрын зураг дээр дарж байршлаа өөрчилнө</small></div>
-        </div>
-      )}
 
       {!sheetOpen && (
         <div className="current-cta-wrap">

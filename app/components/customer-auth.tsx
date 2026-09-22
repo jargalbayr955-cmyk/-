@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react'
 import { authenticateCustomer, AuthMode } from '@/lib/client/customer-auth'
 import { clearCustomerBrowserState, notifyCustomerSessionChanged, phoneInput } from '@/lib/client/session'
 import { SessionGate } from './session-gate'
-import { AdminAccess, BrandAccess } from './access-shortcuts'
+import { BrandAccess } from './access-shortcuts'
 
 export function CustomerAuth({ initialMode = 'login' }: { initialMode?: AuthMode }) {
   return <SessionGate mode="guest"><AuthForm initialMode={initialMode} /></SessionGate>
@@ -69,7 +69,7 @@ function AuthForm({ initialMode }: { initialMode: AuthMode }) {
 
   return <main className="auth-shell">
     <section className="auth-card" aria-labelledby="auth-title">
-      <div className="auth-brand-row"><BrandAccess className="auth-brand-mark" /><AdminAccess /></div>
+      <BrandAccess className="auth-brand-mark" />
       <p className="auth-eyebrow">АЧИЛТ • ТУСЛАМЖ ОЙРХОН</p>
       <h1 id="auth-title">Тавтай морил</h1>
       <p className="auth-intro">Байршлаа сонгоод, ойр жолооч нарын үнийн саналаас сонгоорой.</p>
