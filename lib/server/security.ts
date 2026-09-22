@@ -3,7 +3,7 @@ import crypto from 'crypto'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 
 export const DEVICE_SESSION_TTL_SECONDS = 60 * 60 * 24 * 90
-const ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 24 * 7
+export const ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 4
 
 function getSecret() {
   const value = process.env.SESSION_SECRET

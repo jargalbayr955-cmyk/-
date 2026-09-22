@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifySession } from '@/lib/server/security'
+import { requireAdmin } from '@/lib/server/admin'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 
 export async function GET(req: NextRequest) {
-  const session=verifySession(req.cookies.get('achilt_admin_session')?.value,'admin')
-  if(!session) return NextResponse.json({error:'Unauthorized'},{status:401})
+  const access=await requireAdmin(req)
+  if(!access.ok) return NextResponse.json({error:access.error},{status:access.status})
   const s=getSupabaseAdmin(); const since=new Date(Date.now()-24*60*60*1000).toISOString()
   const [driversR,activeR,historyR,settingsR]=await Promise.all([
     s.from('drivers').select('id,name,phone,car_type,car_number,photo_url,price,available,active,lat,lng,location_updated_at,created_at').is('deleted_at',null).order('created_at',{ascending:false}),

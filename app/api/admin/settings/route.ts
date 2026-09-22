@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifySession } from '@/lib/server/security'
+import { requireAdmin } from '@/lib/server/admin'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 
 const ALLOWED_KEYS = new Set(['hero_url', 'bank_name', 'bank_account'])
 
 export async function POST(req: NextRequest) {
-  const session = verifySession(req.cookies.get('achilt_admin_session')?.value, 'admin')
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const access = await requireAdmin(req)
+  if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
   const { key, value } = await req.json().catch(() => ({}))
   if (!ALLOWED_KEYS.has(String(key))) return NextResponse.json({ error: 'Invalid key' }, { status: 400 })

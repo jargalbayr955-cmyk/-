@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
-import { verifySession, normalizeMnPhone } from '@/lib/server/security'
+import { normalizeMnPhone } from '@/lib/server/security'
+import { requireAdmin } from '@/lib/server/admin'
 
 export async function POST(req:NextRequest){
- const session=verifySession(req.cookies.get('achilt_admin_session')?.value,'admin'); if(!session)return NextResponse.json({error:'Unauthorized'},{status:401})
+ const access=await requireAdmin(req); if(!access.ok)return NextResponse.json({error:access.error},{status:access.status})
  const {action,driver,id,order_id}=await req.json().catch(()=>({})); const s=getSupabaseAdmin()
  if(action==='add'){
   const phone=normalizeMnPhone(driver?.phone); if(!phone)return NextResponse.json({error:'Утасны дугаар буруу'},{status:400})

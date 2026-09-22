@@ -1,5 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react'
+import { AdminPasswordForm } from '../components/admin-password-form'
 import { createDotMarker, freeMapStyle, loadFreeMap, validCoords, ULAANBAATAR } from '@/lib/client/free-map'
 
 type Driver = {
@@ -99,6 +100,12 @@ export default function AdminPage() {
   const [showForm, setShowForm] = useState(false)
   const [password, setPassword] = useState('')
   const [authed, setAuthed] = useState(false)
+  const [mustChangePassword, setMustChangePassword] = useState(false)
+  const [showPasswordForm, setShowPasswordForm] = useState(false)
+  const [loginError, setLoginError] = useState('')
+  const [loginBusy, setLoginBusy] = useState(false)
+  const [passwordMessage, setPasswordMessage] = useState('')
+  const loginPending = React.useRef(false)
   const [mounted, setMounted] = useState(false)
   const [heroUrl, setHeroUrl] = useState('')
   const [bankName, setBankName] = useState('')
@@ -114,7 +121,7 @@ export default function AdminPage() {
     setNowMs(Date.now())
     const clock = setInterval(() => setNowMs(Date.now()), 60_000)
     fetch('/api/admin/session', { cache: 'no-store' })
-      .then(r => { if (r.ok) setAuthed(true) })
+      .then(async r => { if (r.ok) { const body = await r.json(); setMustChangePassword(Boolean(body.mustChangePassword)); setAuthed(true) } })
       .catch(() => {})
     return () => clearInterval(clock)
   }, [])
@@ -140,10 +147,10 @@ export default function AdminPage() {
   const fetchOrders = fetchDashboard
 
   useEffect(() => {
-    if (authed) {
+    if (authed && !mustChangePassword) {
       fetchDashboard()
     }
-  }, [authed])
+  }, [authed, mustChangePassword])
 
   const saveHeroUrl = async () => {
     const res = await fetch('/api/admin/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:'hero_url',value:heroUrl}) })
@@ -220,6 +227,20 @@ export default function AdminPage() {
     return type || '-'
   }
 
+  const logout = async () => {
+    try {
+      const response = await fetch('/api/admin/session', { method: 'DELETE' })
+      if (!response.ok) { setDashboardError('Гарч чадсангүй. Дахин оролдоно уу.'); return }
+      setAuthed(false); setMustChangePassword(false); setShowPasswordForm(false)
+      setPasswordMessage(''); setDashboardError(''); setDrivers([]); setOrders([]); setActiveOrders([])
+    } catch { setDashboardError('Холболтоо шалгаад дахин оролдоно уу.') }
+  }
+
+  const passwordChanged = () => {
+    setMustChangePassword(false); setShowPasswordForm(false)
+    setPasswordMessage('Нууц үг солигдлоо. Дараа нэвтрэхдээ шинэ нууц үгээ ашиглана уу.')
+  }
+
   // Нийт статистик
   const totalRevenue = orders.reduce((sum, o) => sum + (o.final_price || 0), 0)
   const totalOrders = orders.length
@@ -234,29 +255,45 @@ export default function AdminPage() {
             <div style={{fontSize:'36px', marginBottom:'8px'}}>🔐</div>
             <h1 style={{color:D.text, fontSize:'20px', fontWeight:'800', margin:0}}>Admin</h1>
           </div>
-          <input type="password" placeholder="Нууц үг" value={password} onChange={e => setPassword(e.target.value)}
-            style={{...D.input, marginBottom:'14px'}}/>
-          <button onClick={async () => {
-            const res = await fetch('/api/admin/session', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password })
-            })
-            if (res.ok) { setAuthed(true); setPassword('') }
-            else alert('Буруу нууц үг эсвэл олон оролдлого хийсэн байна')
-          }}
-            style={{width:'100%', borderRadius:'14px', padding:'14px', background:D.red, border:'none', color:D.text, fontSize:'15px', fontWeight:'800', cursor:'pointer', boxShadow:'0 4px 20px rgba(232,67,58,0.4)'}}>
-            Нэвтрэх →
-          </button>
+          <form onSubmit={async event => {
+            event.preventDefault()
+            if (loginPending.current) return
+            loginPending.current = true; setLoginBusy(true); setLoginError('')
+            try {
+              const res = await fetch('/api/admin/session', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }),
+              })
+              const body = await res.json().catch(() => ({}))
+              if (res.ok) { setMustChangePassword(Boolean(body.mustChangePassword)); setAuthed(true); setPassword('') }
+              else setLoginError(body.error || 'Нэвтэрч чадсангүй. Дахин оролдоно уу.')
+            } catch { setLoginError('Холболтоо шалгаад дахин оролдоно уу.') }
+            finally { loginPending.current = false; setLoginBusy(false) }
+          }}>
+            <label htmlFor="admin-login-password" style={{display:'block', color:'#c4ccd8', fontSize:13, marginBottom:8}}>Админы нууц үг</label>
+            <input id="admin-login-password" type="password" autoComplete="current-password" required maxLength={128} placeholder="Нууц үг" value={password} disabled={loginBusy} onChange={e => setPassword(e.target.value)}
+              style={{...D.input, fontSize:16, marginBottom:14}}/>
+            {loginError && <p className="admin-auth-error" role="alert">{loginError}</p>}
+            <button type="submit" disabled={loginBusy}
+              style={{width:'100%', borderRadius:14, padding:14, background:D.red, border:'none', color:D.text, fontSize:15, fontWeight:800, cursor:'pointer'}}>
+              {loginBusy ? 'Нэвтэрч байна…' : 'Нэвтрэх →'}
+            </button>
+          </form>
         </div>
         <style>{`input::placeholder{color:rgba(255,255,255,0.25);}`}</style>
       </div>
     )
   }
 
+  if (mustChangePassword) return <main className="admin-password-screen">
+    {dashboardError && <p className="admin-auth-error" role="alert">{dashboardError}</p>}
+    <AdminPasswordForm required onChanged={passwordChanged} onCancel={logout} onSessionExpired={() => { setAuthed(false); setLoginError('Нэвтрэлт дууслаа. Дахин нэвтэрнэ үү.') }} />
+  </main>
+
   return (
     <div style={{minHeight:'100vh', background:D.bg, paddingBottom:'40px'}}>
       {dashboardError && <div role="alert" style={{padding:'16px', color:'#ff6b6b'}}>{dashboardError} <button onClick={fetchDashboard}>Дахин ачаалах</button></div>}
       {/* Header */}
-      <div style={{padding:'16px 20px', background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', gap:'12px'}}>
+      <div style={{padding:'16px 20px', background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap'}}>
         <div style={{display:'flex', alignItems:'center', gap:'10px', flex:1}}>
           <span style={{fontSize:'24px'}}>🚛</span>
           <h1 style={{color:D.text, fontSize:'18px', fontWeight:'800', margin:0}}>Admin Panel</h1>
@@ -267,13 +304,14 @@ export default function AdminPage() {
             + Жолооч нэмэх
           </button>
         )}
-        <button onClick={async () => {
-            await fetch('/api/admin/session', { method: 'DELETE' })
-            setAuthed(false)
-          }} style={{borderRadius:'20px', padding:'7px 14px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.4)', fontSize:'13px', fontWeight:'600', cursor:'pointer'}}>
-          Гарах
-        </button>
+        <button className="admin-account-action" onClick={() => { setShowPasswordForm(value => !value); setPasswordMessage('') }}>Нууц үг солих</button>
+        <button className="admin-account-action" onClick={logout}>Гарах</button>
       </div>
+
+      {passwordMessage && <p className="admin-password-success" role="status">{passwordMessage}</p>}
+      {showPasswordForm && <div className="admin-password-wrapper">
+        <AdminPasswordForm onChanged={passwordChanged} onCancel={() => setShowPasswordForm(false)} onSessionExpired={() => { setAuthed(false); setLoginError('Нэвтрэлт дууслаа. Дахин нэвтэрнэ үү.') }} />
+      </div>}
 
       {/* Tabs */}
       <div style={{display:'flex', gap:'8px', padding:'16px 20px 0', borderBottom:'1px solid rgba(255,255,255,0.06)'}}>

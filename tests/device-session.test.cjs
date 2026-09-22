@@ -156,7 +156,7 @@ test('signed session validation rejects role confusion, missing expiry, tamperin
   assert.equal(security.verifySession(token.slice(0, -2) + 'xx', 'customer'), null)
   assert.equal(security.verifySession(signed({ sub: 'customer-a', role: 'customer' }), 'customer'), null)
   const admin = security.verifySession(security.signSession('admin', 'admin'), 'admin')
-  assert.equal(admin.exp - h.now(), 7 * DAY)
+  assert.equal(admin.exp - h.now(), 4 * 60 * 60)
 })
 
 test('driver login and session restoration have the same persistent lifetime', async () => {

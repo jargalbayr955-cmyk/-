@@ -29,6 +29,7 @@ function harness({ rows = {}, driver = { id: 'driver-a', phone: '+97600000000', 
     vm.runInNewContext(source, { exports, Buffer, URL, Date, process: { env }, console: { error() {}, warn() {} }, require(name) {
       if (name === 'server-only') return {}
       if (name.endsWith('/supabase-admin')) return { getSupabaseAdmin: () => admin }
+      if (name === '@/lib/server/admin') return { requireAdmin: async () => ({ ok: true, credential: {} }) }
       if (name === '@/lib/server/driver') return { requireDriver: async () => driver, driverHasBlockingWork: async () => blocked }
       if (name === '@/lib/server/security') return { allowRequest: async () => true, getClientIp: () => 'test', safeEqual: (a,b) => a === b, verifySession: () => ({ sub: 'admin-a' }) }
       if (name === 'web-push') return { setVapidDetails() {}, sendNotification: send }
