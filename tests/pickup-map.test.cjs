@@ -55,6 +55,7 @@ function pickupMap() {
         ULAANBAATAR: { lat: 47.9184, lng: 106.9177 }, mapErrorMessage: String,
       }
       if (name.includes('access-shortcuts')) return { AdminAccess: () => null, BrandAccess: () => null }
+      if (name.includes('customer-order-sheet')) return { CustomerOrderSheet: () => null }
       if (name.includes('customer-account')) return { CustomerAccount: () => null }
       throw new Error('Unexpected import: ' + name)
     },
