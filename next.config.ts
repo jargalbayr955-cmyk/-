@@ -6,9 +6,9 @@ const csp = [
   "form-action 'self'",
   "frame-ancestors 'none'",
   "object-src 'none'",
-  // Next.js currently emits bootstrap scripts/styles that require inline allowances.
+  // Next.js and Google Maps currently require inline script/style allowances.
   "script-src 'self' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com",
-  "style-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   // Driver profiles accept HTTPS photo URLs. Keep the browser policy in sync.
   "img-src 'self' data: blob: https:",
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://tiles.openfreemap.org https://*.openfreemap.org https://maps.googleapis.com https://*.googleapis.com https://*.gstatic.com https://*.google.com",
