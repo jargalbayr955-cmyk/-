@@ -3,9 +3,10 @@
   "version": "5.5.0",
   "private": true,
   "scripts": {
+    "test": "node --test tests/*.test.cjs",
     "predev": "node scripts/prepare-map-assets.mjs",
     "dev": "next dev",
-    "prebuild": "node scripts/prepare-map-assets.mjs",
+    "prebuild": "npm test && node scripts/prepare-map-assets.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
