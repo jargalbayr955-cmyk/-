@@ -1,5 +1,6 @@
 'use client'
 
+type MapLibre = typeof import('maplibre-gl')
 type AnyRecord = Record<string, any>
 type PointTuple = [number, number]
 
@@ -12,7 +13,7 @@ let mapLibreLoaderPromise: Promise<any> | null = null
 
 declare global {
   interface Window {
-    maplibregl?: any
+    maplibregl?: MapLibre & { __achiltGoogleAdapter?: boolean }
     google?: any
     __achiltGoogleMapsReady?: () => void
   }
@@ -496,16 +497,16 @@ async function buildGoogleAdapter() {
     LngLatBounds: GoogleBoundsAdapter,
     NavigationControl: GoogleNavigationControl,
   }
-  window.maplibregl = adapter
+  window.maplibregl = adapter as unknown as MapLibre & { __achiltGoogleAdapter?: boolean }
   return adapter
 }
 
-export async function loadFreeMap(): Promise<any> {
+export async function loadFreeMap(): Promise<MapLibre> {
   if (typeof window === 'undefined') throw new Error('Map is browser-only')
 
   if (GOOGLE_KEY) {
     try {
-      return await buildGoogleAdapter()
+      return await buildGoogleAdapter() as unknown as MapLibre
     } catch (error) {
       console.warn('[Achilt] Google Maps failed; using OpenFreeMap fallback.', error)
       if (window.maplibregl?.__achiltGoogleAdapter) delete window.maplibregl
