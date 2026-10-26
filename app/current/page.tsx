@@ -87,14 +87,14 @@ export default function CurrentPage() {
       const rawGoogleMap = (map as any).rawMap
       if (rawGoogleMap && window.google?.maps) {
         rawGoogleMap.setOptions({
-          mapTypeId: window.google.maps.MapTypeId?.ROADMAP || 'roadmap',
+          mapTypeId: window.google.maps.MapTypeId?.HYBRID || 'hybrid',
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,
           zoomControl: false,
           clickableIcons: true,
           gestureHandling: 'greedy',
-          backgroundColor: '#f3f6f8',
+          backgroundColor: '#0b0f12',
         })
         const TrafficLayer = window.google.maps.TrafficLayer
         if (TrafficLayer) {
