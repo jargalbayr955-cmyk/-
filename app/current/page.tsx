@@ -9,6 +9,7 @@ import { isBookingScreen, readBookingDraft } from '@/lib/client/booking-draft'
 import { readScreen } from '@/lib/client/navigation'
 
 type LocationPoint = { lat: number; lng: number }
+type LocationIssue = 'denied' | 'unavailable' | 'timeout' | 'unsupported' | ''
 
 export default function CurrentPage() {
   const mapRef = useRef<HTMLDivElement | null>(null)
@@ -21,6 +22,7 @@ export default function CurrentPage() {
   const booking = useScreenHistory('booking', 'map', isBookingScreen)
   const [location, setLocation] = useState<LocationPoint | null>(null)
   const [locating, setLocating] = useState(true)
+  const [locationIssue, setLocationIssue] = useState<LocationIssue>('')
   const [mapError, setMapError] = useState('')
   const [trafficAvailable, setTrafficAvailable] = useState(false)
   const [trafficEnabled, setTrafficEnabled] = useState(true)
@@ -28,6 +30,7 @@ export default function CurrentPage() {
   const setMarker = useCallback((lat: number, lng: number, fly = false) => {
     latestLocation.current = { lat, lng }
     setLocation({ lat, lng })
+    setLocationIssue('')
     const map = mapInstanceRef.current
     const ml = window.maplibregl
     if (!map || !ml) return
@@ -40,6 +43,7 @@ export default function CurrentPage() {
         const pos = markerRef.current.getLngLat()
         gpsRequest.current += 1
         setLocating(false)
+        setLocationIssue('')
         latestLocation.current = { lat: pos.lat, lng: pos.lng }
         setLocation({ lat: pos.lat, lng: pos.lng })
       })
@@ -78,6 +82,7 @@ export default function CurrentPage() {
         // A late GPS response must never replace a pickup chosen on the map.
         gpsRequest.current += 1
         setLocating(false)
+        setLocationIssue('')
         setMarker(e.lngLat.lat, e.lngLat.lng)
       })
       map.on('error', () => setMapError('Газрын зураг ачаалахад түр алдаа гарлаа'))
@@ -118,22 +123,53 @@ export default function CurrentPage() {
     const request = ++gpsRequest.current
     if (!navigator.geolocation) {
       setLocating(false)
+      setLocationIssue('unsupported')
       return
     }
     setLocating(true)
+    setLocationIssue('')
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         if (request !== gpsRequest.current) return
         setLocating(false)
+        setLocationIssue('')
         setMarker(pos.coords.latitude, pos.coords.longitude, true)
       },
-      () => {
+      (failure) => {
         if (request !== gpsRequest.current) return
         setLocating(false)
+        setLocationIssue(failure.code === failure.PERMISSION_DENIED ? 'denied' : failure.code === failure.TIMEOUT ? 'timeout' : 'unavailable')
       },
       { timeout: 10000, enableHighAccuracy: true, maximumAge: 15000 },
     )
   }, [setMarker])
+
+  useEffect(() => {
+    if (!navigator.permissions?.query) return
+    let active = true
+    let status: PermissionStatus | undefined
+    const onChange = () => {
+      if (!active || !status) return
+      if (status.state === 'denied') {
+        setLocating(false)
+        setLocationIssue('denied')
+      } else if (status.state === 'granted' && !latestLocation.current) {
+        requestLocation()
+      } else if (status.state === 'prompt') {
+        setLocationIssue('')
+      }
+    }
+    navigator.permissions.query({ name: 'geolocation' }).then((value) => {
+      if (!active) return
+      status = value
+      status.addEventListener('change', onChange)
+      onChange()
+    }).catch(() => {})
+    return () => {
+      active = false
+      status?.removeEventListener('change', onChange)
+    }
+  }, [requestLocation])
 
   useEffect(() => {
     let mounted = true
@@ -153,6 +189,22 @@ export default function CurrentPage() {
     }
   }, [initMap, requestLocation, setMarker])
 
+  const locationTitle = locating
+    ? 'Таны байршлыг тогтоож байна'
+    : locationIssue === 'denied'
+      ? 'Байршлын зөвшөөрөл хаалттай байна'
+      : 'Газрын зураг дээр ачих цэгээ сонгоно уу'
+
+  const locationHelp = locating
+    ? 'Байршлын зөвшөөрөл асуувал Allow / Зөвшөөрөх сонгоно уу. Эсвэл газрын зураг дээр дарж цэгээ сонгоорой.'
+    : locationIssue === 'denied'
+      ? 'Хаягийн мөрний зүүн талын Site info → Location → Allow гэж зөвшөөрөөд байршлын товчийг дахин дарна уу. Эсвэл газрын зураг дээр цэгээ гараар сонгож болно.'
+      : locationIssue === 'timeout'
+        ? 'GPS хариу өгөх хугацаа дууслаа. Байршлын товчийг дахин дарж эсвэл газрын зураг дээр цэгээ сонгоно уу.'
+        : locationIssue === 'unsupported'
+          ? 'Энэ browser автомат байршил дэмжихгүй байна. Газрын зураг дээр ачих цэгээ сонгоно уу.'
+          : 'GPS байршил олдсонгүй. Байршлын товчийг дахин дарж эсвэл газрын зураг дээр цэгээ сонгоно уу.'
+
   return (
     <main className="current-map-page">
       <div ref={mapRef} className="current-map-canvas" aria-label="Ачих байршлын газрын зураг" />
@@ -171,9 +223,9 @@ export default function CurrentPage() {
       {mapError && <div className="current-map-error">{mapError}</div>}
 
       {!location && (
-        <div className="current-location-status" role="status">
-          <strong>{locating ? 'Таны байршлыг тогтоож байна' : 'Газрын зураг дээр ачих цэгээ сонгоно уу'}</strong>
-          <span>{locating ? 'Байршлын зөвшөөрөл асуувал зөвшөөрнө үү. Эсвэл газрын зураг дээр дарж цэгээ сонгоорой.' : 'GPS байршил олдсонгүй. Газрын зураг дээр дарж эсвэл байршлын товчоор дахин оролдоно уу.'}</span>
+        <div className="current-location-status" role={locationIssue === 'denied' ? 'alert' : 'status'}>
+          <strong>{locationTitle}</strong>
+          <span>{locationHelp}</span>
         </div>
       )}
 
@@ -209,7 +261,7 @@ export default function CurrentPage() {
         </button>
       )}
 
-      <button className="current-recenter-btn" type="button" onClick={requestLocation} aria-label="Миний байршил руу очих" aria-busy={locating}>
+      <button className="current-recenter-btn" type="button" onClick={requestLocation} aria-label="Миний байршил руу очих" aria-busy={locating} title={locationIssue === 'denied' ? 'Байршлын зөвшөөрлөө Allow болгоно уу' : 'Миний байршил'}>
         <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
           <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
         </svg>
