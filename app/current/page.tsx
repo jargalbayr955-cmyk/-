@@ -14,6 +14,7 @@ export default function CurrentPage() {
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<any>(null)
   const markerRef = useRef<any>(null)
+  const trafficLayerRef = useRef<any>(null)
   const latestLocation = useRef<LocationPoint | null>(null)
   const gpsRequest = useRef(0)
 
@@ -21,6 +22,8 @@ export default function CurrentPage() {
   const [location, setLocation] = useState<LocationPoint | null>(null)
   const [locating, setLocating] = useState(true)
   const [mapError, setMapError] = useState('')
+  const [trafficAvailable, setTrafficAvailable] = useState(false)
+  const [trafficEnabled, setTrafficEnabled] = useState(true)
 
   const setMarker = useCallback((lat: number, lng: number, fly = false) => {
     latestLocation.current = { lat, lng }
@@ -30,7 +33,7 @@ export default function CurrentPage() {
     if (!map || !ml) return
 
     if (!markerRef.current) {
-      markerRef.current = new ml.Marker({ element: createDotMarker('#e8433a', 22), draggable: true })
+      markerRef.current = new ml.Marker({ element: createDotMarker('#1a73e8', 22), draggable: true })
         .setLngLat([lng, lat])
         .addTo(map)
       markerRef.current.on('dragend', () => {
@@ -47,6 +50,17 @@ export default function CurrentPage() {
     if (fly) map.easeTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 15), duration: 600 })
   }, [])
 
+  const toggleTraffic = useCallback(() => {
+    const rawGoogleMap = mapInstanceRef.current?.rawMap
+    const layer = trafficLayerRef.current
+    if (!rawGoogleMap || !layer) return
+    setTrafficEnabled((enabled) => {
+      const next = !enabled
+      layer.setMap(next ? rawGoogleMap : null)
+      return next
+    })
+  }, [])
+
   const initMap = useCallback(async (isMounted: () => boolean) => {
     if (!mapRef.current || mapInstanceRef.current) return
     try {
@@ -56,7 +70,7 @@ export default function CurrentPage() {
         container: mapRef.current,
         style: freeMapStyle(),
         center: [ULAANBAATAR.lng, ULAANBAATAR.lat],
-        zoom: 12,
+        zoom: 13,
         attributionControl: {},
       })
       map.addControl(new ml.NavigationControl({ showCompass: false }), 'top-right')
@@ -69,6 +83,29 @@ export default function CurrentPage() {
       map.on('error', () => setMapError('Газрын зураг ачаалахад түр алдаа гарлаа'))
       map.on('idle', () => setMapError(''))
       mapInstanceRef.current = map
+
+      const rawGoogleMap = (map as any).rawMap
+      if (rawGoogleMap && window.google?.maps) {
+        rawGoogleMap.setOptions({
+          mapTypeId: window.google.maps.MapTypeId?.ROADMAP || 'roadmap',
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+          zoomControl: false,
+          clickableIcons: true,
+          gestureHandling: 'greedy',
+          backgroundColor: '#f3f6f8',
+        })
+        const TrafficLayer = window.google.maps.TrafficLayer
+        if (TrafficLayer) {
+          const traffic = new TrafficLayer()
+          traffic.setMap(rawGoogleMap)
+          trafficLayerRef.current = traffic
+          setTrafficEnabled(true)
+          setTrafficAvailable(true)
+        }
+      }
+
       if (latestLocation.current) setMarker(latestLocation.current.lat, latestLocation.current.lng, true)
     } catch (error) {
       if (!isMounted()) return
@@ -107,6 +144,8 @@ export default function CurrentPage() {
     return () => {
       mounted = false
       gpsRequest.current += 1
+      trafficLayerRef.current?.setMap?.(null)
+      trafficLayerRef.current = null
       markerRef.current?.remove?.()
       markerRef.current = null
       mapInstanceRef.current?.remove?.()
@@ -133,9 +172,41 @@ export default function CurrentPage() {
 
       {!location && (
         <div className="current-location-status" role="status">
-            <strong>{locating ? 'Таны байршлыг тогтоож байна' : 'Газрын зураг дээр ачих цэгээ сонгоно уу'}</strong>
-            <span>{locating ? 'Байршлын зөвшөөрөл асуувал зөвшөөрнө үү. Эсвэл газрын зураг дээр дарж цэгээ сонгоорой.' : 'GPS байршил олдсонгүй. Газрын зураг дээр дарж эсвэл байршлын товчоор дахин оролдоно уу.'}</span>
+          <strong>{locating ? 'Таны байршлыг тогтоож байна' : 'Газрын зураг дээр ачих цэгээ сонгоно уу'}</strong>
+          <span>{locating ? 'Байршлын зөвшөөрөл асуувал зөвшөөрнө үү. Эсвэл газрын зураг дээр дарж цэгээ сонгоорой.' : 'GPS байршил олдсонгүй. Газрын зураг дээр дарж эсвэл байршлын товчоор дахин оролдоно уу.'}</span>
         </div>
+      )}
+
+      {trafficAvailable && (
+        <button
+          type="button"
+          onClick={toggleTraffic}
+          aria-pressed={trafficEnabled}
+          aria-label="Замын хөдөлгөөний мэдээлэл"
+          style={{
+            position: 'absolute',
+            zIndex: 500,
+            right: 16,
+            bottom: 'calc(190px + env(safe-area-inset-bottom))',
+            minHeight: 42,
+            padding: '0 14px',
+            border: '1px solid rgba(60,64,67,.18)',
+            borderRadius: 999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            color: '#202124',
+            background: 'rgba(255,255,255,.96)',
+            boxShadow: '0 2px 10px rgba(60,64,67,.24)',
+            fontSize: 12,
+            fontWeight: 800,
+            cursor: 'pointer',
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          <span aria-hidden="true">{trafficEnabled ? '🟢' : '⚪'}</span>
+          Замын хөдөлгөөн
+        </button>
       )}
 
       <button className="current-recenter-btn" type="button" onClick={requestLocation} aria-label="Миний байршил руу очих" aria-busy={locating}>
