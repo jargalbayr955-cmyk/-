@@ -20,6 +20,8 @@ export function OfferMap({ pickup, offers, selectedDriverId, onSelect }: {
   const markers = useRef(new Map<string, OfferMarker>())
   const fittedPoints = useRef('')
   const selectRef = useRef(onSelect)
+  const latestPickup = useRef<PickupPoint | null>(pickup)
+  latestPickup.current = pickup
   const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
 
@@ -32,14 +34,22 @@ export function OfferMap({ pickup, offers, selectedDriverId, onSelect }: {
       try {
         const ml = await loadFreeMap()
         if (cancelled || !container.current) return
-        const map = new ml.Map({ container: container.current, style: freeMapStyle(), center: [ULAANBAATAR.lng, ULAANBAATAR.lat], zoom: 12, attributionControl: {} })
+        const start = latestPickup.current || ULAANBAATAR
+        const map = new ml.Map({
+          container: container.current,
+          style: freeMapStyle(),
+          center: [start.lng, start.lat],
+          zoom: latestPickup.current ? 15 : 13,
+          attributionControl: {},
+        })
+        mapRef.current = map
+        map.addControl(new ml.NavigationControl({ showCompass: false }), 'top-right')
         map.on('error', () => setError('Газрын зураг ачаалахад алдаа гарлаа. Холболтоо шалгана уу.'))
         map.on('idle', () => setError(''))
-        mapRef.current = map
 
         const rawGoogleMap = (map as any).rawMap
         if (rawGoogleMap && window.google?.maps) {
-          rawGoogleMap.setOptions({
+          const applyGoogleVisuals = () => rawGoogleMap.setOptions({
             mapTypeId: window.google.maps.MapTypeId?.HYBRID || 'hybrid',
             mapTypeControl: false,
             streetViewControl: false,
@@ -49,6 +59,11 @@ export function OfferMap({ pickup, offers, selectedDriverId, onSelect }: {
             gestureHandling: 'greedy',
             backgroundColor: '#0b0f12',
           })
+          applyGoogleVisuals()
+          window.google.maps.event?.addListenerOnce?.(rawGoogleMap, 'idle', () => {
+            if (!cancelled) applyGoogleVisuals()
+          })
+
           const TrafficLayer = window.google.maps.TrafficLayer
           if (TrafficLayer) {
             const traffic = new TrafficLayer()
@@ -124,7 +139,7 @@ export function OfferMap({ pickup, offers, selectedDriverId, onSelect }: {
         for (const slot of offers) if (slot.lng != null && slot.lat != null) bounds.extend([slot.lng, slot.lat])
         const height = container.current?.clientHeight || 600
         map.fitBounds(bounds, { padding: { top: Math.min(210, height * .32), bottom: Math.min(190, height * .29), left: 76, right: 76 }, maxZoom: 15, duration: 500 })
-      } else map.easeTo({ center: [pickup.lng, pickup.lat], zoom: 14, duration: 400 })
+      } else map.easeTo({ center: [pickup.lng, pickup.lat], zoom: 15, duration: 400 })
     }
   }, [pickup, offers, selectedDriverId, ready])
 
