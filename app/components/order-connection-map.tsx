@@ -49,7 +49,8 @@ export function OrderConnectionMap({ pickup, driver, driverLabel = 'Жолооч
         map.addControl(new ml.NavigationControl({ showCompass: false }), 'top-right')
 
         const rawGoogleMap = (map as any).rawMap
-        if (rawGoogleMap && window.google?.maps) {
+        const googleMode = Boolean(rawGoogleMap && window.google?.maps)
+        if (googleMode) {
           rawGoogleMap.setOptions({
             mapTypeId: window.google.maps.MapTypeId?.HYBRID || 'hybrid',
             mapTypeControl: false,
@@ -90,8 +91,26 @@ export function OrderConnectionMap({ pickup, driver, driverLabel = 'Жолооч
           }
         }
 
+        // This fallback is only for the non-Google/legacy renderer. Production Google Maps never shows a straight connector.
+        const setLegacyConnectionData = (p: PickupPoint | null, d: PickupPoint | null) => {
+          if (!map.isStyleLoaded()) return
+          const data: GeoJSON.FeatureCollection = {
+            type: 'FeatureCollection',
+            features: p && d ? [{
+              type: 'Feature', properties: {},
+              geometry: { type: 'LineString', coordinates: [[d.lng, d.lat], [p.lng, p.lat]] },
+            }] : [],
+          }
+          const source = map.getSource('order-connection') as GeoJSONSource | undefined
+          if (source) source.setData(data)
+          else {
+            map.addSource('order-connection', { type: 'geojson', data })
+            map.addLayer({ id: 'order-connection-line', source: 'order-connection', type: 'line', paint: { 'line-color': '#e8433a', 'line-width': 3 } })
+          }
+        }
+
         const computeRoadRoute = async () => {
-          if (cancelled) return
+          if (cancelled || !googleMode) return
           const { pickup: p, driver: d, driverLabel: label } = latest.current
           if (!p || !d || !window.google?.maps?.importLibrary) {
             setRoadData([])
@@ -142,6 +161,7 @@ export function OrderConnectionMap({ pickup, driver, driverLabel = 'Жолооч
         }
 
         const scheduleRoadRoute = () => {
+          if (!googleMode) return
           if (routeTimer.current != null) window.clearTimeout(routeTimer.current)
           const wait = Math.max(0, 15_000 - (Date.now() - lastRouteAt.current))
           routeTimer.current = window.setTimeout(() => {
@@ -162,12 +182,16 @@ export function OrderConnectionMap({ pickup, driver, driverLabel = 'Жолооч
             driverMarker.current.setLngLat([d.lng, d.lat])
           } else { driverMarker.current?.remove(); driverMarker.current = null }
 
-          if (p && d) scheduleRoadRoute()
-          else {
-            if (routeTimer.current != null) window.clearTimeout(routeTimer.current)
-            routeTimer.current = null
-            setRoadData([])
-            setRoadDistanceKm(null)
+          if (googleMode) {
+            if (p && d) scheduleRoadRoute()
+            else {
+              if (routeTimer.current != null) window.clearTimeout(routeTimer.current)
+              routeTimer.current = null
+              setRoadData([])
+              setRoadDistanceKm(null)
+            }
+          } else {
+            setLegacyConnectionData(p, d)
           }
 
           if (p && d && !framedBoth) {
