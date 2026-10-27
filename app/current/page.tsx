@@ -242,7 +242,7 @@ export default function CurrentPage() {
         padding: '7px 10px', borderRadius: 999, color: '#fff', background: 'rgba(7,9,13,.82)',
         backdropFilter: 'blur(10px)', fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap', pointerEvents: 'none',
       }}>Таны одоогийн байршилд заах</span>
-      <button className="current-recenter-btn" type="button" onClick={requestLocation} aria-label="Таны одоогийн байршилд заах" aria-busy={locating} title={locationIssue === 'denied' ? 'Байршлын зөвшөөрлөө Allow болгоно уу' : 'Таны одоогийн байршилд заах'}>
+      <button className="current-recenter-btn" type="button" onClick={requestLocation} aria-label="Миний байршил руу очих" aria-busy={locating} title={locationIssue === 'denied' ? 'Байршлын зөвшөөрлөө Allow болгоно уу' : 'Таны одоогийн байршилд заах'}>
         <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
           <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
         </svg>
