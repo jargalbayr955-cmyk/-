@@ -16,6 +16,7 @@ export function OfferMap({ pickup, offers, selectedDriverId, onSelect }: {
   const container = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const pickupMarker = useRef<Marker | null>(null)
+  const trafficLayer = useRef<any>(null)
   const markers = useRef(new Map<string, OfferMarker>())
   const fittedPoints = useRef('')
   const selectRef = useRef(onSelect)
@@ -35,6 +36,27 @@ export function OfferMap({ pickup, offers, selectedDriverId, onSelect }: {
         map.on('error', () => setError('Газрын зураг ачаалахад алдаа гарлаа. Холболтоо шалгана уу.'))
         map.on('idle', () => setError(''))
         mapRef.current = map
+
+        const rawGoogleMap = (map as any).rawMap
+        if (rawGoogleMap && window.google?.maps) {
+          rawGoogleMap.setOptions({
+            mapTypeId: window.google.maps.MapTypeId?.HYBRID || 'hybrid',
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            zoomControl: false,
+            clickableIcons: true,
+            gestureHandling: 'greedy',
+            backgroundColor: '#0b0f12',
+          })
+          const TrafficLayer = window.google.maps.TrafficLayer
+          if (TrafficLayer) {
+            const traffic = new TrafficLayer()
+            traffic.setMap(rawGoogleMap)
+            trafficLayer.current = traffic
+          }
+        }
+
         setReady(true)
       } catch (cause) {
         if (!cancelled) setError(mapErrorMessage(cause))
@@ -42,6 +64,8 @@ export function OfferMap({ pickup, offers, selectedDriverId, onSelect }: {
     })()
     return () => {
       cancelled = true
+      trafficLayer.current?.setMap?.(null)
+      trafficLayer.current = null
       pickupMarker.current?.remove()
       pickupMarker.current = null
       for (const { marker } of markerStore.values()) marker.remove()
@@ -66,7 +90,6 @@ export function OfferMap({ pickup, offers, selectedDriverId, onSelect }: {
       live.add(slot.driver_id)
       let item = markers.current.get(slot.driver_id)
       if (!item) {
-        // A real button supports tapping, keyboard selection, and safe text labels.
         const button = document.createElement('button')
         button.type = 'button'
         button.className = 'offer-map-marker'
@@ -93,7 +116,6 @@ export function OfferMap({ pickup, offers, selectedDriverId, onSelect }: {
       if (!live.has(id)) { item.marker.remove(); markers.current.delete(id) }
     }
 
-    // Frame new offers once; polling must not repeatedly undo the user's map pan/zoom.
     const key = `${pickup?.lat},${pickup?.lng}|${offers.map(slot => slot.offer?.id).sort().join(',')}`
     if (key !== fittedPoints.current && pickup) {
       fittedPoints.current = key

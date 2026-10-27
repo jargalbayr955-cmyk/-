@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { offerDistance, offerPrice } from '@/lib/order-offers'
 
 export function DriverSummary({ name, photo, plate, carType, price, distance }: {
@@ -8,16 +8,29 @@ export function DriverSummary({ name, photo, plate, carType, price, distance }: 
   price: number | null; distance: number | null
 }) {
   const [failedPhoto, setFailedPhoto] = useState<string | null>(null)
+  const [roadDistance, setRoadDistance] = useState<number | null>(null)
   const image = photo?.startsWith('https://') && photo !== failedPhoto ? photo : null
+
+  useEffect(() => {
+    const onRoadRoute = (event: Event) => {
+      const detail = (event as CustomEvent<{ source?: string; distanceKm?: number }>).detail
+      if (detail?.source !== 'order-connection' || !Number.isFinite(Number(detail.distanceKm))) return
+      setRoadDistance(Number(detail.distanceKm))
+    }
+    window.addEventListener('achilt:road-route', onRoadRoute)
+    return () => window.removeEventListener('achilt:road-route', onRoadRoute)
+  }, [])
+
+  const shownDistance = roadDistance ?? distance
   return <div className="driver-summary">
     <div className="driver-summary-identity">
       <div className="driver-summary-photo">
-        {image ? /* User-uploaded photo; no image proxy or remote host allowlist needed. */
+        {image ?
           <img src={image} alt={`${name || 'Жолооч'}ийн зураг`} referrerPolicy="no-referrer" onError={() => setFailedPhoto(image)} />
           : <span aria-label="Жолооч зураг оруулаагүй">{name?.trim().slice(0, 1) || '🚛'}</span>}
       </div>
       <div><strong>{name || 'Жолооч'}</strong><span>{carType === 'butten' ? 'Бүтэн ачигч' : carType === 'chiregch' ? 'Чирэгч' : 'Ачигч'}</span><b className="driver-plate">{plate || 'Улсын дугаар оруулаагүй'}</b></div>
     </div>
-    <div className="driver-summary-quote"><div><span>Үнийн санал</span><b>{price != null ? offerPrice(price) : 'Үнэ тодорхойгүй'}</b></div><div><strong>{offerDistance(distance)}</strong><span>Шулуун зайгаар</span></div></div>
+    <div className="driver-summary-quote"><div><span>Үнийн санал</span><b>{price != null ? offerPrice(price) : 'Үнэ тодорхойгүй'}</b></div><div><strong>{offerDistance(shownDistance)}</strong><span>{roadDistance != null ? 'Авто замаар' : 'Шулуун зайгаар'}</span></div></div>
   </div>
 }

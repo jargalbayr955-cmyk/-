@@ -79,7 +79,6 @@ export default function CurrentPage() {
       })
       map.addControl(new ml.NavigationControl({ showCompass: false }), 'top-right')
       map.on('click', (e: any) => {
-        // A late GPS response must never replace a pickup chosen on the map.
         gpsRequest.current += 1
         setLocating(false)
         setLocationIssue('')
@@ -189,22 +188,6 @@ export default function CurrentPage() {
     }
   }, [initMap, requestLocation, setMarker])
 
-  const locationTitle = locating
-    ? 'Таны байршлыг тогтоож байна'
-    : locationIssue === 'denied'
-      ? 'Байршлын зөвшөөрөл хаалттай байна'
-      : 'Газрын зураг дээр ачих цэгээ сонгоно уу'
-
-  const locationHelp = locating
-    ? 'Байршлын зөвшөөрөл асуувал Allow / Зөвшөөрөх сонгоно уу. Эсвэл газрын зураг дээр дарж цэгээ сонгоорой.'
-    : locationIssue === 'denied'
-      ? 'Хаягийн мөрний зүүн талын Site info → Location → Allow гэж зөвшөөрөөд байршлын товчийг дахин дарна уу. Эсвэл газрын зураг дээр цэгээ гараар сонгож болно.'
-      : locationIssue === 'timeout'
-        ? 'GPS хариу өгөх хугацаа дууслаа. Байршлын товчийг дахин дарж эсвэл газрын зураг дээр цэгээ сонгоно уу.'
-        : locationIssue === 'unsupported'
-          ? 'Энэ browser автомат байршил дэмжихгүй байна. Газрын зураг дээр ачих цэгээ сонгоно уу.'
-          : 'GPS байршил олдсонгүй. Байршлын товчийг дахин дарж эсвэл газрын зураг дээр цэгээ сонгоно уу.'
-
   return (
     <main className="current-map-page">
       <div ref={mapRef} className="current-map-canvas" aria-label="Ачих байршлын газрын зураг" />
@@ -221,13 +204,6 @@ export default function CurrentPage() {
       </header>
 
       {mapError && <div className="current-map-error">{mapError}</div>}
-
-      {!location && (
-        <div className="current-location-status" role={locationIssue === 'denied' ? 'alert' : 'status'}>
-          <strong>{locationTitle}</strong>
-          <span>{locationHelp}</span>
-        </div>
-      )}
 
       {trafficAvailable && (
         <button
@@ -261,7 +237,12 @@ export default function CurrentPage() {
         </button>
       )}
 
-      <button className="current-recenter-btn" type="button" onClick={requestLocation} aria-label="Миний байршил руу очих" aria-busy={locating} title={locationIssue === 'denied' ? 'Байршлын зөвшөөрлөө Allow болгоно уу' : 'Миний байршил'}>
+      <span style={{
+        position: 'absolute', zIndex: 500, right: 74, bottom: 'calc(143px + env(safe-area-inset-bottom))',
+        padding: '7px 10px', borderRadius: 999, color: '#fff', background: 'rgba(7,9,13,.82)',
+        backdropFilter: 'blur(10px)', fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap', pointerEvents: 'none',
+      }}>Таны одоогийн байршилд заах</span>
+      <button className="current-recenter-btn" type="button" onClick={requestLocation} aria-label="Таны одоогийн байршилд заах" aria-busy={locating} title={locationIssue === 'denied' ? 'Байршлын зөвшөөрлөө Allow болгоно уу' : 'Таны одоогийн байршилд заах'}>
         <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
           <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
         </svg>
