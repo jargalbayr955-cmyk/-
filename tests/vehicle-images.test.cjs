@@ -9,16 +9,16 @@ for (const [file, label] of [
   ['public/vehicle-buten-achigch.svg', 'Бүтэн ачигч'],
   ['public/vehicle-chiregch.svg', 'Чирэгч'],
 ]) {
-  test(`${label} image is self-contained and never depends on an old deployment`, () => {
+  test(`${label} image is a local scalable vector with no deployment dependency`, () => {
     const svg = read(file)
-    assert.match(svg, /viewBox="0 0 118 72"/)
-    assert.match(svg, /data:image\/jpeg;base64,/)
-    assert.doesNotMatch(svg, /<image[^>]+href="https?:\/\//i)
-    assert.doesNotMatch(svg, /xMidYMid slice/)
+    assert.match(svg, /viewBox="0 0 900 520"/)
+    assert.doesNotMatch(svg, /<image\b/i)
+    assert.doesNotMatch(svg, /href="https?:\/\//i)
+    assert.doesNotMatch(svg, /vercel\.app/i)
   })
 }
 
-test('tow images keep the same fixed aspect ratio on customer and registration screens', () => {
+test('tow images keep a stable frame on customer and registration screens', () => {
   const customer = read('app/components/customer-order-sheet.tsx')
   const registration = read('app/components/driver-registration.tsx')
   assert.match(customer, /width: 118, height: 72/)
