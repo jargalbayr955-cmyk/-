@@ -10,7 +10,11 @@ const { NextRequest } = require('next/server')
 const verificationId = 'c4f1e2d3-7a8b-4c9d-a0e1-f2a3b4c5d6e7'
 const customer = { id: '11111111-1111-4111-8111-111111111111', phone: '+97699112233', active: true }
 
-function harness({ secret = 'x'.repeat(32), wesendKey = 'ws_test_fixture', providerReplies = [], user = customer } = {}) {
+function harness(options = {}) {
+  const secret = Object.prototype.hasOwnProperty.call(options, 'secret') ? options.secret : 'x'.repeat(32)
+  const wesendKey = Object.prototype.hasOwnProperty.call(options, 'wesendKey') ? options.wesendKey : 'ws_test_fixture'
+  const providerReplies = options.providerReplies || []
+  const user = Object.prototype.hasOwnProperty.call(options, 'user') ? options.user : customer
   const calls = []
   const cache = new Map()
   const env = { NODE_ENV: 'production', ...(secret === undefined ? {} : { SESSION_SECRET: secret }), ...(wesendKey === undefined ? {} : { WESEND_API_KEY: wesendKey }) }

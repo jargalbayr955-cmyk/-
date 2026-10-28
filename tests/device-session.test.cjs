@@ -6,7 +6,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const vm = require('node:vm')
 const ts = require('typescript')
-const { NextRequest } = require('next/server')
+const { NextRequest, NextResponse } = require('next/server')
 
 const DAY = 86400
 const SECRET = 'test-only-session-secret-not-a-live-secret'
@@ -82,12 +82,20 @@ function signed(payload) {
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
   return body + '.' + crypto.createHmac('sha256', SECRET).update(body).digest('base64url')
 }
-const credentials = { phone: '00006601', pin: '663311' }
+function issueCustomerSession(h, phone = '+97600006601') {
+  let user = h.users.find(row => row.phone === phone)
+  if (!user) {
+    user = { id: 'customer-a', phone, active: true }
+    h.users.push(user)
+  }
+  const response = NextResponse.json({ user: { id: user.id, phone: user.phone } })
+  h.load('lib/server/device-session.ts').setDeviceSession(response, user.id, 'customer')
+  return response
+}
 
-test('registration immediately creates a persistent secure session; PIN never enters the cookie', async () => {
+test('OTP-established customer session is persistent and secure', async () => {
   const h = harness()
-  const response = await h.call('customer/register', credentials)
-  assert.equal(response.status, 200)
+  const response = issueCustomerSession(h)
   assert.match(response.headers.get('set-cookie'), /Max-Age=7776000/)
   assert.match(response.headers.get('set-cookie'), /HttpOnly/)
   assert.match(response.headers.get('set-cookie'), /Secure/)
@@ -100,28 +108,24 @@ test('registration immediately creates a persistent secure session; PIN never en
   assert.equal((await h.call('customer/session', null, saved)).status, 200)
 })
 
-test('a new device signs into the same account with normalized phone and PIN; logout is per device', async () => {
+test('another OTP login can remember the same account on a second device; logout stays per device', async () => {
   const h = harness()
-  const first = cookie(await h.call('customer/register', credentials))
+  const first = cookie(issueCustomerSession(h))
   assert.equal((await h.call('customer/session')).status, 401)
   h.advance(1)
-  const secondResponse = await h.call('customer/login', { ...credentials, phone: '+976 0000 6601' })
-  assert.equal(secondResponse.status, 200)
+  const secondResponse = issueCustomerSession(h)
   const second = cookie(secondResponse)
   assert.notEqual(first, second)
   assert.equal((await secondResponse.json()).user.id, h.users[0].id)
-  assert.equal((await h.call('customer/login', { ...credentials, pin: '000000' })).status, 401)
-  assert.equal((await h.call('customer/register', credentials)).status, 409)
   const logout = await h.call('customer/logout', {}, first)
   assert.match(logout.headers.get('set-cookie'), /Max-Age=0/)
   assert.equal((await h.call('customer/session', null, cookie(logout))).status, 401)
   assert.equal((await h.call('customer/session', null, second)).status, 200)
-  assert.equal((await h.call('customer/login', credentials)).status, 200)
 })
 
-test('daily use renews the saved session; old seven-day sessions upgrade without a PIN', async () => {
+test('daily use renews the saved session; old seven-day sessions upgrade without another OTP', async () => {
   const h = harness()
-  const saved = cookie(await h.call('customer/register', credentials))
+  const saved = cookie(issueCustomerSession(h))
   assert.equal((await h.call('customer/session', null, saved)).headers.get('set-cookie'), null)
   h.advance(2 * DAY)
   const renewed = await h.call('customer/session', null, saved)
@@ -132,9 +136,9 @@ test('daily use renews the saved session; old seven-day sessions upgrade without
   assert.match((await h.call('customer/session', null, old)).headers.get('set-cookie'), /Max-Age=7776000/)
 })
 
-test('expired, disabled and deleted accounts cannot renew; database failure is retryable', async () => {
+test('expired, disabled and deleted customer accounts cannot renew; database failure is retryable', async () => {
   const h = harness()
-  const saved = cookie(await h.call('customer/register', credentials))
+  const saved = cookie(issueCustomerSession(h))
   h.state.unavailable = true
   const unavailable = await h.call('customer/session', null, saved)
   assert.equal(unavailable.status, 503)
