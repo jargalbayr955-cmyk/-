@@ -76,16 +76,17 @@ test('trusted OTP request restores the remembered session without asking for a c
   assert.equal(result.user.id, user.id)
 })
 
-test('customer UI prefills remembered phone and explains the 90-day trusted-device login', () => {
+test('customer UI prefills remembered phone and keeps the phone login screen concise', () => {
   const auth = fs.readFileSync(path.join(__dirname, '..', 'app/components/customer-auth.tsx'), 'utf8')
   const account = fs.readFileSync(path.join(__dirname, '..', 'app/components/customer-account.tsx'), 'utf8')
   assert.match(auth, /readRememberedCustomerPhone\(\)/)
   assert.match(auth, /rememberCustomerPhone\(phone\)/)
   assert.match(auth, /result\.trusted/)
-  assert.match(auth, /90 хоног/)
-  assert.match(auth, /SMS явуулахгүй шууд нэвтэрнэ/)
-  assert.match(auth, /OTP код авах →/)
-  assert.doesNotMatch(auth, /OTP дахин шаардана/)
+  assert.match(auth, /Утасны дугаараар нэвтрэх/)
+  assert.match(auth, /busy \? 'Шалгаж байна\.\.\.' : 'Нэвтрэх'/)
+  assert.doesNotMatch(auth, /Энэ төхөөрөмж өмнө нь OTP-оор баталгаажсан бөгөөд 90 хоног дуусаагүй бол шууд нэвтэрнэ/)
+  assert.doesNotMatch(auth, /Нэг удаа OTP-оор баталгаажсан энэ төхөөрөмж 90 хоног итгэмжлэгдэнэ/)
+  assert.doesNotMatch(auth, /OTP код авах →/)
   assert.match(account, /rememberCustomerPhone\(user\.phone\)/)
   assert.match(account, /await logoutCustomer\(\)/)
 })
