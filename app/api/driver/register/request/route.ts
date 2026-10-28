@@ -3,6 +3,22 @@ import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { allowRequest, getClientIp, normalizeMnPhone } from '@/lib/server/security'
 
 const CAR_TYPES = new Set(['butten', 'chiregch'])
+const JPEG_DATA_URL = /^data:image\/jpeg;base64,([A-Za-z0-9+/]+={0,2})$/
+
+function normalizeFacePhoto(value: unknown): string | null | undefined {
+  if (value === null || value === undefined || value === '') return null
+  if (typeof value !== 'string' || value.length > 300_000) return undefined
+  const match = JPEG_DATA_URL.exec(value)
+  if (!match) return undefined
+  try {
+    const bytes = Buffer.from(match[1], 'base64')
+    if (bytes.length < 4 || bytes.length > 200_000) return undefined
+    if (bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) return undefined
+  } catch {
+    return undefined
+  }
+  return value
+}
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req)
@@ -13,14 +29,21 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
   const phone = normalizeMnPhone(body?.phone)
   const carType = typeof body?.car_type === 'string' ? body.car_type : ''
-  if (!phone || !CAR_TYPES.has(carType)) {
-    return NextResponse.json({ error: 'Утасны дугаар эсвэл ачигчийн төрөл буруу байна.' }, { status: 400 })
+  const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 100) : ''
+  const photoDataUrl = normalizeFacePhoto(body?.photo_data_url)
+  if (!phone || !CAR_TYPES.has(carType) || !name || photoDataUrl === undefined) {
+    return NextResponse.json({ error: photoDataUrl === undefined ? 'Нүүр зураг буруу эсвэл хэт том байна.' : 'Нэр, утасны дугаар эсвэл ачигчийн төрөл буруу байна.' }, { status: 400 })
   }
   if (!(await allowRequest(`driver-register-phone:${phone}`, 6, 10 * 60_000))) {
     return NextResponse.json({ error: 'Энэ дугаараар олон удаа хүсэлт үүсгэлээ. Түр хүлээгээд дахин оролдоно уу.' }, { status: 429 })
   }
 
-  const { data, error } = await getSupabaseAdmin().rpc('start_driver_registration', { p_phone: phone, p_car_type: carType })
+  const { data, error } = await getSupabaseAdmin().rpc('start_driver_registration_v2', {
+    p_phone: phone,
+    p_car_type: carType,
+    p_name: name,
+    p_photo_data_url: photoDataUrl,
+  })
   if (error) {
     if (error.code === '23505') return NextResponse.json({ error: 'Энэ утасны дугаар жолоочоор бүртгэлтэй байна.' }, { status: 409 })
     if (error.code === '22023') return NextResponse.json({ error: 'Бүртгэлийн мэдээлэл буруу байна.' }, { status: 400 })
