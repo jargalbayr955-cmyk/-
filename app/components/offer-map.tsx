@@ -7,15 +7,31 @@ import { DriverSlot, offerDistance, offerPrice, PickupPoint } from '@/lib/order-
 
 type OfferMarker = { marker: Marker; button: HTMLButtonElement; price: HTMLElement; distance: HTMLElement }
 
-export function OfferMap({ pickup, offers, selectedDriverId, onSelect }: {
+function createPickupSearchMarker(searching: boolean) {
+  const element = createDotMarker('#2563eb', 20, 'Ачуулах байршил')
+  element.className = `pickup-search-marker${searching ? ' is-searching' : ''}`
+  element.style.position = 'relative'
+  element.style.overflow = 'visible'
+  for (let index = 1; index <= 3; index += 1) {
+    const ring = document.createElement('span')
+    ring.className = `pickup-search-ring pickup-search-ring-${index}`
+    ring.setAttribute('aria-hidden', 'true')
+    element.append(ring)
+  }
+  return element
+}
+
+export function OfferMap({ pickup, offers, selectedDriverId, searching, onSelect }: {
   pickup: PickupPoint | null
   offers: DriverSlot[]
   selectedDriverId: string | null
+  searching: boolean
   onSelect: (driverId: string) => void
 }) {
   const container = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const pickupMarker = useRef<Marker | null>(null)
+  const pickupElement = useRef<HTMLElement | null>(null)
   const trafficLayer = useRef<any>(null)
   const markers = useRef(new Map<string, OfferMarker>())
   const fittedPoints = useRef('')
@@ -83,6 +99,7 @@ export function OfferMap({ pickup, offers, selectedDriverId, onSelect }: {
       trafficLayer.current = null
       pickupMarker.current?.remove()
       pickupMarker.current = null
+      pickupElement.current = null
       for (const { marker } of markerStore.values()) marker.remove()
       markerStore.clear()
       mapRef.current?.remove()
@@ -95,8 +112,18 @@ export function OfferMap({ pickup, offers, selectedDriverId, onSelect }: {
     const map = mapRef.current, ml = window.maplibregl
     if (!ready || !map || !ml) return
     if (pickup) {
-      if (!pickupMarker.current) pickupMarker.current = new ml.Marker({ element: createDotMarker('#2563eb', 20, 'Ачуулах байршил') }).setLngLat([pickup.lng, pickup.lat]).addTo(map)
-      else pickupMarker.current.setLngLat([pickup.lng, pickup.lat])
+      if (!pickupMarker.current) {
+        const element = createPickupSearchMarker(searching)
+        pickupElement.current = element
+        pickupMarker.current = new ml.Marker({ element }).setLngLat([pickup.lng, pickup.lat]).addTo(map)
+      } else {
+        pickupMarker.current.setLngLat([pickup.lng, pickup.lat])
+      }
+      if (pickupElement.current) pickupElement.current.className = `pickup-search-marker${searching ? ' is-searching' : ''}`
+    } else if (pickupMarker.current) {
+      pickupMarker.current.remove()
+      pickupMarker.current = null
+      pickupElement.current = null
     }
 
     const live = new Set<string>()
@@ -141,7 +168,7 @@ export function OfferMap({ pickup, offers, selectedDriverId, onSelect }: {
         map.fitBounds(bounds, { padding: { top: Math.min(210, height * .32), bottom: Math.min(190, height * .29), left: 76, right: 76 }, maxZoom: 15, duration: 500 })
       } else map.easeTo({ center: [pickup.lng, pickup.lat], zoom: 15, duration: 400 })
     }
-  }, [pickup, offers, selectedDriverId, ready])
+  }, [pickup, offers, selectedDriverId, searching, ready])
 
   return <>
     <div ref={container} className="offers-map-canvas" aria-label="Ачуулах байршил болон жолоочийн үнийн саналын газрын зураг" />
