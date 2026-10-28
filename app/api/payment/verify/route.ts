@@ -4,6 +4,16 @@ import { allowRequest, getClientIp, safeEqual } from '@/lib/server/security'
 import { getPaymentWebhookSecret, validPaymentReceipt } from '@/lib/server/payment-webhook'
 import { parseKhanBankSms, readBankSmsConfig, type BankReceipt } from '@/lib/server/khan-bank-sms'
 
+function registrationError(error: { code?: string } | null, legacy = false) {
+  const status = error?.code === 'P0002' ? 404 : error?.code === '22023' ? 400 : error?.code === 'P0001' ? 409 : 503
+  return NextResponse.json({ error: status === 404 ? (legacy ? 'Invalid registration reference' : 'Registration code not found') : status === 409 ? 'Payment amount or reference mismatch' : 'Payment verification unavailable' }, { status })
+}
+
+function commissionError(error: { code?: string } | null) {
+  const status = error?.code === 'P0002' ? 404 : error?.code === '22023' ? 400 : error?.code === 'P0001' ? 409 : 503
+  return NextResponse.json({ error: status === 404 ? 'Invalid code' : status === 409 ? 'Payment amount or reference mismatch' : 'Payment verification unavailable' }, { status })
+}
+
 export async function POST(req: NextRequest) {
   const secret = getPaymentWebhookSecret()
   const provided = req.headers.get('x-webhook-secret') || ''
@@ -30,8 +40,6 @@ export async function POST(req: NextRequest) {
     receipt = parseKhanBankSms(text, sender, config)
     if (!receipt) return NextResponse.json({ error: 'Expected the configured account, incoming MNT amount and exact six- or eight-digit Utga' }, { status: 400 })
   } else {
-    // Compatibility for existing trusted bank adapters, which must themselves
-    // validate the bank sender/account. Never merge fields into a raw SMS receipt.
     let body: unknown
     try { body = JSON.parse(text) } catch { body = null }
     if (!validPaymentReceipt(body) || ['sms', 'message', 'text'].some(key => key in body)) {
@@ -40,14 +48,25 @@ export async function POST(req: NextRequest) {
     receipt = body
   }
 
-  const registrationReceipt = /^\d{8}$/.test(receipt.code)
-  const result = registrationReceipt
-    ? await supabase.rpc('confirm_driver_registration_payment', { p_phone: `+976${receipt.code}`, p_amount: receipt.amount })
-    : await supabase.rpc('confirm_driver_commission', { p_code: receipt.code, p_amount: receipt.amount })
-  const { data, error } = result
-  if (error) {
-    const status = error.code === 'P0002' ? 404 : error.code === '22023' ? 400 : error.code === 'P0001' ? 409 : 503
-    return NextResponse.json({ error: status === 404 ? (registrationReceipt ? 'Invalid registration reference' : 'Invalid code') : status === 409 ? 'Payment amount or reference mismatch' : 'Payment verification unavailable' }, { status })
+  if (/^\d{6}$/.test(receipt.code)) {
+    // New driver registrations also use six digits. Their codes are generated
+    // outside the commission-code namespace, so try registration first and
+    // fall back to the existing commission flow only when no registration exists.
+    const registration = await supabase.rpc('confirm_driver_registration_payment_by_code', { p_code: receipt.code, p_amount: receipt.amount })
+    if (!registration.error) {
+      return NextResponse.json({ ...registration.data, payment_type: 'driver_registration' }, { headers: { 'Cache-Control': 'no-store' } })
+    }
+    if (registration.error.code !== 'P0002') return registrationError(registration.error)
+
+    const commission = await supabase.rpc('confirm_driver_commission', { p_code: receipt.code, p_amount: receipt.amount })
+    if (commission.error) return commissionError(commission.error)
+    return NextResponse.json({ ...commission.data, payment_type: 'driver_commission' }, { headers: { 'Cache-Control': 'no-store' } })
   }
-  return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } })
+
+  // Legacy registration requests created before the six-digit rollout used the
+  // eight local phone digits as the bank reference. Keep those payable until
+  // they expire so an in-flight registration is not stranded by the release.
+  const legacyRegistration = await supabase.rpc('confirm_driver_registration_payment', { p_phone: `+976${receipt.code}`, p_amount: receipt.amount })
+  if (legacyRegistration.error) return registrationError(legacyRegistration.error, true)
+  return NextResponse.json({ ...legacyRegistration.data, payment_type: 'driver_registration_legacy' }, { headers: { 'Cache-Control': 'no-store' } })
 }
