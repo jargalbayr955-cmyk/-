@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { allowRequest } from '@/lib/server/security'
 import { setDeviceSession } from '@/lib/server/device-session'
-import { driverNeedsOnboarding, requireDriver } from '@/lib/server/driver'
+import { requireDriver } from '@/lib/server/driver'
 
 export async function POST(req: NextRequest) {
   const driver = await requireDriver(req, { allowIncomplete: true })
@@ -14,9 +14,11 @@ export async function POST(req: NextRequest) {
   const b = (await req.json().catch(() => null)) ?? {}
   const name = String(b.name || '').trim().slice(0, 100)
   const carNumber = String(b.car_number || '').trim().slice(0, 30)
+  const currentName = String(driver.name || '').trim()
+  const onboarding = !currentName || currentName === 'Шинэ жолооч' || !String(driver.car_number || '').trim()
   const s = getSupabaseAdmin()
 
-  if (driverNeedsOnboarding(driver)) {
+  if (onboarding) {
     const newPin = String(b.new_pin || '')
     if (!name || !carNumber) {
       return NextResponse.json({ error: 'Нэр болон машины улсын дугаараа оруулна уу.' }, { status: 400 })
