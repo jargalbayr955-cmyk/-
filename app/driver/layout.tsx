@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { DriverInstallButton } from '../components/driver-install-button'
 import { DriverOnboardingGate } from '../components/driver-onboarding-gate'
+import { DriverRegistrationEntry } from '../components/driver-registration-entry'
 
 export const metadata: Metadata = {
   title: 'Ачилт · Жолооч',
@@ -18,5 +19,5 @@ export const metadata: Metadata = {
 }
 
 export default function DriverLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <>{children}<DriverOnboardingGate /><DriverInstallButton /></>
+  return <>{children}<DriverOnboardingGate /><DriverInstallButton /><DriverRegistrationEntry /></>
 }
