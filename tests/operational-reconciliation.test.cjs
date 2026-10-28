@@ -8,7 +8,7 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8')
 
 test('admin dashboard only treats linked confirmed orders as active', () => {
   const source = read('app/api/admin/dashboard/route.ts')
-  assert.match(source, /\.eq\('status', 'confirmed'\)\.not\('driver_id', 'is', null\)/)
+  assert.match(source, /const activeOrders = \(activeR\.data \|\| \[\]\)\.filter\(order => Boolean\(order\.driver_id\)\)/)
 })
 
 test('stale dispatch cleanup is wired into a Hobby-compatible daily cron', () => {
