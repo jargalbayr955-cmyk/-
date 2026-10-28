@@ -10,8 +10,8 @@ export async function POST(req:NextRequest){
  const {action,driver,id,order_id}=(await req.json().catch(() => null)) ?? {}; const s=getSupabaseAdmin()
  if(action==='add'){
   const phone=normalizeMnPhone(driver?.phone); if(!phone)return NextResponse.json({error:'Утасны дугаар буруу'},{status:400})
-  const pin=String(driver?.pin||crypto.randomInt(100000,1000000)); if(!/^\d{4,8}$/.test(pin))return NextResponse.json({error:'PIN буруу'},{status:400})
-  const {data:newId,error}=await s.rpc('admin_create_driver_secure',{p_phone:phone,p_name:String(driver?.name||'Шинэ жолооч').slice(0,100),p_pin:pin,p_car_type:driver?.car_type||null})
+  const pin='000000'
+  const {data:newId,error}=await s.rpc('admin_create_driver_secure',{p_phone:phone,p_name:'Шинэ жолооч',p_pin:pin,p_car_type:null})
   if(error)return NextResponse.json({error:error.message},{status:409}); return NextResponse.json({success:true,id:newId,pin})
  }
  if(action==='toggle'){
