@@ -54,10 +54,11 @@ test('payment webhook tries a six-digit registration reference before driver com
   assert.match(route, /driver_registration_legacy/)
 })
 
-test('registration migrations allocate a unique six-digit code and create the paid driver with submitted name and optional photo', () => {
+test('registration migrations allocate a unique six-digit code and keep it outside the commission-code namespace', () => {
   const first = read('supabase/migrations/20261028092437_v5_8_driver_registration_six_digit_reference.sql')
   const fix = read('supabase/migrations/20261028092516_fix_v5_8_driver_registration_start_state.sql')
-  const sql = `${first}\n${fix}`
+  const separate = read('supabase/migrations/20261028092928_v5_8_separate_registration_commission_codes.sql')
+  const sql = `${first}\n${fix}\n${separate}`
   assert.match(sql, /add column if not exists driver_name text/i)
   assert.match(sql, /add column if not exists photo_data_url text/i)
   assert.match(sql, /add column if not exists payment_code text/i)
@@ -69,4 +70,5 @@ test('registration migrations allocate a unique six-digit code and create the pa
   assert.match(sql, /v_request\.photo_data_url/)
   assert.match(sql, /false,[\s\n]*false/)
   assert.match(sql, /v_existing := found/)
+  assert.match(separate, /driver_registration_requests r where r\.payment_code=v_code/)
 })
