@@ -36,20 +36,25 @@ export function watchDriverLocation(onLocation: (point: SavedDriverLocation) => 
   }
   const failed = (error: GeolocationPositionError) => {
     if (!stopped) onMessage(error.code === 1
-      ? 'Байршлын зөвшөөрөл хаалттай. Утасны тохиргооноос энэ сайтын байршлыг зөвшөөрнө үү.'
+      ? 'Байршлын зөвшөөрөл хаалттай. Энэ сайтын байршлыг зөвшөөрөөд дахин оролдоно уу.'
       : 'GPS дохио хүлээж байна. Байршил автоматаар дахин шалгагдана.')
   }
   const options = { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
   const refresh = () => { if (!stopped && document.visibilityState === 'visible') navigator.geolocation.getCurrentPosition(receive, failed, options) }
+  const retryFromUser = () => refresh()
   const watch = navigator.geolocation.watchPosition(receive, failed, options)
   refresh()
   const heartbeat = setInterval(refresh, 45_000)
   document.addEventListener('visibilitychange', refresh)
   window.addEventListener('online', refresh)
+  // A visible retry button dispatches this synchronously from the user's tap. This matters on iOS,
+  // where a permission prompt can be suppressed when GPS starts only from background/session restore logic.
+  window.addEventListener('achilt-location-retry', retryFromUser)
   return () => {
     stopped = true; controller.abort(); clearInterval(heartbeat)
     navigator.geolocation.clearWatch(watch)
     document.removeEventListener('visibilitychange', refresh)
     window.removeEventListener('online', refresh)
+    window.removeEventListener('achilt-location-retry', retryFromUser)
   }
 }
