@@ -13,7 +13,7 @@ export function getPaymentWebhookSecret() {
 export function validPaymentReceipt(body: unknown): body is { code: string; amount: number; currency: 'MNT'; direction: 'credit' } {
   if (!body || typeof body !== 'object') return false
   const value = body as Record<string, unknown>
-  return typeof value.code === 'string' && /^\d{6}$/.test(value.code)
+  return typeof value.code === 'string' && /^(?:\d{6}|\d{8})$/.test(value.code)
     && typeof value.amount === 'number' && Number.isSafeInteger(value.amount) && value.amount > 0
     && value.currency === 'MNT' && value.direction === 'credit'
 }

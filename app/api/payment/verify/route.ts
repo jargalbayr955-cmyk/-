@@ -28,21 +28,26 @@ export async function POST(req: NextRequest) {
     if (!config) return NextResponse.json({ error: 'Configure the receiving account and bank SMS sender in admin' }, { status: 503 })
     if (sender !== config.sender) return NextResponse.json({ error: 'SMS sender mismatch' }, { status: 403 })
     receipt = parseKhanBankSms(text, sender, config)
-    if (!receipt) return NextResponse.json({ error: 'Expected the configured account, incoming MNT amount and exact six-digit Utga' }, { status: 400 })
+    if (!receipt) return NextResponse.json({ error: 'Expected the configured account, incoming MNT amount and exact six- or eight-digit Utga' }, { status: 400 })
   } else {
     // Compatibility for existing trusted bank adapters, which must themselves
     // validate the bank sender/account. Never merge fields into a raw SMS receipt.
     let body: unknown
     try { body = JSON.parse(text) } catch { body = null }
     if (!validPaymentReceipt(body) || ['sms', 'message', 'text'].some(key => key in body)) {
-      return NextResponse.json({ error: 'Expected code, positive integer amount, currency MNT and direction credit' }, { status: 400 })
+      return NextResponse.json({ error: 'Expected six/eight-digit code, positive integer amount, currency MNT and direction credit' }, { status: 400 })
     }
     receipt = body
   }
-  const { data, error } = await supabase.rpc('confirm_driver_commission', { p_code: receipt.code, p_amount: receipt.amount })
+
+  const registrationReceipt = /^\d{8}$/.test(receipt.code)
+  const result = registrationReceipt
+    ? await supabase.rpc('confirm_driver_registration_payment', { p_phone: `+976${receipt.code}`, p_amount: receipt.amount })
+    : await supabase.rpc('confirm_driver_commission', { p_code: receipt.code, p_amount: receipt.amount })
+  const { data, error } = result
   if (error) {
     const status = error.code === 'P0002' ? 404 : error.code === '22023' ? 400 : error.code === 'P0001' ? 409 : 503
-    return NextResponse.json({ error: status === 404 ? 'Invalid code' : status === 409 ? 'Payment amount or order mismatch' : 'Payment verification unavailable' }, { status })
+    return NextResponse.json({ error: status === 404 ? (registrationReceipt ? 'Invalid registration reference' : 'Invalid code') : status === 409 ? 'Payment amount or reference mismatch' : 'Payment verification unavailable' }, { status })
   }
   return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } })
 }

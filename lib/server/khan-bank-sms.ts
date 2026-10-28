@@ -29,10 +29,10 @@ export function readBankSmsConfig(value: unknown, bankAccount: unknown): BankSms
   } catch { return null }
 }
 
-// Observed Khan Bank incoming SMS format, 2026-09-22. Anchor the entire message:
-// balance, failed card transactions and reference-like digits elsewhere cannot pay.
+// Observed Khan Bank incoming SMS format, 2026-09-22. Six digits are driver
+// commission references; eight digits are driver-registration phone references.
 const money = '(?:0|[1-9]\\d{0,14}|[1-9]\\d{0,2}(?:,\\d{3}){1,4})\\.\\d{2}'
-const incoming = new RegExp(`^Tany (\\d\\*{3}\\d{4}) dansand ORLOGO:(${money})MNT orj ULDEGDEL:${money}MNT bolloo\\. ?Utga:(\\d{6})$`, 'i')
+const incoming = new RegExp(`^Tany (\\d\\*{3}\\d{4}) dansand ORLOGO:(${money})MNT orj ULDEGDEL:${money}MNT bolloo\\. ?Utga:(\\d{6}|\\d{8})$`, 'i')
 
 export function parseKhanBankSms(sms: string, sender: string, config: BankSmsConfig): BankReceipt | null {
   if (sms.length > 2048 || sender.trim() !== config.sender) return null

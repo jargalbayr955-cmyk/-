@@ -5,6 +5,7 @@ import { clearCustomerBrowserState, notifyCustomerSessionChanged, phoneInput } f
 import { requestCustomerOtp, verifyCustomerOtp } from '@/lib/client/customer-auth'
 import { SessionGate } from './session-gate'
 import { BrandAccess } from './access-shortcuts'
+import { DriverRegistrationDialog } from './driver-registration'
 
 export function CustomerAuth() {
   return <SessionGate mode="guest"><AuthForm /></SessionGate>
@@ -19,6 +20,7 @@ function AuthForm() {
   const [error, setError] = useState('')
   const [signedOut, setSignedOut] = useState(false)
   const [resendAt, setResendAt] = useState(0)
+  const [driverRegistrationOpen, setDriverRegistrationOpen] = useState(false)
   const [, setTick] = useState(0)
   const pending = useRef(false)
   const phoneRef = useRef<HTMLInputElement>(null)
@@ -108,7 +110,12 @@ function AuthForm() {
 
   return <main className="auth-shell">
     <section className="auth-card" aria-labelledby="auth-title">
-      <BrandAccess className="auth-brand-mark" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+        <BrandAccess className="auth-brand-mark" />
+        <button type="button" onClick={() => setDriverRegistrationOpen(true)} style={{ border: '1px solid rgba(255,255,255,.18)', borderRadius: 14, background: '#171b22', color: '#fff', padding: '10px 12px', fontWeight: 800, cursor: 'pointer', lineHeight: 1.2 }}>
+          🚚 Жолоочоор бүртгүүлэх
+        </button>
+      </div>
       <p className="auth-eyebrow">АЧИЛТ • ТУСЛАМЖ ОЙРХОН</p>
       <h1 id="auth-title">Тавтай морил</h1>
       <p className="auth-intro">Утасны дугаараа баталгаажуулаад ойр жолооч нарын үнийн саналаас сонгоорой.</p>
@@ -143,6 +150,7 @@ function AuthForm() {
       </>}
 
       <p className="auth-remember">Нэвтрэлт энэ төхөөрөмжийн browser дээр хадгалагдана. Бусдын төхөөрөмж ашигласан бол дуусмагц «Гарах» товчийг дараарай.</p>
+      {driverRegistrationOpen && <DriverRegistrationDialog initialPhone={phone} onClose={() => setDriverRegistrationOpen(false)} />}
     </section>
   </main>
 }
