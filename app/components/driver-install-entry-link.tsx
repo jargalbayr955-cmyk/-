@@ -22,6 +22,11 @@ export function DriverInstallEntryLink() {
   const hostRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
+    if (browserStandaloneMode() && window.location.pathname === '/start') {
+      window.location.replace('/driver')
+      return
+    }
+
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {})
 
     const onBeforeInstall = (event: Event) => {
