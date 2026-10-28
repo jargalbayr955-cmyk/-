@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { allowRequest, getClientIp, safeEqual } from '@/lib/server/security'
-import { getPaymentWebhookSecret, validPaymentReceipt } from '@/lib/server/payment-webhook'
+import { getPaymentWebhookSecrets, validPaymentReceipt } from '@/lib/server/payment-webhook'
 import { parseKhanBankSms, readBankSmsConfig, type BankReceipt } from '@/lib/server/khan-bank-sms'
 
 function registrationError(error: { code?: string } | null, legacy = false) {
@@ -15,9 +15,9 @@ function commissionError(error: { code?: string } | null) {
 }
 
 export async function POST(req: NextRequest) {
-  const secret = getPaymentWebhookSecret()
+  const secrets = getPaymentWebhookSecrets()
   const provided = req.headers.get('x-webhook-secret') || ''
-  if (!secret || !provided || !safeEqual(secret, provided)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!provided || secrets.length === 0 || !secrets.some(secret => safeEqual(secret, provided))) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await allowRequest(`payment-webhook:${getClientIp(req)}`, 120, 60_000))) return NextResponse.json({ error: 'Rate limited' }, { status: 429 })
 
   const supabase = getSupabaseAdmin()
@@ -50,22 +50,17 @@ export async function POST(req: NextRequest) {
   }
 
   if (/^0\d{5}$/.test(receipt.code)) {
-    // 0xxxxx is reserved for new driver-registration payments.
     const registration = await supabase.rpc('confirm_driver_registration_payment_by_code', { p_code: receipt.code, p_amount: receipt.amount })
     if (registration.error) return registrationError(registration.error)
     return NextResponse.json(registration.data, { headers: { 'Cache-Control': 'no-store' } })
   }
 
   if (/^[1-9]\d{5}$/.test(receipt.code)) {
-    // Existing commission references remain 100000-999999.
     const commission = await supabase.rpc('confirm_driver_commission', { p_code: receipt.code, p_amount: receipt.amount })
     if (commission.error) return commissionError(commission.error)
     return NextResponse.json(commission.data, { headers: { 'Cache-Control': 'no-store' } })
   }
 
-  // Legacy registration requests created before the six-digit rollout used the
-  // eight local phone digits as the bank reference. Keep those payable until
-  // they expire so an in-flight registration is not stranded by the release.
   const legacyRegistration = await supabase.rpc('confirm_driver_registration_payment', { p_phone: `+976${receipt.code}`, p_amount: receipt.amount })
   if (legacyRegistration.error) return registrationError(legacyRegistration.error, true)
   return NextResponse.json(legacyRegistration.data, { headers: { 'Cache-Control': 'no-store' } })
