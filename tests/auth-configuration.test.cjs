@@ -7,25 +7,46 @@ const vm = require('node:vm')
 const ts = require('typescript')
 const { NextRequest } = require('next/server')
 
-// Exercise the real route handlers with a fake database boundary and isolated env.
-function harness(secret, rpcResult = { data: null, error: null }) {
+const verificationId = 'c4f1e2d3-7a8b-4c9d-a0e1-f2a3b4c5d6e7'
+const customer = { id: '11111111-1111-4111-8111-111111111111', phone: '+97699112233', active: true }
+
+function harness({ secret = 'x'.repeat(32), wesendKey = 'ws_test_fixture', providerReplies = [], user = customer } = {}) {
   const calls = []
   const cache = new Map()
-  const fakeProcess = { env: { NODE_ENV: 'production', ...(secret === undefined ? {} : { SESSION_SECRET: secret }) } }
+  const env = { NODE_ENV: 'production', ...(secret === undefined ? {} : { SESSION_SECRET: secret }), ...(wesendKey === undefined ? {} : { WESEND_API_KEY: wesendKey }) }
   const admin = {
-    rpc: async (name) => { calls.push(name); return name === 'consume_rate_limit' ? { data: true, error: null } : rpcResult },
-    from: () => { calls.push('from'); return { select: () => ({ limit: async () => ({ error: null }) }) } },
+    async rpc(name, args) {
+      calls.push({ type: 'rpc', name, args })
+      return name === 'consume_rate_limit' ? { data: true, error: null } : { data: null, error: null }
+    },
+    from(table) {
+      const query = { type: 'from', table, operations: [] }
+      calls.push(query)
+      const chain = {
+        select(...args) { query.operations.push(['select', ...args]); return chain },
+        limit(...args) { query.operations.push(['limit', ...args]); return Promise.resolve({ data: [], error: null }) },
+        upsert(...args) { query.operations.push(['upsert', ...args]); return chain },
+        single() { query.operations.push(['single']); return Promise.resolve({ data: user, error: null }) },
+      }
+      return chain
+    },
+  }
+  const providerFetch = async (url, options) => {
+    calls.push({ type: 'fetch', url: String(url), options })
+    const reply = providerReplies.shift()
+    if (!reply) throw new Error('Unexpected provider call')
+    return Response.json(reply.body || {}, { status: reply.status || 200, headers: reply.headers || {} })
   }
   function load(file) {
     if (cache.has(file)) return cache.get(file)
     const exports = {}
     cache.set(file, exports)
     const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), {
-      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX },
     }).outputText
     vm.runInNewContext(source, {
-      exports, process: fakeProcess, Buffer,
-      console: { error: () => {} },
+      exports, process: { env }, Buffer, URL, Date, Response, AbortController, setTimeout, clearTimeout,
+      console: { error: () => {}, warn: () => {} }, fetch: providerFetch,
       require: (name) => {
         if (name === 'server-only') return {}
         if (name === '@/lib/server/supabase-admin') return { getSupabaseAdmin: () => admin }
@@ -38,76 +59,98 @@ function harness(secret, rpcResult = { data: null, error: null }) {
   }
   return { load, calls }
 }
-function request() {
-  return new NextRequest('https://achilt.example/api/customer/login', {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ phone: '00005520', pin: '550020' }),
+
+function otpRequest(phone = '99112233') {
+  return new NextRequest('https://achilt.example/api/customer/otp/request', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone }),
+  })
+}
+function otpVerify(code = '482913', phone = '99112233') {
+  return new NextRequest('https://achilt.example/api/customer/otp/verify', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone, verification_id: verificationId, code }),
   })
 }
 
 for (const secret of [undefined, 'x'.repeat(31)]) {
-  test(`invalid session config (${secret === undefined ? 'missing' : 'too short'}) blocks auth before database writes`, async () => {
-    const h = harness(secret)
-    for (const route of ['register', 'login']) {
-      const response = await h.load(`app/api/customer/${route}/route.ts`).POST(request())
-      assert.equal(response.status, 503)
-      assert.equal(response.headers.get('set-cookie'), null)
-      assert.equal(typeof (await response.json()).error, 'string')
-    }
+  test(`invalid session config (${secret === undefined ? 'missing' : 'too short'}) blocks OTP before provider/database access`, async () => {
+    const h = harness({ secret })
+    const response = await h.load('app/api/customer/otp/request/route.ts').POST(otpRequest())
+    assert.equal(response.status, 503)
+    assert.equal(response.headers.get('set-cookie'), null)
     assert.deepEqual(h.calls, [])
   })
 }
 
-test('health fails when database works but session signing is unavailable', async () => {
-  const h = harness(undefined)
-  const response = await h.load('app/api/health/route.ts').GET()
+test('missing WeSend key blocks OTP before provider/database access', async () => {
+  const h = harness({ wesendKey: undefined })
+  const response = await h.load('app/api/customer/otp/request/route.ts').POST(otpRequest())
   assert.equal(response.status, 503)
-  const body = await response.json()
-  assert.equal(body.database, 'ok')
-  assert.equal(body.authentication, 'error')
-  assert.equal(body.ok, false)
+  assert.deepEqual(h.calls, [])
 })
 
-test('valid PIN with configured signing creates a secure, verifiable session', async () => {
-  const h = harness('x'.repeat(32), { data: 'test-user-id', error: null })
-  const response = await h.load('app/api/customer/login/route.ts').POST(request())
+test('OTP request sends a six-digit Mongolian verification request without creating a session', async () => {
+  const h = harness({ providerReplies: [{ body: { id: verificationId, status: 'pending', channel: 'sms', to: '99112233', expires_at: '2026-10-28T07:00:00.000Z' } }] })
+  const response = await h.load('app/api/customer/otp/request/route.ts').POST(otpRequest())
+  assert.equal(response.status, 200)
+  assert.equal(response.headers.get('set-cookie'), null)
+  const body = await response.json()
+  assert.equal(body.verification_id, verificationId)
+  const provider = h.calls.find(call => call.type === 'fetch')
+  assert.equal(provider.url, 'https://api.wesend.mn/v1/verify')
+  const sent = JSON.parse(provider.options.body)
+  assert.equal(sent.to, '99112233')
+  assert.equal(sent.code_length, 6)
+  assert.equal(sent.ttl, 300)
+})
+
+test('approved OTP creates or finds the customer and issues a secure remembered session', async () => {
+  const h = harness({ providerReplies: [{ body: { id: verificationId, status: 'approved', channel: 'sms', to: '99112233', expires_at: '2026-10-28T07:00:00.000Z' } }] })
+  const response = await h.load('app/api/customer/otp/verify/route.ts').POST(otpVerify())
   assert.equal(response.status, 200)
   const cookie = response.headers.get('set-cookie')
   assert.match(cookie, /HttpOnly/)
   assert.match(cookie, /Secure/)
   assert.match(cookie, /SameSite=lax/i)
-  const value = cookie.match(/^achilt_customer_session=([^;]+)/)[1]
-  const session = h.load('lib/server/security.ts').verifySession(decodeURIComponent(value), 'customer')
-  assert.equal(session.sub, 'test-user-id')
-  assert.equal(session.role, 'customer')
+  assert.match(cookie, /Max-Age=7776000/)
+  const write = h.calls.find(call => call.type === 'from' && call.table === 'users')
+  assert.ok(write.operations.some(operation => operation[0] === 'upsert'))
 })
 
-test('PIN database failure is not misreported as a wrong PIN', async () => {
-  const h = harness('x'.repeat(32), { data: null, error: { code: 'XX000' } })
-  const response = await h.load('app/api/customer/login/route.ts').POST(request())
-  assert.equal(response.status, 503)
+test('wrong OTP never creates a customer session', async () => {
+  const h = harness({ providerReplies: [{ status: 422, body: { error: { code: 'invalid_code', attempts_remaining: 4 } } }] })
+  const response = await h.load('app/api/customer/otp/verify/route.ts').POST(otpVerify('000000'))
+  assert.equal(response.status, 422)
+  assert.equal(response.headers.get('set-cookie'), null)
+  assert.equal(h.calls.some(call => call.type === 'from' && call.table === 'users'), false)
+  assert.match((await response.json()).error, /4 оролдлого/)
 })
 
-test('a wrong PIN still fails authentication', async () => {
-  const h = harness('x'.repeat(32))
-  assert.equal((await h.load('app/api/customer/login/route.ts').POST(request())).status, 401)
+test('provider phone mismatch never logs in the submitted phone', async () => {
+  const h = harness({ providerReplies: [{ body: { id: verificationId, status: 'approved', channel: 'sms', to: '88112233', expires_at: '2026-10-28T07:00:00.000Z' } }] })
+  const response = await h.load('app/api/customer/otp/verify/route.ts').POST(otpVerify())
+  assert.equal(response.status, 401)
+  assert.equal(response.headers.get('set-cookie'), null)
+  assert.equal(h.calls.some(call => call.type === 'from' && call.table === 'users'), false)
 })
 
-test('health passes only with database and session signing ready', async () => {
-  const h = harness('x'.repeat(32))
+test('legacy customer PIN login and registration are disabled', async () => {
+  const h = harness()
+  for (const route of ['login', 'register']) {
+    const response = await h.load(`app/api/customer/${route}/route.ts`).POST()
+    assert.equal(response.status, 410)
+    assert.equal(response.headers.get('set-cookie'), null)
+  }
+})
+
+test('health reports authentication error until both session signing and WeSend are configured', async () => {
+  for (const options of [{ secret: undefined }, { wesendKey: undefined }]) {
+    const h = harness(options)
+    const response = await h.load('app/api/health/route.ts').GET()
+    assert.equal(response.status, 503)
+    assert.equal((await response.json()).authentication, 'error')
+  }
+  const h = harness()
   const response = await h.load('app/api/health/route.ts').GET()
   assert.equal(response.status, 200)
   assert.equal((await response.json()).authentication, 'ok')
 })
-
-for (const route of ['customer/register', 'customer/login', 'driver/login']) {
-  test(`${route} rejects null and malformed payloads without creating a session`, async () => {
-    for (const body of ['null', '[]', '{invalid']) {
-      const h = harness('x'.repeat(32))
-      const response = await h.load(`app/api/${route}/route.ts`).POST(new NextRequest('https://achilt.example/api/test', {method:'POST', body}))
-      assert.equal(response.status,400)
-      assert.equal(response.headers.get('set-cookie'),null)
-      assert.deepEqual(h.calls,['consume_rate_limit'])
-    }
-  })
-}

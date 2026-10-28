@@ -7,6 +7,7 @@ const vm = require('node:vm')
 const ts = require('typescript')
 
 const user = { id: 'fixture-customer', phone: '+97600009988' }
+const verificationId = 'c4f1e2d3-7a8b-4c9d-a0e1-f2a3b4c5d6e7'
 function client({ responses = [], blockedStorage = false } = {}) {
   const requests = []
   const storage = new Map([
@@ -103,36 +104,45 @@ test('phone input accepts pasted country code and preserves local numbers beginn
   assert.equal(phoneInput('99112233'), '99112233')
 })
 
-test('login succeeds only after the browser session resolves to the same account', async () => {
+test('requesting OTP uses only the phone number and returns the provider verification handle', async () => {
+  const h = client({ responses: [{ body: { verification_id: verificationId, expires_at: '2026-10-28T07:00:00Z', resend_after_seconds: 60 } }] })
+  const result = await h.load('lib/client/customer-auth.ts').requestCustomerOtp('00009988')
+  assert.equal(result.ok, true)
+  assert.equal(result.verificationId, verificationId)
+  assert.equal(h.requests.length, 1)
+  assert.equal(h.requests[0].url, '/api/customer/otp/request')
+  assert.deepEqual(JSON.parse(h.requests[0].options.body), { phone: '00009988' })
+})
+
+test('OTP login succeeds only after the remembered browser session resolves to the same account', async () => {
   const h = client({ responses: [{ body: { user } }, { body: { user } }] })
-  const result = await h.load('lib/client/customer-auth.ts').authenticateCustomer('login', '00009988', '123456')
+  const result = await h.load('lib/client/customer-auth.ts').verifyCustomerOtp('00009988', verificationId, '123456')
   assert.equal(result.ok, true)
   assert.equal(result.user.phone, user.phone)
   assert.equal(h.requests.length, 2)
+  assert.equal(h.requests[0].url, '/api/customer/otp/verify')
   assert.equal(h.requests[1].url, '/api/customer/session')
 })
 
-test('blocked cookies and wrong account responses never report a successful login', async () => {
+test('blocked cookies and wrong account responses never report a successful OTP login', async () => {
   for (const session of [{ status: 401 }, { body: { user: { ...user, id: 'another-account' } } }]) {
     const h = client({ responses: [{ body: { user } }, session] })
-    const result = await h.load('lib/client/customer-auth.ts').authenticateCustomer('login', '00009988', '123456')
+    const result = await h.load('lib/client/customer-auth.ts').verifyCustomerOtp('00009988', verificationId, '123456')
     assert.equal(result.ok, false)
-    assert.match(result.error, /cookie/)
+    assert.match(result.error, /Cookie/)
   }
 })
 
-test('duplicate registration offers login and never issues a second registration request', async () => {
-  const h = client({ responses: [{ status: 409, body: { error: 'Энэ дугаар бүртгэлтэй байна.' } }] })
-  const result = await h.load('lib/client/customer-auth.ts').authenticateCustomer('register', '00009988', '123456')
-  assert.equal(result.ok, false)
-  assert.equal(result.canLogin, true)
-  assert.equal(h.requests.length, 1)
-})
+test('OTP request and verification surface safe server errors without extra retries', async () => {
+  const requestHarness = client({ responses: [{ status: 429, body: { error: 'Түр хүлээгээд дахин оролдоно уу.' } }] })
+  const requested = await requestHarness.load('lib/client/customer-auth.ts').requestCustomerOtp('00009988')
+  assert.equal(requested.ok, false)
+  assert.match(requested.error, /Түр хүлээгээд/)
+  assert.equal(requestHarness.requests.length, 1)
 
-test('registration followed by a connection failure explains that the account was created', async () => {
-  const h = client({ responses: [{ body: { user } }, new Error('offline')] })
-  const result = await h.load('lib/client/customer-auth.ts').authenticateCustomer('register', '00009988', '123456')
-  assert.equal(result.ok, false)
-  assert.equal(result.canLogin, true)
-  assert.match(result.error, /Бүртгэл үүслээ/)
+  const verifyHarness = client({ responses: [{ status: 422, body: { error: 'OTP код буруу байна.' } }] })
+  const verified = await verifyHarness.load('lib/client/customer-auth.ts').verifyCustomerOtp('00009988', verificationId, '000000')
+  assert.equal(verified.ok, false)
+  assert.match(verified.error, /буруу/)
+  assert.equal(verifyHarness.requests.length, 1)
 })

@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { videoIsConfigured } from '@/lib/server/video-turn'
 import { isSessionConfigured } from '@/lib/server/security'
+import { isWeSendConfigured } from '@/lib/server/wesend'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const started = Date.now()
-  const authentication = isSessionConfigured() ? 'ok' : 'error'
+  const authentication = isSessionConfigured() && isWeSendConfigured() ? 'ok' : 'error'
   let database = 'ok'
   try {
     const { error } = await getSupabaseAdmin().from('settings').select('key').limit(1)
