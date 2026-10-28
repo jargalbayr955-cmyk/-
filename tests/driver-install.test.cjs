@@ -5,11 +5,11 @@ const path = require('node:path')
 
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
 
-test('driver PWA opens directly on the driver route', () => {
+test('installed driver PWA opens on the main registration and login route', () => {
   const manifest = JSON.parse(read('public/driver-manifest.json'))
   const layout = read('app/driver/layout.tsx')
   assert.equal(manifest.id, '/driver')
-  assert.equal(manifest.start_url, '/driver')
+  assert.equal(manifest.start_url, '/start')
   assert.equal(manifest.display, 'standalone')
   assert.match(layout, /manifest:\s*['"]\/driver-manifest\.json['"]/)
   assert.match(layout, /DriverInstallButton/)
@@ -26,7 +26,7 @@ test('driver install control sits below login and supports native browser instal
   assert.match(source, /a\[href=\"\/driver\/app\"\]/)
 })
 
-test('main customer login installs the driver PWA directly and standalone start is forced to driver', () => {
+test('main customer login installs the app and standalone launch stays on the registration start page', () => {
   const start = read('app/start/page.tsx')
   const startLayout = read('app/start/layout.tsx')
   const entry = read('app/components/driver-install-entry-link.tsx')
@@ -37,9 +37,8 @@ test('main customer login installs the driver PWA directly and standalone start 
   assert.match(entry, /beforeinstallprompt/)
   assert.match(entry, /installPrompt\.prompt\(\)/)
   assert.match(entry, /navigator\.serviceWorker\.register\(['"]\/sw\.js['"]\)/)
-  assert.match(entry, /browserStandaloneMode\(\) && window\.location\.pathname === ['"]\/start['"]/)
-  assert.match(entry, /window\.location\.replace\(['"]\/driver['"]\)/)
   assert.match(entry, /Жолооч апп утас дээр суулгах/)
-  assert.match(entry, /жолоочийн нүүрийг шууд нээнэ/)
+  assert.match(entry, /бүртгүүлэх\/нэвтрэх нүүрийг шууд нээнэ/)
+  assert.doesNotMatch(entry, /window\.location\.replace\(['"]\/driver['"]\)/)
   assert.doesNotMatch(entry, /href=\"\/driver\"/)
 })
