@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" role="img" aria-label="Бүтэн ачигч машин дээр SUV бүтнээр ачсан зураг">
+<defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#7ec8ff"/><stop offset="1" stop-color="#eaf7ff"/></linearGradient>
+  <linearGradient id="road" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#6b727a"/><stop offset="1" stop-color="#42484f"/></linearGradient>
+  <linearGradient id="truck" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#d9e1e8"/></linearGradient>
+  <linearGradient id="car" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#25303b"/><stop offset="1" stop-color="#05080b"/></linearGradient>
+  <filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-opacity=".28"/></filter>
+</defs>
+<rect width="900" height="520" rx="36" fill="url(#sky)"/>
+<path d="M0 300 C120 250 210 290 330 250 S610 235 900 280 V520 H0Z" fill="#8db579" opacity=".55"/>
+<g opacity=".38" fill="#8092a3"><rect x="55" y="150" width="75" height="150"/><rect x="142" y="125" width="108" height="175"/><rect x="690" y="135" width="92" height="165"/><rect x="790" y="105" width="70" height="195"/></g>
+<rect y="360" width="900" height="160" fill="url(#road)"/><path d="M35 450H240M660 450H860" stroke="#fff" stroke-width="12" stroke-linecap="round" opacity=".8"/>
+<g filter="url(#shadow)">
+  <rect x="265" y="328" width="535" height="42" rx="10" fill="#f5a623"/><rect x="280" y="338" width="505" height="12" rx="6" fill="#20262d"/>
+  <path d="M104 215h170c40 0 69 32 69 72v79H76v-101c0-28 12-50 28-50Z" fill="url(#truck)" stroke="#aab4bd" stroke-width="5"/>
+  <path d="M130 228h103c30 0 54 25 54 55v16H119v-46c0-14 5-25 11-25Z" fill="#79bfe9"/><path d="M120 304h173v54H91v-43c0-7 6-11 29-11Z" fill="#eef3f6"/>
+  <rect x="78" y="345" width="220" height="33" rx="10" fill="#313942"/><rect x="287" y="355" width="95" height="18" rx="7" fill="#2f3841"/>
+  <rect x="183" y="195" width="62" height="15" rx="7" fill="#ff9d18"/><rect x="194" y="188" width="40" height="9" rx="4" fill="#ff6d00"/>
+  <g fill="#161a1e" stroke="#dce3e8" stroke-width="8"><circle cx="151" cy="391" r="42"/><circle cx="704" cy="391" r="42"/></g><g fill="#77828c"><circle cx="151" cy="391" r="18"/><circle cx="704" cy="391" r="18"/></g>
+  <g transform="translate(385 192)">
+    <path d="M40 89 92 30c12-14 28-22 50-22h181c22 0 40 10 52 30l38 62 22 16v72H0v-56c0-22 14-38 40-43Z" fill="url(#car)" stroke="#3f4b58" stroke-width="5"/>
+    <path d="m105 39-36 55h121V31h-54c-13 0-22 3-31 8Zm105-8v63h158l-28-45c-7-11-19-18-37-18Z" fill="#74a8c9" opacity=".9"/>
+    <rect x="30" y="107" width="373" height="44" rx="16" fill="#111820"/>
+    <circle cx="92" cy="173" r="38" fill="#111" stroke="#d6dce1" stroke-width="7"/><circle cx="348" cy="173" r="38" fill="#111" stroke="#d6dce1" stroke-width="7"/><circle cx="92" cy="173" r="14" fill="#707d88"/><circle cx="348" cy="173" r="14" fill="#707d88"/>
+  </g>
+</g>
+</svg>
