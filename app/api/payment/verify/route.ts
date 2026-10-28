@@ -21,10 +21,6 @@ export async function POST(req: NextRequest) {
   if (!(await allowRequest(`payment-webhook:${getClientIp(req)}`, 120, 60_000))) return NextResponse.json({ error: 'Rate limited' }, { status: 429 })
 
   const supabase = getSupabaseAdmin()
-  const autoSetting = await supabase.from('settings').select('value').eq('key', 'payment_auto_verify_enabled').maybeSingle()
-  if (autoSetting.error) return NextResponse.json({ error: 'Automatic payment setting unavailable' }, { status: 503 })
-  if (autoSetting.data?.value === 'false') return NextResponse.json({ error: 'Automatic payment verification is disabled by admin' }, { status: 423 })
-
   const contentType = (req.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()
   if (!['text/plain', 'application/json'].includes(contentType)) return NextResponse.json({ error: 'Unsupported content type' }, { status: 415 })
   if (Number(req.headers.get('content-length')) > 2048) return NextResponse.json({ error: 'Receipt too large' }, { status: 413 })
@@ -35,7 +31,7 @@ export async function POST(req: NextRequest) {
   if (contentType === 'text/plain') {
     const sender = req.headers.get('x-sms-sender')?.trim()
     if (!sender) return NextResponse.json({ error: 'Missing SMS sender' }, { status: 400 })
-    const settingsResult = await supabase.from('settings').select('key,value').in('key', ['bank_account', 'bank_sms_config'])
+    const settingsResult = await supabase.from('settings').select('key,value').in('key', ['bank_account', 'bank_sms_config', 'payment_auto_verify_enabled'])
     if (settingsResult.error) return NextResponse.json({ error: 'SMS settings unavailable' }, { status: 503 })
     const settings = Object.fromEntries((settingsResult.data || []).map(x => [x.key, x.value]))
     const config = readBankSmsConfig(settings.bank_sms_config, settings.bank_account)
@@ -43,6 +39,7 @@ export async function POST(req: NextRequest) {
     if (sender !== config.sender) return NextResponse.json({ error: 'SMS sender mismatch' }, { status: 403 })
     receipt = parseKhanBankSms(text, sender, config)
     if (!receipt) return NextResponse.json({ error: 'Expected the configured account, incoming MNT amount and exact six- or eight-digit Utga' }, { status: 400 })
+    if (settings.payment_auto_verify_enabled === 'false') return NextResponse.json({ error: 'Automatic payment verification is disabled by admin' }, { status: 423 })
   } else {
     let body: unknown
     try { body = JSON.parse(text) } catch { body = null }
