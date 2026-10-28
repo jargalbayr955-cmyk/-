@@ -7,6 +7,17 @@ import { DriverSlot, offerDistance, offerPrice, PickupPoint } from '@/lib/order-
 
 type OfferMarker = { marker: Marker; button: HTMLButtonElement; price: HTMLElement; distance: HTMLElement }
 
+const SEARCH_RADAR_CSS = `
+.pickup-search-marker{position:relative!important;overflow:visible!important;isolation:isolate}
+.pickup-search-marker>div{position:relative;z-index:2}
+.pickup-search-ring{position:absolute;left:50%;top:10px;width:24px;height:24px;margin:-12px 0 0 -12px;border:2px solid rgba(77,141,255,.72);border-radius:50%;background:rgba(77,141,255,.08);pointer-events:none;z-index:1;opacity:0;transform:scale(.45)}
+.pickup-search-marker.is-searching .pickup-search-ring{animation:achiltSearchRadar 3.2s ease-in-out infinite}
+.pickup-search-marker.is-searching .pickup-search-ring-2{animation-delay:-1.05s}
+.pickup-search-marker.is-searching .pickup-search-ring-3{animation-delay:-2.1s}
+@keyframes achiltSearchRadar{0%,100%{opacity:.68;transform:scale(.45)}50%{opacity:.08;transform:scale(7.2)}}
+@media (prefers-reduced-motion:reduce){.pickup-search-marker.is-searching .pickup-search-ring{animation:none;opacity:.22;transform:scale(2.2)}}
+`
+
 function createPickupSearchMarker(searching: boolean) {
   const element = createDotMarker('#2563eb', 20, 'Ачуулах байршил')
   element.className = `pickup-search-marker${searching ? ' is-searching' : ''}`
@@ -21,11 +32,11 @@ function createPickupSearchMarker(searching: boolean) {
   return element
 }
 
-export function OfferMap({ pickup, offers, selectedDriverId, searching, onSelect }: {
+export function OfferMap({ pickup, offers, selectedDriverId, searching = true, onSelect }: {
   pickup: PickupPoint | null
   offers: DriverSlot[]
   selectedDriverId: string | null
-  searching: boolean
+  searching?: boolean
   onSelect: (driverId: string) => void
 }) {
   const container = useRef<HTMLDivElement | null>(null)
@@ -171,6 +182,7 @@ export function OfferMap({ pickup, offers, selectedDriverId, searching, onSelect
   }, [pickup, offers, selectedDriverId, searching, ready])
 
   return <>
+    <style>{SEARCH_RADAR_CSS}</style>
     <div ref={container} className="offers-map-canvas" aria-label="Ачуулах байршил болон жолоочийн үнийн саналын газрын зураг" />
     {error && <p className="offers-map-error" role="alert">{error}</p>}
   </>
