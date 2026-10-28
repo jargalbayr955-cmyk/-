@@ -4,9 +4,18 @@ import { useEffect, useRef, useState } from 'react'
 import { createRequestSignal } from '@/lib/client/request-signal'
 import styles from './admin-payment-queue.module.css'
 
+type PaymentConnection = {
+  url: string
+  secret: string
+  bankName: string
+  bankAccount: string
+  configured: boolean
+  autoEnabled: boolean
+}
+
 export function AdminPaymentConnection() {
   const [open, setOpen] = useState(false)
-  const [connection, setConnection] = useState<{ url: string; secret: string; bankName: string; bankAccount: string; configured: boolean } | null>(null)
+  const [connection, setConnection] = useState<PaymentConnection | null>(null)
   const [sender, setSender] = useState('')
   const [accountMask, setAccountMask] = useState('')
   const [saving, setSaving] = useState(false)
@@ -49,12 +58,39 @@ export function AdminPaymentConnection() {
       if (!parent?.aborted) setMessage(cause instanceof Error && cause.name !== 'AbortError' ? cause.message : 'Холболт тасарлаа. Хааж нээгээд тохиргоо хадгалагдсан эсэхийг шалгана уу.')
     } finally { request.dispose(); savingRef.current = false; if (!parent?.aborted) setSaving(false) }
   }
+  const toggleAuto = async () => {
+    if (!connection || savingRef.current) return
+    const next = !connection.autoEnabled
+    savingRef.current = true; setSaving(true); setMessage('')
+    const parent = lifetime.current?.signal, request = createRequestSignal(12_000, parent)
+    try {
+      const response = await fetch('/api/admin/payment-connection', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ autoEnabled: next }), signal: request.signal })
+      const body = await response.json()
+      if (parent?.aborted) return
+      if (!response.ok) throw new Error(body.error || 'Тохиргоог өөрчилж чадсангүй.')
+      setConnection(value => value && { ...value, autoEnabled: Boolean(body.autoEnabled) })
+      setMessage(body.autoEnabled ? 'MacroDroid автомат баталгаажуулалтыг админаас зөвшөөрлөө.' : 'MacroDroid автомат баталгаажуулалтыг админаас түр хаалаа.')
+    } catch (cause) {
+      if (!parent?.aborted) setMessage(cause instanceof Error && cause.name !== 'AbortError' ? cause.message : 'Холболт тасарлаа. Дахин оролдоно уу.')
+    } finally { request.dispose(); savingRef.current = false; if (!parent?.aborted) setSaving(false) }
+  }
   return <div className={styles.connection}>
     <button type="button" disabled={saving} aria-expanded={open} onClick={() => { setOpen(value => !value); setConnection(null); setSender(''); setAccountMask(''); setMessage('') }}>MacroDroid холболт {open ? 'хаах' : 'тохируулах'}</button>
     {open && <div>
       <p className={styles.note}>Хаан банкны орлогын SMS-ийг бүтнээр нь илгээнэ. Сервер ORLOGO-оос орлогын дүн, Utga-аас 6 оронтой кодыг уншина. Үлдэгдэл, зарлага, амжилтгүй гүйлгээг төлбөрт тооцохгүй.</p>
       {connection ? <>
         <p className={styles.note}>Төлбөр авах данс: <strong>{connection.bankName} {connection.bankAccount || 'Хадгалаагүй'}</strong>. Дээрх «Шимтгэл хүлээн авах данс» хэсэгт хадгалж эсвэл солино. Данс сольсон бол SMS тохиргоог дахин хадгална.</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, margin: '14px 0 18px', padding: 12, border: `1px solid ${connection.autoEnabled ? '#40945c' : '#6b3b38'}`, borderRadius: 12, background: connection.autoEnabled ? '#102b1b' : '#2b1716' }}>
+          <div>
+            <strong style={{ display: 'block', marginBottom: 4 }}>Админы зөвшөөрөл</strong>
+            <span style={{ color: '#c6c6cc', fontSize: 12, lineHeight: 1.5 }}>{connection.autoEnabled ? 'Автомат төлбөр баталгаажуулалт ажиллана.' : 'MacroDroid хүсэлт ирсэн ч төлбөр автоматаар батлагдахгүй.'}</span>
+          </div>
+          <button type="button" aria-pressed={connection.autoEnabled} disabled={saving} onClick={() => void toggleAuto()}
+            style={{ flex: '0 0 auto', borderColor: connection.autoEnabled ? '#40945c' : '#8b4b45', background: connection.autoEnabled ? '#17622f' : '#4a2421', fontWeight: 800 }}>
+            {saving ? '…' : connection.autoEnabled ? 'ЗӨВШӨӨРСӨН ✓' : 'ЗӨВШӨӨРӨХ'}
+          </button>
+        </div>
         <form onSubmit={event => { event.preventDefault(); void save() }}>
           <label htmlFor="payment-sms-sender">Банкны SMS илгээгчийн дугаар / ID</label>
           <input id="payment-sms-sender" value={sender} required maxLength={64} autoComplete="off" disabled={saving} onChange={event => setSender(event.target.value)} />
