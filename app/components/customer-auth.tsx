@@ -134,7 +134,6 @@ function AuthForm() {
 
       {step === 'phone' ? <>
         <h2 className="auth-section-title">Утасны дугаараар нэвтрэх</h2>
-        <p className="auth-hint">Энэ төхөөрөмж өмнө нь OTP-оор баталгаажсан бөгөөд 90 хоног дуусаагүй бол шууд нэвтэрнэ. Үгүй бол 6 оронтой OTP код SMS-ээр очно.</p>
         <form onSubmit={submitPhone} noValidate aria-busy={busy}>
           <label className="auth-label" htmlFor="auth-phone">Утасны дугаар</label>
           <div className="auth-phone-row">
@@ -142,7 +141,7 @@ function AuthForm() {
             <input ref={phoneRef} id="auth-phone" name="username" type="tel" inputMode="numeric" autoComplete="tel-national" value={phone} disabled={busy} onChange={event => { setPhone(phoneInput(event.target.value)); setError('') }} placeholder="8 оронтой дугаар" aria-describedby={error ? 'auth-error' : undefined} />
           </div>
           {error && <div id="auth-error" className="auth-error" role="alert"><p>{error}</p></div>}
-          <button type="submit" className="auth-submit" disabled={busy}>{busy ? 'Шалгаж байна...' : 'OTP код авах →'}</button>
+          <button type="submit" className="auth-submit" disabled={busy}>{busy ? 'Шалгаж байна...' : 'Нэвтрэх'}</button>
         </form>
       </> : <>
         <h2 className="auth-section-title">OTP код оруулах</h2>
@@ -160,7 +159,6 @@ function AuthForm() {
         </div>
       </>}
 
-      <p className="auth-remember">Нэг удаа OTP-оор баталгаажсан энэ төхөөрөмж 90 хоног итгэмжлэгдэнэ. «Гарах» дарсан ч дугаар хадгалагдаж үлдэх бөгөөд 90 хоног дуусаагүй бол “OTP код авах” дээр дарахад SMS явуулахгүй шууд нэвтэрнэ.</p>
       {driverRegistrationOpen && <DriverRegistrationDialog initialPhone={phone} onClose={() => setDriverRegistrationOpen(false)} />}
     </section>
   </main>
