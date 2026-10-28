@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { setDeviceSession } from '@/lib/server/device-session'
+import { setDeviceSession, setTrustedCustomerDevice } from '@/lib/server/device-session'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { allowRequest, getClientIp, isSessionConfigured, normalizeMnPhone } from '@/lib/server/security'
 import { checkPhoneVerification, describeWeSendFailure, isWeSendConfigured } from '@/lib/server/wesend'
@@ -58,5 +58,6 @@ export async function POST(req: NextRequest) {
 
   const response = NextResponse.json({ user: { id: String(user.id), phone: normalized } })
   setDeviceSession(response, String(user.id), 'customer')
+  setTrustedCustomerDevice(response, String(user.id))
   return response
 }

@@ -29,7 +29,9 @@ function harness(options = {}) {
       const chain = {
         select(...args) { query.operations.push(['select', ...args]); return chain },
         limit(...args) { query.operations.push(['limit', ...args]); return Promise.resolve({ data: [], error: null }) },
+        eq(...args) { query.operations.push(['eq', ...args]); return chain },
         upsert(...args) { query.operations.push(['upsert', ...args]); return chain },
+        maybeSingle() { query.operations.push(['maybeSingle']); return Promise.resolve({ data: user, error: null }) },
         single() { query.operations.push(['single']); return Promise.resolve({ data: user, error: null }) },
       }
       return chain
@@ -64,9 +66,9 @@ function harness(options = {}) {
   return { load, calls }
 }
 
-function otpRequest(phone = '99112233') {
+function otpRequest(phone = '99112233', cookie = '') {
   return new NextRequest('https://achilt.example/api/customer/otp/request', {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone }),
+    method: 'POST', headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) }, body: JSON.stringify({ phone }),
   })
 }
 function otpVerify(code = '482913', phone = '99112233') {
@@ -107,11 +109,37 @@ test('OTP request sends a six-digit Mongolian verification request without creat
   assert.equal(sent.ttl, 300)
 })
 
-test('approved OTP creates or finds the customer and issues a secure remembered session', async () => {
+test('trusted device restores the same customer session without sending another OTP', async () => {
+  const h = harness()
+  const token = h.load('lib/server/security.ts').signSession(customer.id, 'customer')
+  const response = await h.load('app/api/customer/otp/request/route.ts').POST(otpRequest('99112233', `achilt_customer_trust=${token}`))
+  assert.equal(response.status, 200)
+  const body = await response.json()
+  assert.equal(body.trusted_login, true)
+  assert.equal(body.user.id, customer.id)
+  assert.equal(h.calls.some(call => call.type === 'fetch'), false)
+  assert.match(response.headers.get('set-cookie'), /achilt_customer_session=/)
+  assert.match(response.headers.get('set-cookie'), /Max-Age=7776000/)
+})
+
+test('trusted device is bound to its verified phone and a different phone still receives OTP', async () => {
+  const h = harness({ providerReplies: [{ body: { id: verificationId, status: 'pending', channel: 'sms', to: '88112233', expires_at: '2026-10-28T07:00:00.000Z' } }] })
+  const token = h.load('lib/server/security.ts').signSession(customer.id, 'customer')
+  const response = await h.load('app/api/customer/otp/request/route.ts').POST(otpRequest('88112233', `achilt_customer_trust=${token}`))
+  assert.equal(response.status, 200)
+  const body = await response.json()
+  assert.equal(body.trusted_login, undefined)
+  assert.equal(body.verification_id, verificationId)
+  assert.equal(h.calls.filter(call => call.type === 'fetch').length, 1)
+})
+
+test('approved OTP creates or finds the customer and issues both session and 90-day trusted-device cookies', async () => {
   const h = harness({ providerReplies: [{ body: { id: verificationId, status: 'approved', channel: 'sms', to: '99112233', expires_at: '2026-10-28T07:00:00.000Z' } }] })
   const response = await h.load('app/api/customer/otp/verify/route.ts').POST(otpVerify())
   assert.equal(response.status, 200)
   const cookie = response.headers.get('set-cookie')
+  assert.match(cookie, /achilt_customer_session=/)
+  assert.match(cookie, /achilt_customer_trust=/)
   assert.match(cookie, /HttpOnly/)
   assert.match(cookie, /Secure/)
   assert.match(cookie, /SameSite=lax/i)
@@ -135,6 +163,15 @@ test('provider phone mismatch never logs in the submitted phone', async () => {
   assert.equal(response.status, 401)
   assert.equal(response.headers.get('set-cookie'), null)
   assert.equal(h.calls.some(call => call.type === 'from' && call.table === 'users'), false)
+})
+
+test('logout clears the active customer session without deleting the 90-day trusted-device cookie', async () => {
+  const h = harness()
+  const response = await h.load('app/api/customer/logout/route.ts').POST()
+  const cookie = response.headers.get('set-cookie')
+  assert.match(cookie, /achilt_customer_session=/)
+  assert.match(cookie, /Max-Age=0/)
+  assert.doesNotMatch(cookie, /achilt_customer_trust=/)
 })
 
 test('legacy customer PIN login and registration are disabled', async () => {

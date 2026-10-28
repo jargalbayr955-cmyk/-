@@ -2,7 +2,8 @@ import { CustomerIdentity, readSession } from './session'
 import { createRequestSignal } from './request-signal'
 
 export type OtpRequestResult =
-  | { ok: true; verificationId: string; expiresAt: string; resendAfterSeconds: number }
+  | { ok: true; trusted: true; user: CustomerIdentity }
+  | { ok: true; trusted: false; verificationId: string; expiresAt: string; resendAfterSeconds: number }
   | { ok: false; error: string }
 
 export type OtpVerifyResult =
@@ -10,7 +11,7 @@ export type OtpVerifyResult =
   | { ok: false; error: string }
 
 export async function requestCustomerOtp(phone: string): Promise<OtpRequestResult> {
-  const deadline = createRequestSignal(20_000)
+  let deadline = createRequestSignal(20_000)
   try {
     const response = await fetch('/api/customer/otp/request', {
       method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
@@ -18,9 +19,21 @@ export async function requestCustomerOtp(phone: string): Promise<OtpRequestResul
     })
     const body = await response.json().catch(() => ({}))
     if (!response.ok) return { ok: false, error: body.error || 'OTP код илгээж чадсангүй. Дахин оролдоно уу.' }
+
+    if (body.trusted_login === true) {
+      deadline.dispose()
+      deadline = createRequestSignal(10_000)
+      const session = await readSession('customer', deadline.signal)
+      if (!session.user || session.user.id !== body.user?.id) {
+        return { ok: false, error: 'Нэвтрэлт энэ төхөөрөмж дээр сэргэсэнгүй. Шинээр OTP код авч оролдоно уу.' }
+      }
+      return { ok: true, trusted: true, user: session.user }
+    }
+
     if (typeof body.verification_id !== 'string' || !body.verification_id) return { ok: false, error: 'OTP үйлчилгээний хариу буруу байна. Дахин оролдоно уу.' }
     return {
       ok: true,
+      trusted: false,
       verificationId: body.verification_id,
       expiresAt: typeof body.expires_at === 'string' ? body.expires_at : '',
       resendAfterSeconds: Number.isFinite(body.resend_after_seconds) ? Math.max(1, Number(body.resend_after_seconds)) : 60,

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { readTrustedCustomerDevice, setDeviceSession } from '@/lib/server/device-session'
+import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { allowRequest, getClientIp, isSessionConfigured, normalizeMnPhone } from '@/lib/server/security'
 import { describeWeSendFailure, isWeSendConfigured, startPhoneVerification } from '@/lib/server/wesend'
 
@@ -16,6 +18,29 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
   const normalized = normalizeMnPhone(body && typeof body === 'object' ? (body as { phone?: unknown }).phone : null)
   if (!normalized) return NextResponse.json({ error: '8 оронтой утасны дугаараа оруулна уу.' }, { status: 400 })
+
+  const trusted = readTrustedCustomerDevice(req)
+  if (trusted) {
+    const { data: user, error } = await getSupabaseAdmin()
+      .from('users')
+      .select('id, phone, active')
+      .eq('id', trusted.sub)
+      .maybeSingle()
+
+    if (error) {
+      console.error('[customer/otp/request] Trusted customer lookup failed', { code: error.code })
+      return NextResponse.json({ error: 'Нэвтрэх үйлчилгээнд алдаа гарлаа. Дахин оролдоно уу.' }, { status: 503 })
+    }
+
+    const trustedPhone = normalizeMnPhone(user?.phone)
+    if (user?.id && trustedPhone === normalized) {
+      if (user.active === false) return NextResponse.json({ error: 'Энэ хэрэглэгчийн эрх идэвхгүй байна.' }, { status: 403 })
+      const response = NextResponse.json({ trusted_login: true, user: { id: String(user.id), phone: normalized } })
+      setDeviceSession(response, String(user.id), 'customer')
+      return response
+    }
+  }
+
   if (!(await allowRequest(`customer-otp-request-phone:${normalized}`, 5, 10 * 60_000))) {
     return NextResponse.json({ error: 'Энэ дугаар руу олон удаа код хүссэн байна. Түр хүлээгээд дахин оролдоно уу.' }, { status: 429 })
   }

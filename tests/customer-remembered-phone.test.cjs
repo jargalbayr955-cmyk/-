@@ -63,13 +63,29 @@ test('deliberate logout clears the authenticated state but keeps the remembered 
   assert.equal(h.notices.get('achilt_signed_out'), '1')
 })
 
-test('customer UI prefills remembered phone after logout while keeping OTP required', () => {
+test('trusted OTP request restores the remembered session without asking for a code', async () => {
+  const user = { id: 'customer-a', phone: '+97699112233' }
+  const h = harness({ responses: [
+    { body: { trusted_login: true, user } },
+    { body: { user } },
+  ] })
+  const auth = h.load('lib/client/customer-auth.ts')
+  const result = await auth.requestCustomerOtp('99112233')
+  assert.equal(result.ok, true)
+  assert.equal(result.trusted, true)
+  assert.equal(result.user.id, user.id)
+})
+
+test('customer UI prefills remembered phone and explains the 90-day trusted-device login', () => {
   const auth = fs.readFileSync(path.join(__dirname, '..', 'app/components/customer-auth.tsx'), 'utf8')
   const account = fs.readFileSync(path.join(__dirname, '..', 'app/components/customer-account.tsx'), 'utf8')
   assert.match(auth, /readRememberedCustomerPhone\(\)/)
   assert.match(auth, /rememberCustomerPhone\(phone\)/)
-  assert.match(auth, /Дахин нэвтрэх OTP авах/)
-  assert.match(auth, /«Гарах» дарсан бол аюулгүй байдлаар OTP дахин шаардана/)
+  assert.match(auth, /result\.trusted/)
+  assert.match(auth, /90 хоног/)
+  assert.match(auth, /SMS явуулахгүй шууд нэвтэрнэ/)
+  assert.match(auth, /OTP код авах →/)
+  assert.doesNotMatch(auth, /OTP дахин шаардана/)
   assert.match(account, /rememberCustomerPhone\(user\.phone\)/)
   assert.match(account, /await logoutCustomer\(\)/)
 })

@@ -49,6 +49,13 @@ function AuthForm() {
 
   const resendSeconds = Math.max(0, Math.ceil((resendAt - Date.now()) / 1000))
 
+  const finishLogin = () => {
+    rememberCustomerPhone(phone)
+    clearCustomerBrowserState()
+    notifyCustomerSessionChanged()
+    window.location.replace('/current')
+  }
+
   const sendOtp = async () => {
     if (pending.current) return
     setError('')
@@ -61,6 +68,10 @@ function AuthForm() {
     setBusy(true)
     const result = await requestCustomerOtp(phone)
     if (result.ok) {
+      if (result.trusted) {
+        finishLogin()
+        return
+      }
       setVerificationId(result.verificationId)
       setCode('')
       setStep('otp')
@@ -90,10 +101,7 @@ function AuthForm() {
     setBusy(true)
     const result = await verifyCustomerOtp(phone, verificationId, code)
     if (result.ok) {
-      rememberCustomerPhone(phone)
-      clearCustomerBrowserState()
-      notifyCustomerSessionChanged()
-      window.location.replace('/current')
+      finishLogin()
       return
     }
     setError(result.error)
@@ -122,11 +130,11 @@ function AuthForm() {
       <p className="auth-eyebrow">АЧИЛТ • ТУСЛАМЖ ОЙРХОН</p>
       <h1 id="auth-title">Тавтай морил</h1>
       <p className="auth-intro">Утасны дугаараа баталгаажуулаад ойр жолооч нарын үнийн саналаас сонгоорой.</p>
-      {signedOut && <p className="auth-success" role="status">Амжилттай гарлаа. Өмнөх дугаар санагдсан бол нэг товшоод OTP авч дахин нэвтэрнэ үү.</p>}
+      {signedOut && <p className="auth-success" role="status">Амжилттай гарлаа. Энэ төхөөрөмж 90 хоногийн баталгаажуулалттай хэвээр бол доорх товчийг дарахад OTP SMS явуулахгүйгээр шууд нэвтэрнэ.</p>}
 
       {step === 'phone' ? <>
         <h2 className="auth-section-title">Утасны дугаараар нэвтрэх</h2>
-        <p className="auth-hint">Дугаараа оруулмагц 6 оронтой OTP код SMS-ээр очно. Шинэ дугаар бол код баталгаажмагц бүртгэл автоматаар үүснэ.</p>
+        <p className="auth-hint">Энэ төхөөрөмж өмнө нь OTP-оор баталгаажсан бөгөөд 90 хоног дуусаагүй бол шууд нэвтэрнэ. Үгүй бол 6 оронтой OTP код SMS-ээр очно.</p>
         <form onSubmit={submitPhone} noValidate aria-busy={busy}>
           <label className="auth-label" htmlFor="auth-phone">Утасны дугаар</label>
           <div className="auth-phone-row">
@@ -134,7 +142,7 @@ function AuthForm() {
             <input ref={phoneRef} id="auth-phone" name="username" type="tel" inputMode="numeric" autoComplete="tel-national" value={phone} disabled={busy} onChange={event => { setPhone(phoneInput(event.target.value)); setError('') }} placeholder="8 оронтой дугаар" aria-describedby={error ? 'auth-error' : undefined} />
           </div>
           {error && <div id="auth-error" className="auth-error" role="alert"><p>{error}</p></div>}
-          <button type="submit" className="auth-submit" disabled={busy}>{busy ? 'Код илгээж байна...' : signedOut && /^\d{8}$/.test(phone) ? 'Дахин нэвтрэх OTP авах →' : 'OTP код авах →'}</button>
+          <button type="submit" className="auth-submit" disabled={busy}>{busy ? 'Шалгаж байна...' : 'OTP код авах →'}</button>
         </form>
       </> : <>
         <h2 className="auth-section-title">OTP код оруулах</h2>
@@ -142,7 +150,7 @@ function AuthForm() {
         <form onSubmit={event => void submitCode(event)} noValidate aria-busy={busy}>
           <label className="auth-label" htmlFor="auth-otp">OTP код</label>
           <input ref={codeRef} className="auth-pin-input" id="auth-otp" name="one-time-code" type="text" inputMode="numeric" autoComplete="one-time-code" value={code} disabled={busy} maxLength={6} onChange={event => { setCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setError('') }} placeholder="6 оронтой код" aria-describedby={error ? 'auth-error' : 'auth-otp-help'} />
-          <p id="auth-otp-help" className="auth-field-help">Код 5 минут хүчинтэй. Энэ browser/утсанд амжилттай нэвтэрсний дараа таны нэвтрэлтийг санана.</p>
+          <p id="auth-otp-help" className="auth-field-help">Код 5 минут хүчинтэй. Амжилттай баталгаажмагц энэ төхөөрөмж 90 хоногийн хугацаанд OTP дахин шаардахгүй.</p>
           {error && <div id="auth-error" className="auth-error" role="alert"><p>{error}</p></div>}
           <button type="submit" className="auth-submit" disabled={busy}>{busy ? 'Шалгаж байна...' : 'Нэвтрэх →'}</button>
         </form>
@@ -152,7 +160,7 @@ function AuthForm() {
         </div>
       </>}
 
-      <p className="auth-remember">Өөрийн утас бол «Гарах» дарах шаардлагагүй — сайтаа хаагаад дараа нээхэд шууд нэвтэрнэ. Харин «Гарах» дарсан бол аюулгүй байдлаар OTP дахин шаардана.</p>
+      <p className="auth-remember">Нэг удаа OTP-оор баталгаажсан энэ төхөөрөмж 90 хоног итгэмжлэгдэнэ. «Гарах» дарсан ч дугаар хадгалагдаж үлдэх бөгөөд 90 хоног дуусаагүй бол “OTP код авах” дээр дарахад SMS явуулахгүй шууд нэвтэрнэ.</p>
       {driverRegistrationOpen && <DriverRegistrationDialog initialPhone={phone} onClose={() => setDriverRegistrationOpen(false)} />}
     </section>
   </main>
