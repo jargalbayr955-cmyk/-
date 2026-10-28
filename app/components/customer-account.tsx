@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { displayPhone, logoutCustomer } from '@/lib/client/session'
+import { displayPhone, logoutCustomer, rememberCustomerPhone } from '@/lib/client/session'
 import { useCustomerIdentity } from './session-gate'
 
 export function CustomerAccount() {
@@ -16,6 +16,8 @@ export function CustomerAccount() {
     setBusy(true)
     setError('')
     try {
+      // Keep only the phone number for the next OTP screen; the authenticated session is still fully cleared.
+      rememberCustomerPhone(user.phone)
       await logoutCustomer()
       // A fresh document prevents the router from reusing a previous account's UI.
       window.location.replace('/start')

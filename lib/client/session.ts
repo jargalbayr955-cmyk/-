@@ -32,10 +32,26 @@ export function displayPhone(phone: string) {
 
 export const CUSTOMER_SESSION_EVENT = 'achilt:customer-session-changed'
 export const CUSTOMER_SESSION_STORAGE_KEY = 'achilt_customer_session_changed'
+export const CUSTOMER_LAST_PHONE_STORAGE_KEY = 'achilt_last_customer_phone'
+
+export function readRememberedCustomerPhone() {
+  try {
+    const phone = phoneInput(localStorage.getItem(CUSTOMER_LAST_PHONE_STORAGE_KEY) || '')
+    return /^\d{8}$/.test(phone) ? phone : ''
+  } catch {
+    return ''
+  }
+}
+
+export function rememberCustomerPhone(phone: string) {
+  const normalized = phoneInput(phone)
+  if (!/^\d{8}$/.test(normalized)) return
+  try { localStorage.setItem(CUSTOMER_LAST_PHONE_STORAGE_KEY, normalized) } catch {}
+}
 
 export function clearCustomerBrowserState() {
   clearBookingDraft()
-  // Remove only customer data. Never erase driver work or unrelated preferences.
+  // Remove only private customer state. Keep the last phone number so a deliberate logout can return to OTP login quickly.
   for (const key of ['user', 'current_order_id', 'tracking_driver_id', 'fromAddress', 'from', 'fromLat', 'fromLng', 'dest', 'phone_called']) {
     try { localStorage.removeItem(key) } catch { /* Cookie auth works even when storage is blocked. */ }
   }

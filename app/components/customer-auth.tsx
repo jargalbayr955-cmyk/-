@@ -1,7 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useRef, useState } from 'react'
-import { clearCustomerBrowserState, notifyCustomerSessionChanged, phoneInput } from '@/lib/client/session'
+import { clearCustomerBrowserState, notifyCustomerSessionChanged, phoneInput, readRememberedCustomerPhone, rememberCustomerPhone } from '@/lib/client/session'
 import { requestCustomerOtp, verifyCustomerOtp } from '@/lib/client/customer-auth'
 import { SessionGate } from './session-gate'
 import { BrandAccess } from './access-shortcuts'
@@ -27,6 +27,8 @@ function AuthForm() {
   const codeRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    const rememberedPhone = readRememberedCustomerPhone()
+    if (rememberedPhone) setPhone(rememberedPhone)
     try {
       if (sessionStorage.getItem('achilt_signed_out') === '1') {
         setSignedOut(true)
@@ -88,6 +90,7 @@ function AuthForm() {
     setBusy(true)
     const result = await verifyCustomerOtp(phone, verificationId, code)
     if (result.ok) {
+      rememberCustomerPhone(phone)
       clearCustomerBrowserState()
       notifyCustomerSessionChanged()
       window.location.replace('/current')
@@ -119,7 +122,7 @@ function AuthForm() {
       <p className="auth-eyebrow">АЧИЛТ • ТУСЛАМЖ ОЙРХОН</p>
       <h1 id="auth-title">Тавтай морил</h1>
       <p className="auth-intro">Утасны дугаараа баталгаажуулаад ойр жолооч нарын үнийн саналаас сонгоорой.</p>
-      {signedOut && <p className="auth-success" role="status">Амжилттай гарлаа. Дугаараараа дахин нэвтрэх боломжтой.</p>}
+      {signedOut && <p className="auth-success" role="status">Амжилттай гарлаа. Өмнөх дугаар санагдсан бол нэг товшоод OTP авч дахин нэвтэрнэ үү.</p>}
 
       {step === 'phone' ? <>
         <h2 className="auth-section-title">Утасны дугаараар нэвтрэх</h2>
@@ -131,7 +134,7 @@ function AuthForm() {
             <input ref={phoneRef} id="auth-phone" name="username" type="tel" inputMode="numeric" autoComplete="tel-national" value={phone} disabled={busy} onChange={event => { setPhone(phoneInput(event.target.value)); setError('') }} placeholder="8 оронтой дугаар" aria-describedby={error ? 'auth-error' : undefined} />
           </div>
           {error && <div id="auth-error" className="auth-error" role="alert"><p>{error}</p></div>}
-          <button type="submit" className="auth-submit" disabled={busy}>{busy ? 'Код илгээж байна...' : 'OTP код авах →'}</button>
+          <button type="submit" className="auth-submit" disabled={busy}>{busy ? 'Код илгээж байна...' : signedOut && /^\d{8}$/.test(phone) ? 'Дахин нэвтрэх OTP авах →' : 'OTP код авах →'}</button>
         </form>
       </> : <>
         <h2 className="auth-section-title">OTP код оруулах</h2>
@@ -149,7 +152,7 @@ function AuthForm() {
         </div>
       </>}
 
-      <p className="auth-remember">Нэвтрэлт энэ төхөөрөмжийн browser дээр хадгалагдана. Бусдын төхөөрөмж ашигласан бол дуусмагц «Гарах» товчийг дараарай.</p>
+      <p className="auth-remember">Өөрийн утас бол «Гарах» дарах шаардлагагүй — сайтаа хаагаад дараа нээхэд шууд нэвтэрнэ. Харин «Гарах» дарсан бол аюулгүй байдлаар OTP дахин шаардана.</p>
       {driverRegistrationOpen && <DriverRegistrationDialog initialPhone={phone} onClose={() => setDriverRegistrationOpen(false)} />}
     </section>
   </main>
