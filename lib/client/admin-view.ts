@@ -8,7 +8,7 @@ export type AdminOrder = {
   final_price: number; duration_minutes?: number | null
 }
 export type AdminDashboard = {
-  drivers: AdminDriver[]; orders: AdminOrder[]; activeOrders: AdminOrder[]; pendingApprovalCount: number
+  drivers: AdminDriver[]; orders: AdminOrder[]; activeOrders: AdminOrder[]; pendingApprovalCount: number; otpRegisteredUserCount: number
   heroUrl: string; bankName: string; bankAccount: string
 }
 export type DriverFilter = 'all' | 'available' | 'paused'
