@@ -20,6 +20,9 @@ alter table public.driver_registration_requests
 
 create index if not exists driver_registration_requests_status_idx
   on public.driver_registration_requests(status, created_at desc);
+create index if not exists driver_registration_requests_driver_id_idx
+  on public.driver_registration_requests(driver_id)
+  where driver_id is not null;
 
 alter table public.driver_registration_requests enable row level security;
 revoke all on table public.driver_registration_requests from public, anon, authenticated;
