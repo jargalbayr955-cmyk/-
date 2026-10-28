@@ -5,9 +5,6 @@ import { clearCustomerBrowserState, notifyCustomerSessionChanged, phoneInput, re
 import { requestCustomerOtp, verifyCustomerOtp } from '@/lib/client/customer-auth'
 import { SessionGate } from './session-gate'
 import { BrandAccess } from './access-shortcuts'
-import { DriverRegistrationDialog } from './driver-registration'
-
-const DRIVER_REGISTRATION_HISTORY = 'achiltDriverRegistration'
 
 export function CustomerAuth() {
   return <SessionGate mode="guest"><AuthForm /></SessionGate>
@@ -22,7 +19,6 @@ function AuthForm() {
   const [error, setError] = useState('')
   const [signedOut, setSignedOut] = useState(false)
   const [resendAt, setResendAt] = useState(0)
-  const [driverRegistrationOpen, setDriverRegistrationOpen] = useState(false)
   const [, setTick] = useState(0)
   const pending = useRef(false)
   const phoneRef = useRef<HTMLInputElement>(null)
@@ -48,14 +44,6 @@ function AuthForm() {
   useEffect(() => {
     if (step === 'otp') codeRef.current?.focus()
   }, [step, verificationId])
-
-  useEffect(() => {
-    const onPopState = () => {
-      if (driverRegistrationOpen) setDriverRegistrationOpen(false)
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [driverRegistrationOpen])
 
   const resendSeconds = Math.max(0, Math.ceil((resendAt - Date.now()) / 1000))
 
@@ -129,27 +117,10 @@ function AuthForm() {
     setTimeout(() => phoneRef.current?.focus(), 0)
   }
 
-  const openDriverRegistration = () => {
-    if (driverRegistrationOpen) return
-    window.history.pushState({ ...window.history.state, [DRIVER_REGISTRATION_HISTORY]: true }, '', window.location.href)
-    setDriverRegistrationOpen(true)
-  }
-
-  const closeDriverRegistration = () => {
-    if (window.history.state?.[DRIVER_REGISTRATION_HISTORY]) {
-      window.history.back()
-      return
-    }
-    setDriverRegistrationOpen(false)
-  }
-
   return <main className="auth-shell">
     <section className="auth-card" aria-labelledby="auth-title">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+      <div style={{ marginBottom: 10 }}>
         <BrandAccess className="auth-brand-mark" />
-        <button type="button" onClick={openDriverRegistration} style={{ border: '1px solid rgba(255,255,255,.18)', borderRadius: 14, background: '#171b22', color: '#fff', padding: '10px 12px', fontWeight: 800, cursor: 'pointer', lineHeight: 1.2 }}>
-          🚚 Жолоочоор бүртгүүлэх
-        </button>
       </div>
       <p className="auth-eyebrow">АЧИЛТ • ТУСЛАМЖ ОЙРХОН</p>
       <h1 id="auth-title">Тавтай морил</h1>
@@ -182,8 +153,6 @@ function AuthForm() {
           <button type="button" disabled={busy || resendSeconds > 0} onClick={() => void sendOtp()}>{resendSeconds > 0 ? `Дахин код авах (${resendSeconds})` : 'Дахин код авах'}</button>
         </div>
       </>}
-
-      {driverRegistrationOpen && <DriverRegistrationDialog initialPhone={phone} onClose={closeDriverRegistration} />}
     </section>
   </main>
 }
