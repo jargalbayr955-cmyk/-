@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireDriver } from '@/lib/server/driver'
+import { driverNeedsOnboarding, requireDriver } from '@/lib/server/driver'
 import { renewDeviceSession } from '@/lib/server/device-session'
 
 export async function GET(req: NextRequest) {
   try {
-    const driver = await requireDriver(req)
+    const driver = await requireDriver(req, { allowIncomplete: true })
     if (!driver) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'private, no-store' } })
-    const res = NextResponse.json({ driver })
+    const res = NextResponse.json({ driver, needsOnboarding: driverNeedsOnboarding(driver) })
     renewDeviceSession(req, res, driver.id, 'driver')
     return res
   } catch {
