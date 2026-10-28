@@ -9,13 +9,14 @@ export async function GET(req: NextRequest) {
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status, headers: { 'Cache-Control': 'no-store' } })
   const secret = getPaymentWebhookSecret()
   if (!secret) return NextResponse.json({ error: 'Холболтын түлхүүр тохируулагдаагүй.' }, { status: 503 })
-  const { data, error } = await getSupabaseAdmin().from('settings').select('key,value').in('key', ['bank_name', 'bank_account', 'bank_sms_config'])
+  const { data, error } = await getSupabaseAdmin().from('settings').select('key,value').in('key', ['bank_name', 'bank_account', 'bank_sms_config', 'payment_auto_verify_enabled'])
   if (error) return NextResponse.json({ error: 'Тохиргоог ачаалж чадсангүй.' }, { status: 503 })
   const settings = Object.fromEntries((data || []).map(x => [x.key, x.value]))
   const config = readBankSmsConfig(settings.bank_sms_config, settings.bank_account)
   return NextResponse.json({ url: new URL('/api/payment/verify', req.url).href, secret,
     bankName: settings.bank_name || '', bankAccount: settings.bank_account || '',
     sender: config?.sender || '', accountMask: config?.accountMask || '', configured: Boolean(config),
+    autoEnabled: settings.payment_auto_verify_enabled !== 'false',
   }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
@@ -24,8 +25,17 @@ export async function POST(req: NextRequest) {
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
   if (!sameOriginAdminRequest(req)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const body = await req.json().catch(() => null)
-  if (!body || typeof body.sender !== 'string' || typeof body.accountMask !== 'string') return NextResponse.json({ error: 'SMS илгээгч, дансны загвараа оруулна уу.' }, { status: 400 })
+  if (!body || typeof body !== 'object') return NextResponse.json({ error: 'Тохиргооны мэдээлэл буруу байна.' }, { status: 400 })
+
   const supabase = getSupabaseAdmin()
+  if ('autoEnabled' in body) {
+    if (typeof body.autoEnabled !== 'boolean') return NextResponse.json({ error: 'Автомат баталгаажуулалтын утга буруу байна.' }, { status: 400 })
+    const saved = await supabase.from('settings').upsert({ key: 'payment_auto_verify_enabled', value: body.autoEnabled ? 'true' : 'false' })
+    if (saved.error) return NextResponse.json({ error: 'Тохиргоог хадгалж чадсангүй.' }, { status: 503 })
+    return NextResponse.json({ success: true, autoEnabled: body.autoEnabled }, { headers: { 'Cache-Control': 'no-store' } })
+  }
+
+  if (typeof body.sender !== 'string' || typeof body.accountMask !== 'string') return NextResponse.json({ error: 'SMS илгээгч, дансны загвараа оруулна уу.' }, { status: 400 })
   const { data, error } = await supabase.from('settings').select('key,value').eq('key', 'bank_account').maybeSingle()
   if (error) return NextResponse.json({ error: 'Тохиргоог ачаалж чадсангүй.' }, { status: 503 })
   const config = { sender: body.sender.trim(), accountMask: body.accountMask.trim(), receivingAccount: normalizeReceivingAccount(data?.value) }
