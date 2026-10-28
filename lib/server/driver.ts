@@ -18,7 +18,15 @@ export type DriverSessionRecord = {
   location_updated_at: string | null
 }
 
-export async function requireDriver(req: NextRequest): Promise<DriverSessionRecord | null> {
+export function driverNeedsOnboarding(driver: Pick<DriverSessionRecord, 'name' | 'car_number'>) {
+  const name = String(driver.name || '').trim()
+  const carNumber = String(driver.car_number || '').trim()
+  return !name || name === 'Шинэ жолооч' || !carNumber
+}
+
+type DriverAccessOptions = { allowIncomplete?: boolean }
+
+export async function requireDriver(req: NextRequest, options: DriverAccessOptions = {}): Promise<DriverSessionRecord | null> {
   const session = verifySession(req.cookies.get('achilt_driver_session')?.value, 'driver')
   if (!session) return null
 
@@ -33,6 +41,7 @@ export async function requireDriver(req: NextRequest): Promise<DriverSessionReco
   if (error) throw new Error('Driver session lookup unavailable')
   if (!data || (data.session_version ?? null) !== (session.version ?? null)) return null
   const { session_version: _version, ...driver } = data
+  if (!options.allowIncomplete && driverNeedsOnboarding(driver)) return null
   return driver as DriverSessionRecord
 }
 
