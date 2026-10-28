@@ -11,15 +11,18 @@ test('admin dashboard only treats linked confirmed orders as active', () => {
   assert.match(source, /const activeOrders = \(activeR\.data \|\| \[\]\)\.filter\(order => Boolean\(order\.driver_id\)\)/)
 })
 
-test('stale dispatch cleanup is wired into a Hobby-compatible daily cron', () => {
-  const source = read('app/api/cron/refresh-slots/route.ts')
-  assert.match(source, /rpc\('cleanup_stale_dispatch_orders'\)/)
+test('stale dispatch cleanup is wired into both database and Hobby-compatible deployment schedules', () => {
+  const route = read('app/api/cron/refresh-slots/route.ts')
+  assert.match(route, /rpc\('cleanup_stale_dispatch_orders'\)/)
+  const scheduler = read('supabase/migrations/20261028174514_dispatch_cleanup_scheduler.sql')
+  assert.match(scheduler, /achilt-dispatch-cleanup/)
+  assert.match(scheduler, /'15 \* \* \* \*'/)
   const config = JSON.parse(read('vercel.json'))
   assert.deepEqual(config.crons, [{ path: '/api/cron/refresh-slots', schedule: '15 18 * * *' }])
 })
 
 test('operational reconciliation keeps history but cleans stale work and legacy debt from active queues', () => {
-  const sql = read('supabase/migrations/20261029180000_operational_reconciliation.sql')
+  const sql = read('supabase/migrations/20261028174050_operational_reconciliation.sql')
   assert.match(sql, /create or replace function public\.cleanup_stale_dispatch_orders\(\)/i)
   assert.match(sql, /bidding_expires_at < pg_catalog\.now\(\) - interval '1 hour'/i)
   assert.match(sql, /created_at < pg_catalog\.now\(\) - interval '24 hours'/i)
@@ -29,7 +32,7 @@ test('operational reconciliation keeps history but cleans stale work and legacy 
 })
 
 test('OTP registration migration uses the repaired first real OTP registration cutoff', () => {
-  const sql = read('supabase/migrations/20261029152000_admin_otp_registration_stats.sql')
+  const sql = read('supabase/migrations/20261028171144_admin_otp_registration_stats.sql')
   assert.match(sql, /2026-10-28 15:44:04\.830544/)
   assert.doesNotMatch(sql, /2026-10-28 08:55:54\.545/)
 })

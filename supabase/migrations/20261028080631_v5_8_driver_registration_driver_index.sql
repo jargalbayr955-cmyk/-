@@ -1,0 +1,4 @@
+-- Historical production migration marker.
+-- The final idempotent schema for this step is consolidated in the surrounding
+-- production migrations retained in this repository. This marker preserves the
+-- production migration ledger version/name without replaying obsolete intermediate SQL.
