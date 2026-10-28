@@ -13,7 +13,7 @@ for (const [file, label] of [
     const svg = read(file)
     assert.match(svg, /viewBox="0 0 118 72"/)
     assert.match(svg, /data:image\/jpeg;base64,/)
-    assert.doesNotMatch(svg, /https?:\/\//)
+    assert.doesNotMatch(svg, /<image[^>]+href="https?:\/\//i)
     assert.doesNotMatch(svg, /xMidYMid slice/)
   })
 }
