@@ -102,6 +102,26 @@ export default function DriversPage() {
     } catch {}
   }, [])
 
+  const restartBooking = useCallback(() => {
+    if (actionPending.current) return
+    const pendingOrderId = orderId
+    clearBookingDraft()
+    try {
+      for (const key of ['current_order_id', 'fromLat', 'fromLng', 'fromAddress', 'dest', 'tracking_driver_id']) {
+        localStorage.removeItem(key)
+      }
+    } catch {}
+    if (pendingOrderId && !confirmed && !finished) {
+      void fetch('/api/order/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: pendingOrderId }),
+        keepalive: true,
+      }).catch(() => {})
+    }
+    router.replace('/current')
+  }, [orderId, confirmed, finished, router])
+
   useEffect(() => {
     if (!orderId) return
     let cancelled = false, pending = false
@@ -203,7 +223,11 @@ export default function DriversPage() {
     <header className="offers-map-header">
       {confirmed && !finished && orderId && <OrderVideoCall key={orderId} orderId={orderId} role="customer" />}
       <div className="offers-status-bar">
-        <button type="button" className="offers-back" onClick={() => { if (!navigation.back()) backInApp(router, '/current') }}>← Буцах</button>
+        <button type="button" className="offers-back" onClick={() => {
+          if (navigation.back()) return
+          if (!confirmed && !finished) { restartBooking(); return }
+          backInApp(router, '/current')
+        }}>← Буцах</button>
         <h1 aria-live="polite">{finished ? 'Захиалга дууссан' : confirmed ? 'Жолооч сонгогдсон' : expired ? 'Хайлтын хугацаа дууслаа' : invitedCount === 0 ? 'Бэлэн жолооч хайж байна' : 'Үнийн санал хүлээж байна'}</h1>
         {!confirmed && !finished && <time className="offers-countdown" aria-label={`Үлдсэн хугацаа ${clock}`}>{clock}</time>}
       </div>
