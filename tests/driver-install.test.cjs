@@ -26,12 +26,18 @@ test('driver install control sits below login and supports native browser instal
   assert.match(source, /a\[href=\"\/driver\/app\"\]/)
 })
 
-test('main customer login exposes a driver app install entry directly below login', () => {
+test('main customer login installs the driver PWA directly without opening driver login first', () => {
   const start = read('app/start/page.tsx')
+  const startLayout = read('app/start/layout.tsx')
   const entry = read('app/components/driver-install-entry-link.tsx')
   assert.match(start, /DriverInstallEntryLink/)
+  assert.match(startLayout, /manifest:\s*['"]\/driver-manifest\.json['"]/)
   assert.match(entry, /button\.auth-submit/)
   assert.match(entry, /insertAdjacentElement\(['"]afterend['"]/)
-  assert.match(entry, /href=\"\/driver\"/)
+  assert.match(entry, /beforeinstallprompt/)
+  assert.match(entry, /installPrompt\.prompt\(\)/)
+  assert.match(entry, /navigator\.serviceWorker\.register\(['"]\/sw\.js['"]\)/)
   assert.match(entry, /Жолооч апп утас дээр суулгах/)
+  assert.match(entry, /жолоочийн нүүрийг шууд нээнэ/)
+  assert.doesNotMatch(entry, /href=\"\/driver\"/)
 })
