@@ -231,7 +231,7 @@ export default function DriversPage() {
         <h1 aria-live="polite">{finished ? 'Захиалга дууссан' : confirmed ? 'Жолооч сонгогдсон' : expired ? 'Хайлтын хугацаа дууслаа' : invitedCount === 0 ? 'Бэлэн жолооч хайж байна' : 'Үнийн санал хүлээж байна'}</h1>
         {!confirmed && !finished && <time className="offers-countdown" aria-label={`Үлдсэн хугацаа ${clock}`}>{clock}</time>}
       </div>
-      {!confirmed && !finished && !expired && invitedCount === 0 && <p className="offers-inline-message" role="status">Сонгосон төрлийн бэлэн жолооч одоогоор алга. Хугацаа дуусахаас өмнө жолооч бэлэн болбол захиалгыг автоматаар илгээнэ.</p>}
+      {!confirmed && !finished && !expired && <p className="offers-inline-message" role="status">Танд ойр байгаа 5 ачигчийн үнийн санал ирэх тул өөрт тохирсон ачигчаа сонгоно уу.</p>}
       {error && <p className="offers-inline-message offers-error" role="alert">{error}</p>}
     </header>
 
