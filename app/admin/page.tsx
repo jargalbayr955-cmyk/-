@@ -12,7 +12,7 @@ import { AdminSettings } from '../components/admin-settings'
 import { AdminDriverMap } from '../components/admin-driver-map'
 import styles from './admin.module.css'
 
-const emptyDashboard: AdminDashboard = { drivers: [], orders: [], activeOrders: [], pendingApprovalCount: 0, heroUrl: '', bankName: '', bankAccount: '' }
+const emptyDashboard: AdminDashboard = { drivers: [], orders: [], activeOrders: [], pendingApprovalCount: 0, otpRegisteredUserCount: 0, heroUrl: '', bankName: '', bankAccount: '' }
 type DriverAction = { action: 'toggle' | 'delete' | 'reset_pin'; driver: AdminDriver }
 type DriverNotice = { ok: boolean; text: string; pin?: string; phone?: string }
 
@@ -47,7 +47,7 @@ export default function AdminPage() {
   const pendingLogin = useRef(false), pendingDriver = useRef(false), sequence = useRef(0), sessionGeneration = useRef(0)
   const lifetime = useRef<AbortController | null>(null), dashboardRequest = useRef<AbortController | null>(null)
   const heading = useRef<HTMLHeadingElement>(null), notice = useRef<HTMLDivElement>(null), previousScreen = useRef(navigation.screen)
-  const { drivers, orders, activeOrders, pendingApprovalCount } = dashboard
+  const { drivers, orders, activeOrders, pendingApprovalCount, otpRegisteredUserCount } = dashboard
   const availableDrivers = drivers.filter(driver => driver.active && driver.available)
   const unlinkedOrders = activeOrders.filter(order => !order.driver_id).length
   const filteredDrivers = filterAdminDrivers(drivers, search, filter)
@@ -72,8 +72,16 @@ export default function AdminPage() {
       const body = await response.json()
       if (attempt !== sequence.current || lifetime.current?.signal.aborted) return
       if (!response.ok) throw new Error(body.error || 'Мэдээлэл ачаалж чадсангүй.')
-      setDashboard({ drivers: body.drivers || [], orders: body.orders || [], activeOrders: body.activeOrders || [], pendingApprovalCount: body.pendingApprovalCount || 0,
-        heroUrl: body.heroUrl || '', bankName: body.bankName || '', bankAccount: body.bankAccount || '' })
+      setDashboard({
+        drivers: body.drivers || [],
+        orders: body.orders || [],
+        activeOrders: body.activeOrders || [],
+        pendingApprovalCount: body.pendingApprovalCount || 0,
+        otpRegisteredUserCount: body.otpRegisteredUserCount || 0,
+        heroUrl: body.heroUrl || '',
+        bankName: body.bankName || '',
+        bankAccount: body.bankAccount || '',
+      })
       setUpdatedAt(new Date().toISOString()); setDashboardError('')
     } catch (cause) {
       if (attempt === sequence.current && !lifetime.current?.signal.aborted) setDashboardError(cause instanceof Error && cause.name !== 'AbortError' ? cause.message : 'Холболт тасарлаа. Мэдээлэл хамгийн сүүлд шинэчилсэн үеийнх байна.')
@@ -122,8 +130,12 @@ export default function AdminPage() {
     pendingDriver.current = true; setDriverBusy(true); setDriverNotice(null)
     const generation = sessionGeneration.current, parent = lifetime.current?.signal, request = createRequestSignal(12_000, parent)
     try {
-      const response = await fetch('/api/admin/drivers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: request.signal,
-        body: JSON.stringify(action === 'add' ? { action, driver: { phone, name: 'Шинэ жолооч' } } : { action, id: driver?.id }) })
+      const response = await fetch('/api/admin/drivers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: request.signal,
+        body: JSON.stringify(action === 'add' ? { action, driver: { phone } } : { action, id: driver?.id }),
+      })
       const body = await response.json()
       if (parent?.aborted || generation !== sessionGeneration.current) return
       if (response.status === 401 || response.status === 403) { sessionExpired(); return }
@@ -186,6 +198,7 @@ export default function AdminPage() {
         {updatedAt && <>
           {tab === 'overview' && <>
             <div className={styles.cards}>
+              <div className={styles.stat}><span>OTP-оор бүртгүүлсэн хэрэглэгч</span><strong>{otpRegisteredUserCount}</strong><small>OTP кодоо баталгаажуулж шинээр бүртгүүлсэн</small></div>
               <button className={`${styles.stat} ${pendingApprovalCount ? styles.attention : ''}`} onClick={() => setTab('payments')}><span>Төлбөр хүлээж буй</span><strong>{pendingApprovalCount}</strong><small>Шимтгэл шалгах, эрх нээх →</small></button>
               <button className={styles.stat} onClick={() => setTab('active')}><span>Явагдаж буй захиалга</span><strong>{activeOrders.length}{activeOrders.length >= 50 ? '+' : ''}</strong><small>Жолооч сонгогдсон захиалгууд →</small></button>
               <button className={styles.stat} onClick={() => { setFilter('available'); setSearch(''); setTab('drivers') }}><span>Захиалга авахад бэлэн</span><strong>{availableDrivers.length}</strong><small>Нийт {drivers.length} жолооч бүртгэлтэй →</small></button>
@@ -194,7 +207,7 @@ export default function AdminPage() {
             {(!dashboard.bankName || !dashboard.bankAccount) && <div className={styles.notice}><strong>Төлбөр авах дансаа тохируулна уу.</strong><p>Жолоочид шилжүүлэх данс харагдахын тулд банк, дансны дугаараа хадгална.</p><button type="button" onClick={() => setTab('settings')}>Банкны данс тохируулах →</button></div>}
             {unlinkedOrders > 0 && <div className={styles.notice}><strong>Нягтлах хуучин захиалга: {unlinkedOrders}</strong><p>Дээрх захиалгын тоонд жолоочгүй боловч баталгаажсан төлөвтэй хуучин бүртгэлүүд орсон байна.</p><button type="button" onClick={() => setTab('active')}>Бүртгэлүүдийг харах →</button></div>}
             <section className={styles.panel}><h3>Та юу хийх вэ?</h3><ol className={styles.steps}>
-              <li><div><strong>Шинэ жолооч бүртгэх</strong><br />Утасны дугаарыг нэмээд, үүссэн түр PIN-ийг жолоочид дамжуулна.<br /><button type="button" className={styles.linkButton} onClick={() => navigation.navigate('drivers:add')}>Жолооч бүртгэх →</button></div></li>
+              <li><div><strong>Шинэ жолооч бүртгэх</strong><br />Зөвхөн утасны дугаарыг нэмнэ. Анхны PIN нь 000000 байна.<br /><button type="button" className={styles.linkButton} onClick={() => navigation.navigate('drivers:add')}>Жолооч бүртгэх →</button></div></li>
               <li><div><strong>Төлбөр төлсөн жолоочийн эрх нээх</strong><br />Улсын дугаар эсвэл утсаар хайж, банкны орлогын дүн, гүйлгээний кодыг тулгана.<br /><button type="button" className={styles.linkButton} onClick={() => setTab('payments')}>Төлбөр шалгах →</button></div></li>
               <li><div><strong>Автоматаар эрх нээлгэх</strong><br />Банкны дансаа хадгалаад SMS авдаг утасны MacroDroid-ыг холбоно.<br /><button type="button" className={styles.linkButton} onClick={() => setTab('settings')}>Тохиргоо нээх →</button></div></li>
             </ol></section>
@@ -202,11 +215,11 @@ export default function AdminPage() {
           {tab === 'payments' && <AdminPaymentPanel onSessionExpired={sessionExpired} onApproved={fetchDashboard} onConfigure={() => setTab('settings')} />}
           {tab === 'drivers' && <>
             <p className={styles.muted}>Бүртгэл идэвхтэй байх нь жолоочийн төлбөр төлөгдсөнийг илэрхийлэхгүй. Шимтгэлийн зөвшөөрлийг «Төлбөр · Эрх нээх» цэсээс удирдана.</p>
-            {showForm && <section className={styles.panel}><h3>Шинэ жолооч бүртгэх</h3><p className={styles.muted}>Утасны дугаараар бүртгэнэ. 6 оронтой түр PIN зөвхөн энэ удаа харагдана. Жолооч нэвтрээд нэр, машин, улсын дугаараа нөхөж оруулна.</p><form onSubmit={event => { event.preventDefault(); void mutateDriver('add') }}>
+            {showForm && <section className={styles.panel}><h3>Шинэ жолооч бүртгэх</h3><p className={styles.muted}>Зөвхөн утасны дугаар оруулна. Анхны PIN нь 000000. Жолооч анх нэвтрэхдээ нэр, улсын дугаар, шинэ PIN-ээ заавал тохируулна.</p><form onSubmit={event => { event.preventDefault(); void mutateDriver('add') }}>
               <label htmlFor="new-driver-phone">Жолоочийн утасны дугаар</label><input id="new-driver-phone" type="tel" inputMode="tel" autoComplete="tel" maxLength={16} required placeholder="Жишээ: 99112233" value={phone} disabled={driverBusy} onChange={event => setPhone(event.target.value)} />
-              <div className={styles.cardFooter}><button type="submit" className={styles.primary} disabled={driverBusy}>{driverBusy ? 'Бүртгэж байна…' : 'Бүртгээд түр PIN үүсгэх'}</button><button type="button" disabled={driverBusy} onClick={closeSubpage}>Болих</button></div>
+              <div className={styles.cardFooter}><button type="submit" className={styles.primary} disabled={driverBusy}>{driverBusy ? 'Бүртгэж байна…' : 'Жолооч бүртгэх'}</button><button type="button" disabled={driverBusy} onClick={closeSubpage}>Болих</button></div>
             </form></section>}
-            {driverNotice && <div ref={notice} tabIndex={-1} role={driverNotice.ok ? 'status' : 'alert'} className={driverNotice.ok ? styles.success : styles.error}><strong>{driverNotice.text}</strong>{driverNotice.pin && <><p>{driverNotice.phone} дугаарт нэвтрэх түр PIN:</p><output className={styles.pin}>{driverNotice.pin}</output><p>Жолоочид аюулгүй сувгаар дамжуулна уу. Энэ хэсгийг хаавал PIN дахин харагдахгүй.</p><button type="button" onClick={() => setDriverNotice(null)}>PIN-ийг дамжуулсан · Хаах</button></>}</div>}
+            {driverNotice && <div ref={notice} tabIndex={-1} role={driverNotice.ok ? 'status' : 'alert'} className={driverNotice.ok ? styles.success : styles.error}><strong>{driverNotice.text}</strong>{driverNotice.pin && <><p>{driverNotice.phone} дугаарын анхны PIN:</p><output className={styles.pin}>{driverNotice.pin}</output><p>Жолооч анх нэвтрэхдээ энэ PIN-ийг ашиглаад өөрийн шинэ PIN-ээ тохируулна.</p><button type="button" onClick={() => setDriverNotice(null)}>PIN-ийг дамжуулсан · Хаах</button></>}</div>}
             <div className={styles.searchRow}><div><label htmlFor="driver-search">Жолооч хайх</label><input id="driver-search" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Нэр, утас эсвэл улсын дугаар" /></div><div><label htmlFor="driver-filter">Төлөвөөр шүүх</label><select id="driver-filter" value={filter} onChange={event => setFilter(event.target.value as DriverFilter)}><option value="all">Бүх жолооч</option><option value="available">Захиалга авахад бэлэн</option><option value="paused">Бүртгэл түр хаасан</option></select></div></div>
             <p className={styles.muted}>Нийт {drivers.length} жолоочоос {filteredDrivers.length} харагдаж байна. {(search || filter !== 'all') && <button type="button" className={styles.linkButton} onClick={() => { setSearch(''); setFilter('all') }}>Хайлт, шүүлтүүр арилгах</button>}</p>
             {!filteredDrivers.length && <p className={styles.empty}>{drivers.length ? 'Тохирох жолооч олдсонгүй. Хайлт, төлөвийн шүүлтүүрээ өөрчилнө үү.' : 'Жолооч бүртгэгдээгүй байна. Дээрх «Жолооч бүртгэх» товчоор эхэлнэ.'}</p>}
