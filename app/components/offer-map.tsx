@@ -195,8 +195,8 @@ export function OfferMap({ pickup, offers, selectedDriverId, searching, onSelect
   }, [pickup, offers, selectedDriverId, activeSearching, ready])
 
   return <>
-    <style>{SEARCH_RADAR_CSS}</style>
     <div ref={container} className="offers-map-canvas" aria-label="Ачуулах байршил болон жолоочийн үнийн саналын газрын зураг" />
+    <style>{SEARCH_RADAR_CSS}</style>
     {error && <p className="offers-map-error" role="alert">{error}</p>}
   </>
 }
