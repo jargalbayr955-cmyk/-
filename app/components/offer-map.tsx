@@ -32,7 +32,7 @@ function createPickupSearchMarker(searching: boolean) {
   return element
 }
 
-export function OfferMap({ pickup, offers, selectedDriverId, searching = true, onSelect }: {
+export function OfferMap({ pickup, offers, selectedDriverId, searching, onSelect }: {
   pickup: PickupPoint | null
   offers: DriverSlot[]
   selectedDriverId: string | null
@@ -51,8 +51,21 @@ export function OfferMap({ pickup, offers, selectedDriverId, searching = true, o
   latestPickup.current = pickup
   const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
+  const [clockSearching, setClockSearching] = useState(true)
+  const activeSearching = searching ?? clockSearching
 
   useEffect(() => { selectRef.current = onSelect }, [onSelect])
+
+  useEffect(() => {
+    if (searching !== undefined || typeof document.querySelector !== 'function') return
+    const sync = () => {
+      const clock = document.querySelector('.offers-countdown')?.textContent?.trim()
+      setClockSearching(Boolean(clock && clock !== '00:00'))
+    }
+    sync()
+    const timer = window.setInterval(sync, 500)
+    return () => window.clearInterval(timer)
+  }, [searching])
 
   useEffect(() => {
     let cancelled = false
@@ -124,13 +137,13 @@ export function OfferMap({ pickup, offers, selectedDriverId, searching = true, o
     if (!ready || !map || !ml) return
     if (pickup) {
       if (!pickupMarker.current) {
-        const element = createPickupSearchMarker(searching)
+        const element = createPickupSearchMarker(activeSearching)
         pickupElement.current = element
         pickupMarker.current = new ml.Marker({ element }).setLngLat([pickup.lng, pickup.lat]).addTo(map)
       } else {
         pickupMarker.current.setLngLat([pickup.lng, pickup.lat])
       }
-      if (pickupElement.current) pickupElement.current.className = `pickup-search-marker${searching ? ' is-searching' : ''}`
+      if (pickupElement.current) pickupElement.current.className = `pickup-search-marker${activeSearching ? ' is-searching' : ''}`
     } else if (pickupMarker.current) {
       pickupMarker.current.remove()
       pickupMarker.current = null
@@ -179,7 +192,7 @@ export function OfferMap({ pickup, offers, selectedDriverId, searching = true, o
         map.fitBounds(bounds, { padding: { top: Math.min(210, height * .32), bottom: Math.min(190, height * .29), left: 76, right: 76 }, maxZoom: 15, duration: 500 })
       } else map.easeTo({ center: [pickup.lng, pickup.lat], zoom: 15, duration: 400 })
     }
-  }, [pickup, offers, selectedDriverId, searching, ready])
+  }, [pickup, offers, selectedDriverId, activeSearching, ready])
 
   return <>
     <style>{SEARCH_RADAR_CSS}</style>
