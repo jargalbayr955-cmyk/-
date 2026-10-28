@@ -12,8 +12,8 @@ type Step = 0 | 1 | 2 | 3
 type Props = { screen: BookingScreen; location: Point | null; onNavigate: (screen: BookingScreen) => void; onBack: () => boolean; onClose: () => void }
 
 const vehicles = [
-  { id: 'butten', label: 'Бүтэн ачигч', image: '/vehicle-buten-achigch.svg', desc: 'Тэвш дээр бүтнээр нь ачна' },
-  { id: 'chiregch', label: 'Чирэгч', image: '/vehicle-chiregch.svg', desc: 'Дугуйнаас өргөж чирж тээвэрлэнэ' },
+  { id: 'butten', label: 'Бүтэн ачигч', image: '/vehicle-buten-achigch-original.svg', desc: 'Тэвш дээр бүтнээр нь ачна' },
+  { id: 'chiregch', label: 'Чирэгч', image: '/vehicle-chiregch-original.svg', desc: 'Дугуйнаас өргөж чирж тээвэрлэнэ' },
 ]
 
 const titles = ['Ямар машин хэрэгтэй вэ?', 'Хаашаа хүргүүлэх вэ?', 'Ямар машин ачуулах вэ?', 'Захиалгаа шалгаарай']
