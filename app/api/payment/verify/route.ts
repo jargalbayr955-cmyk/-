@@ -21,6 +21,10 @@ export async function POST(req: NextRequest) {
   if (!(await allowRequest(`payment-webhook:${getClientIp(req)}`, 120, 60_000))) return NextResponse.json({ error: 'Rate limited' }, { status: 429 })
 
   const supabase = getSupabaseAdmin()
+  const autoSetting = await supabase.from('settings').select('value').eq('key', 'payment_auto_verify_enabled').maybeSingle()
+  if (autoSetting.error) return NextResponse.json({ error: 'Automatic payment setting unavailable' }, { status: 503 })
+  if (autoSetting.data?.value === 'false') return NextResponse.json({ error: 'Automatic payment verification is disabled by admin' }, { status: 423 })
+
   const contentType = (req.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()
   if (!['text/plain', 'application/json'].includes(contentType)) return NextResponse.json({ error: 'Unsupported content type' }, { status: 415 })
   if (Number(req.headers.get('content-length')) > 2048) return NextResponse.json({ error: 'Receipt too large' }, { status: 413 })
