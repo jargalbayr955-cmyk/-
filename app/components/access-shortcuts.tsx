@@ -21,7 +21,6 @@ export function BrandAccess({ className = 'brand-mark' }: { className?: string }
   const cancelPress = useCallback(() => {
     const wasPressing = pressing.current
     endPress()
-    // Touch browsers can emit pointerleave after pointerup; keep that short tap.
     if (wasPressing) {
       suppressClick.current = true
       taps.current.count = 0
@@ -56,7 +55,7 @@ export function BrandAccess({ className = 'brand-mark' }: { className?: string }
     const now = Date.now()
     taps.current.count = now - taps.current.last <= 1800 ? taps.current.count + 1 : 1
     taps.current.last = now
-    if (taps.current.count === 3) {
+    if (taps.current.count === 5) {
       taps.current.count = 0
       router.push('/driver')
     }
