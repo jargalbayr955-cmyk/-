@@ -19,16 +19,20 @@ export function DriverDispatchView(props: Props) {
   const { driver, orders, locating, locationMessage, error, newOrderAlert, nativeDriver, pushReady, notificationsDenied, sentOffers, sendingOffer, onToggleAvailable, onSubscribe, onProfile, onOffer } = props
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [prices, setPrices] = useState<Record<string, string>>({})
+  const [isIOS, setIsIOS] = useState(false)
   const root = useRef<HTMLDivElement | null>(null)
   const position = pickupPoint(driver.lat, driver.lng)
   const fresh = !locationMessage && locationIsFresh(driver.location_updated_at)
   const sorted = nearbyOrders(orders, position)
   const selected = sorted.find(order => order.id === selectedId) || sorted[0] || null
   const offered = selected && (sentOffers[selected.id] || selected.has_offered)
+  const locationDenied = /зөвшөөрөл хаалттай/i.test(locationMessage)
 
   // Keep the price input and submit button visible above a mobile keyboard.
   useEffect(() => {
     const viewport = window.visualViewport
+    const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    setIsIOS(ios)
     if (!viewport) return
     const resize = () => root.current?.style.setProperty('--driver-viewport-height', `${viewport.height}px`)
     resize(); viewport.addEventListener('resize', resize)
@@ -54,7 +58,16 @@ export function DriverDispatchView(props: Props) {
         </button>}
       </div>
       {!driver.car_type && <button className="driver-dispatch-message" onClick={onProfile}>Профайлдаа машины төрлөө сонгоно уу →</button>}
-      {locationMessage && <p className="driver-dispatch-message" role="status">{locationMessage}</p>}
+      {locationMessage && <div className="driver-dispatch-message" role="status">
+        <div>{locationMessage}</div>
+        {isIOS && locationDenied && <div style={{marginTop:8, lineHeight:1.45}}>
+          <strong>iPhone:</strong> Safari дээр Page Menu → Website Settings → Location → <strong>Allow</strong> болгоно. Мөн Settings → Privacy &amp; Security → Location Services асаалттай байна.
+        </div>}
+        {!nativeDriver && driver.available && <button type="button" onClick={() => window.dispatchEvent(new Event('achilt-location-retry'))}
+          style={{marginTop:10, border:0, borderRadius:10, padding:'10px 12px', background:'#e8433a', color:'white', fontWeight:800, cursor:'pointer'}}>
+          📍 Байршил дахин зөвшөөрөх
+        </button>}
+      </div>}
       {error && <p className="driver-dispatch-message driver-dispatch-error" role="alert">{error}</p>}
       {newOrderAlert && <p className="driver-new-order" role="status">Шинэ захиалга ирлээ. Зураг дээрх цэгийг дарж үзнэ үү.</p>}
     </header>
