@@ -3,7 +3,7 @@
   "short_name": "Ачилт",
   "description": "Ачилт үйлчилгээний жолоочийн апп",
   "id": "/driver",
-  "start_url": "/driver",
+  "start_url": "/start",
   "scope": "/",
   "display": "standalone",
   "background_color": "#060608",
