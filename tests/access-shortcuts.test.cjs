@@ -41,10 +41,9 @@ function shortcut() {
   }
 }
 
-test('three short taps still open driver access, including touch pointerleave after release', () => {
+test('five short taps open driver access, including touch pointerleave after release', () => {
   const h = shortcut()
-  h.tap({ leaveAfterUp: true }); h.advance(100)
-  h.tap({ leaveAfterUp: true }); h.advance(100)
+  for (let index = 0; index < 4; index += 1) { h.tap({ leaveAfterUp: true }); h.advance(100) }
   assert.deepEqual(h.routes, [])
   h.tap({ leaveAfterUp: true })
   assert.deepEqual(h.routes, ['/driver'])
@@ -52,13 +51,13 @@ test('three short taps still open driver access, including touch pointerleave af
 
 test('admin opens only after five seconds; release cannot also trigger the driver shortcut', () => {
   const h = shortcut()
-  h.tap(); h.tap(); h.down()
+  h.tap(); h.tap(); h.tap(); h.tap(); h.down()
   h.advance(4999)
   assert.deepEqual(h.routes, [])
   h.advance(1)
   assert.deepEqual(h.routes, ['/admin'])
   h.up(); h.props.onClick()
-  h.tap(); h.tap()
+  h.tap(); h.tap(); h.tap(); h.tap()
   assert.deepEqual(h.routes, ['/admin'])
   h.tap()
   assert.deepEqual(h.routes, ['/admin', '/driver'])
@@ -80,7 +79,7 @@ test('backgrounding or unmounting clears the pending hold', () => {
   }
 })
 
-test('keyboard holds support admin without repeat keydown triggering three taps', () => {
+test('keyboard holds support admin without repeat keydown triggering short taps', () => {
   const h = shortcut()
   const event = { key: 'Enter', repeat: false, preventDefault() {} }
   h.props.onKeyDown(event)
