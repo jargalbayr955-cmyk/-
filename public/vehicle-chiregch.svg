@@ -1,37 +1,43 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" role="img" aria-label="Чирэгч машин улаан суудлын машиныг дугуйнаас өргөж чирж байгаа тод зураг">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" role="img" aria-label="Цагаан чирэгч улаан машиныг дугуйнаас өргөж чирж байгаа хажуугийн тод зураг">
 <defs>
-  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#79c8ff"/><stop offset="1" stop-color="#dff4ff"/></linearGradient>
-  <linearGradient id="road" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#65717b"/><stop offset="1" stop-color="#343b42"/></linearGradient>
-  <linearGradient id="cab" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#d9e2e8"/></linearGradient>
-  <linearGradient id="redcar" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff3345"/><stop offset="1" stop-color="#c90920"/></linearGradient>
-  <filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-opacity=".25"/></filter>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#78c9ff"/><stop offset="1" stop-color="#dff5ff"/></linearGradient>
+  <linearGradient id="road" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#67727a"/><stop offset="1" stop-color="#333a40"/></linearGradient>
+  <linearGradient id="cab" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#dde6eb"/></linearGradient>
+  <linearGradient id="red" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff3347"/><stop offset="1" stop-color="#c8071f"/></linearGradient>
+  <filter id="shadow"><feDropShadow dx="0" dy="7" stdDeviation="7" flood-opacity=".25"/></filter>
 </defs>
-<rect width="900" height="520" rx="34" fill="url(#sky)"/>
-<g opacity=".38" fill="#7199b7"><rect x="50" y="120" width="76" height="190" rx="3"/><rect x="138" y="155" width="58" height="155" rx="3"/><rect x="212" y="98" width="92" height="212" rx="3"/><rect x="645" y="135" width="84" height="175" rx="3"/><rect x="745" y="92" width="96" height="218" rx="3"/></g>
-<g fill="#65aa58"><circle cx="45" cy="294" r="42"/><circle cx="92" cy="302" r="38"/><circle cx="810" cy="296" r="43"/><circle cx="858" cy="305" r="36"/></g>
-<rect y="338" width="900" height="182" fill="url(#road)"/>
-<path d="M28 458H212M680 458H862" stroke="#fff" stroke-width="11" stroke-linecap="round" opacity=".85"/>
+<rect width="900" height="520" rx="32" fill="url(#sky)"/>
+<g opacity=".38" fill="#6d9bc0"><rect x="35" y="120" width="70" height="190"/><rect x="120" y="155" width="55" height="155"/><rect x="195" y="95" width="82" height="215"/><rect x="670" y="135" width="72" height="175"/><rect x="758" y="100" width="95" height="210"/></g>
+<g fill="#62aa57"><circle cx="44" cy="305" r="45"/><circle cx="91" cy="308" r="38"/><circle cx="808" cy="300" r="46"/><circle cx="858" cy="310" r="36"/></g>
+<rect y="356" width="900" height="164" fill="url(#road)"/>
+<path d="M25 466H205M690 466H875" stroke="#fff" stroke-width="10" stroke-linecap="round" opacity=".86"/>
 <g filter="url(#shadow)">
-  <path d="M91 205h155c48 0 86 39 86 86v78H63V269c0-36 12-64 28-64Z" fill="url(#cab)" stroke="#9ba8b1" stroke-width="5"/>
-  <path d="M122 220h92c36 0 65 29 65 65v12H109v-49c0-17 5-28 13-28Z" fill="#72b7df"/>
-  <path d="M67 309h230v54H72Z" fill="#edf2f5"/>
-  <rect x="72" y="356" width="330" height="28" rx="9" fill="#252c32"/>
-  <rect x="183" y="183" width="63" height="14" rx="7" fill="#ff9a16"/><rect x="196" y="176" width="38" height="8" rx="4" fill="#ff6d00"/>
-  <path d="M330 266h68l83 112h-52l-55-73h-44Z" fill="#1f252b"/>
-  <path d="M389 273 440 342" stroke="#aeb7bf" stroke-width="8" stroke-linecap="round"/>
-  <path d="M432 345h105l46 27v22H409v-24c0-14 8-25 23-25Z" fill="#f4a916"/>
-  <path d="M526 380h92" stroke="#f4a916" stroke-width="22" stroke-linecap="round"/>
-  <path d="M606 380h52" stroke="#f4a916" stroke-width="12" stroke-linecap="round"/>
-  <g fill="#171b1f" stroke="#e1e7ea" stroke-width="8"><circle cx="145" cy="397" r="43"/><circle cx="355" cy="397" r="43"/></g>
-  <g fill="#747f88"><circle cx="145" cy="397" r="18"/><circle cx="355" cy="397" r="18"/></g>
-  <g transform="translate(574 240)">
-    <path d="M22 74 61 32c12-13 28-20 48-20h128c23 0 42 10 54 28l39 57 22 12v91H0v-73c0-24 8-42 22-53Z" fill="url(#redcar)" stroke="#ad0d1f" stroke-width="5"/>
-    <path d="M76 39 48 72h98V35h-34c-16 0-27 1-36 4Zm89-4v37h115l-23-32c-6-9-17-14-32-14Z" fill="#7fa7bd" opacity=".88"/>
-    <rect x="18" y="104" width="310" height="40" rx="15" fill="#8d0a17"/>
-    <circle cx="82" cy="181" r="37" fill="#111" stroke="#e1e6e8" stroke-width="7"/><circle cx="270" cy="181" r="37" fill="#111" stroke="#e1e6e8" stroke-width="7"/>
-    <circle cx="82" cy="181" r="14" fill="#737f89"/><circle cx="270" cy="181" r="14" fill="#737f89"/>
+  <!-- compact white wheel-lift tow truck -->
+  <path d="M52 207h135c46 0 81 36 81 82v88H32V269c0-36 8-62 20-62Z" fill="url(#cab)" stroke="#9ba8b1" stroke-width="5"/>
+  <path d="M81 223h81c34 0 59 27 59 60v18H70v-52c0-16 4-26 11-26Z" fill="#72bbe6"/>
+  <path d="M35 310h201v58H38Z" fill="#f2f6f8"/>
+  <rect x="39" y="359" width="292" height="27" rx="8" fill="#282e33"/>
+  <rect x="139" y="185" width="62" height="14" rx="7" fill="#ff9b16"/><rect x="152" y="178" width="37" height="8" rx="4" fill="#ff6d00"/>
+  <!-- exactly two visible tow-truck wheels -->
+  <g fill="#15191c" stroke="#edf1f3" stroke-width="8"><circle cx="102" cy="407" r="44"/><circle cx="304" cy="407" r="44"/></g>
+  <g fill="#747f88"><circle cx="102" cy="407" r="18"/><circle cx="304" cy="407" r="18"/></g>
+  <!-- large yellow/black hydraulic wheel-lift, clearly not a flatbed -->
+  <path d="M272 252h64l96 121h-56l-69-80h-35Z" fill="#1e252b"/>
+  <path d="M326 259 394 347" stroke="#b6bec4" stroke-width="10" stroke-linecap="round"/>
+  <path d="M382 344h103l55 28v24H357v-27c0-15 9-25 25-25Z" fill="#f5ad16"/>
+  <path d="M474 381h108" stroke="#f5ad16" stroke-width="24" stroke-linecap="round"/>
+  <path d="M568 381h76" stroke="#f5ad16" stroke-width="14" stroke-linecap="round"/>
+  <path d="M630 379c24 0 41 12 52 34" fill="none" stroke="#f5ad16" stroke-width="13" stroke-linecap="round"/>
+  <!-- red sedan being towed; two side wheels both visible -->
+  <g transform="translate(548 224)">
+    <path d="M22 91 66 42c13-15 31-23 53-23h139c25 0 45 10 58 29l43 62 25 13v173H0V151c0-27 8-47 22-60Z" fill="url(#red)" stroke="#aa0d20" stroke-width="6"/>
+    <path d="M84 49 53 87h106V43h-37c-17 0-29 2-38 6Zm95-6v44h126l-26-36c-7-10-19-15-35-15Z" fill="#83acc2" opacity=".9"/>
+    <rect x="19" y="119" width="337" height="44" rx="15" fill="#8d0918"/>
+    <!-- front wheel is slightly lifted by the yellow yoke; rear stays on road -->
+    <g fill="#101315" stroke="#e8ecef" stroke-width="8"><circle cx="87" cy="211" r="41"/><circle cx="292" cy="225" r="41"/></g>
+    <g fill="#717d86"><circle cx="87" cy="211" r="16"/><circle cx="292" cy="225" r="16"/></g>
   </g>
-  <path d="M634 374h32" stroke="#f4a916" stroke-width="18" stroke-linecap="round"/>
-  <path d="M652 374c18 0 33 10 42 24" fill="none" stroke="#f4a916" stroke-width="12" stroke-linecap="round"/>
+  <!-- yoke visibly under the front wheel -->
+  <path d="M625 390h55" stroke="#f5ad16" stroke-width="18" stroke-linecap="round"/>
 </g>
 </svg>
