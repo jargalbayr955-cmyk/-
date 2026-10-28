@@ -7,6 +7,8 @@ import { SessionGate } from './session-gate'
 import { BrandAccess } from './access-shortcuts'
 import { DriverRegistrationDialog } from './driver-registration'
 
+const DRIVER_REGISTRATION_HISTORY = 'achiltDriverRegistration'
+
 export function CustomerAuth() {
   return <SessionGate mode="guest"><AuthForm /></SessionGate>
 }
@@ -46,6 +48,14 @@ function AuthForm() {
   useEffect(() => {
     if (step === 'otp') codeRef.current?.focus()
   }, [step, verificationId])
+
+  useEffect(() => {
+    const onPopState = () => {
+      if (driverRegistrationOpen) setDriverRegistrationOpen(false)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [driverRegistrationOpen])
 
   const resendSeconds = Math.max(0, Math.ceil((resendAt - Date.now()) / 1000))
 
@@ -119,11 +129,25 @@ function AuthForm() {
     setTimeout(() => phoneRef.current?.focus(), 0)
   }
 
+  const openDriverRegistration = () => {
+    if (driverRegistrationOpen) return
+    window.history.pushState({ ...window.history.state, [DRIVER_REGISTRATION_HISTORY]: true }, '', window.location.href)
+    setDriverRegistrationOpen(true)
+  }
+
+  const closeDriverRegistration = () => {
+    if (window.history.state?.[DRIVER_REGISTRATION_HISTORY]) {
+      window.history.back()
+      return
+    }
+    setDriverRegistrationOpen(false)
+  }
+
   return <main className="auth-shell">
     <section className="auth-card" aria-labelledby="auth-title">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
         <BrandAccess className="auth-brand-mark" />
-        <button type="button" onClick={() => setDriverRegistrationOpen(true)} style={{ border: '1px solid rgba(255,255,255,.18)', borderRadius: 14, background: '#171b22', color: '#fff', padding: '10px 12px', fontWeight: 800, cursor: 'pointer', lineHeight: 1.2 }}>
+        <button type="button" onClick={openDriverRegistration} style={{ border: '1px solid rgba(255,255,255,.18)', borderRadius: 14, background: '#171b22', color: '#fff', padding: '10px 12px', fontWeight: 800, cursor: 'pointer', lineHeight: 1.2 }}>
           🚚 Жолоочоор бүртгүүлэх
         </button>
       </div>
@@ -159,7 +183,7 @@ function AuthForm() {
         </div>
       </>}
 
-      {driverRegistrationOpen && <DriverRegistrationDialog initialPhone={phone} onClose={() => setDriverRegistrationOpen(false)} />}
+      {driverRegistrationOpen && <DriverRegistrationDialog initialPhone={phone} onClose={closeDriverRegistration} />}
     </section>
   </main>
 }
