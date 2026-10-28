@@ -11,6 +11,25 @@ import { OfferMap } from '../components/offer-map'
 import { DriverSummary } from '../components/driver-summary'
 import { DriverSlot, mapOffers, offerSnapshot, PickupPoint, pickupPoint, remainingSeconds } from '@/lib/order-offers'
 
+type AlertWindow = Window & {
+  webkitAudioContext?: typeof AudioContext
+  __achiltOfferAlertContext?: AudioContext
+}
+
+async function primeOfferAlertAudio() {
+  const view = window as AlertWindow
+  const Ctx = window.AudioContext || view.webkitAudioContext
+  if (!Ctx) return null
+  if (!view.__achiltOfferAlertContext || view.__achiltOfferAlertContext.state === 'closed') {
+    view.__achiltOfferAlertContext = new Ctx()
+  }
+  const ctx = view.__achiltOfferAlertContext
+  if (ctx.state === 'suspended') {
+    try { await ctx.resume() } catch {}
+  }
+  return ctx
+}
+
 export default function DriversPage() {
   const router = useRouter()
   const [orderId, setOrderId] = useState<string | null>(null)
@@ -28,11 +47,6 @@ export default function DriversPage() {
   const [accepting, setAccepting] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const [error, setError] = useState('')
-  const [alertsEnabled, setAlertsEnabled] = useState(false)
-  const [alertsBusy, setAlertsBusy] = useState(false)
-  const [alertsMessage, setAlertsMessage] = useState('')
-  const audioContext = useRef<AudioContext | null>(null)
-  const alertsActive = useRef(false)
   const actionPending = useRef(false)
   const expired = serverExpired || secondsLeft === 0
   const offers = useMemo(() => expired ? [] : mapOffers(slots), [slots, expired])
@@ -55,16 +69,22 @@ export default function DriversPage() {
     return () => clearInterval(timer)
   }, [expiresAt])
 
-  useEffect(() => () => { void audioContext.current?.close().catch(() => {}) }, [])
+  useEffect(() => {
+    void primeOfferAlertAudio()
+    const unlock = () => { void primeOfferAlertAudio() }
+    document.addEventListener('pointerdown', unlock, true)
+    document.addEventListener('keydown', unlock, true)
+    return () => {
+      document.removeEventListener('pointerdown', unlock, true)
+      document.removeEventListener('keydown', unlock, true)
+    }
+  }, [])
 
   const playOfferAlert = useCallback(async () => {
-    if (!alertsActive.current) return
     if (typeof navigator.vibrate === 'function') navigator.vibrate([250, 120, 250])
-    const ctx = audioContext.current
-    if (!ctx) return
+    const ctx = await primeOfferAlertAudio()
+    if (!ctx || ctx.state !== 'running') return
     try {
-      if (ctx.state === 'suspended') await ctx.resume()
-      if (!alertsActive.current || ctx.state !== 'running') return
       const now = ctx.currentTime
       for (const [index, frequency] of [880, 1040].entries()) {
         const oscillator = ctx.createOscillator(), gain = ctx.createGain()
@@ -79,32 +99,8 @@ export default function DriversPage() {
         oscillator.start(now + index * .2)
         oscillator.stop(now + index * .2 + .18)
       }
-    } catch { setAlertsMessage('Дуу тоглосонгүй. Дууны тохиргоогоо шалгаарай.') }
+    } catch {}
   }, [])
-
-  const toggleAlerts = async () => {
-    if (alertsBusy) return
-    if (alertsActive.current) {
-      alertsActive.current = false
-      setAlertsEnabled(false)
-      setAlertsMessage('')
-      return
-    }
-    setAlertsBusy(true)
-    setAlertsMessage('')
-    try {
-      const Ctx = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-      if (!Ctx) throw new Error('Audio unsupported')
-      audioContext.current ??= new Ctx()
-      if (audioContext.current.state === 'suspended') await audioContext.current.resume()
-      if (audioContext.current.state !== 'running') throw new Error('Audio not enabled')
-      alertsActive.current = true
-      setAlertsEnabled(true)
-      await playOfferAlert()
-      if (typeof navigator.vibrate !== 'function') setAlertsMessage('Дуу асаалттай. Энэ browser чичиргээ дэмжихгүй.')
-    } catch { setAlertsMessage('Дууг асааж чадсангүй. Дахин дарж оролдоно уу.') }
-    finally { setAlertsBusy(false) }
-  }
 
   useEffect(() => {
     if (!orderId) return
@@ -211,10 +207,6 @@ export default function DriversPage() {
         <h1 aria-live="polite">{finished ? 'Захиалга дууссан' : confirmed ? 'Жолооч сонгогдсон' : expired ? 'Хайлтын хугацаа дууслаа' : invitedCount === 0 ? 'Бэлэн жолооч хайж байна' : 'Үнийн санал хүлээж байна'}</h1>
         {!confirmed && !finished && <time className="offers-countdown" aria-label={`Үлдсэн хугацаа ${clock}`}>{clock}</time>}
       </div>
-      {!confirmed && !finished && <button type="button" className="offers-alerts" aria-pressed={alertsEnabled} onClick={() => void toggleAlerts()} disabled={alertsBusy}>
-        {alertsBusy ? 'Дууг асааж байна…' : alertsEnabled ? '🔔 Дуу + чичиргээ асаалттай' : '🔔 Үнэ ирэхэд дуу + чичиргээ асаах'}
-      </button>}
-      {alertsMessage && <p className="offers-inline-message" role="status">{alertsMessage}</p>}
       {!confirmed && !finished && !expired && invitedCount === 0 && <p className="offers-inline-message" role="status">Сонгосон төрлийн бэлэн жолооч одоогоор алга. Хугацаа дуусахаас өмнө жолооч бэлэн болбол захиалгыг автоматаар илгээнэ.</p>}
       {error && <p className="offers-inline-message offers-error" role="alert">{error}</p>}
     </header>
