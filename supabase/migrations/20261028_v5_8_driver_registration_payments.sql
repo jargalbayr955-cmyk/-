@@ -30,11 +30,11 @@ returns jsonb language plpgsql security invoker set search_path = '' as $$
 declare v_request public.driver_registration_requests%rowtype;
 begin
   if p_phone is null or p_phone !~ '^\+976[0-9]{8}$' or p_car_type not in ('butten','chiregch') then raise exception 'Invalid driver registration' using errcode='22023'; end if;
-  if exists(select 1 from public.drivers d where regexp_replace(d.phone,'[^0-9]','','g')=regexp_replace(p_phone,'[^0-9]','','g') and d.deleted_at is null) then raise exception 'Driver phone already exists' using errcode='23505'; end if;
   select * into v_request from public.driver_registration_requests where phone=p_phone for update;
   if found and v_request.status in ('paid','contacted') then
     return jsonb_build_object('request_id',v_request.id,'status',v_request.status,'payment_amount',v_request.payment_amount,'expires_at',v_request.expires_at);
   end if;
+  if exists(select 1 from public.drivers d where regexp_replace(d.phone,'[^0-9]','','g')=regexp_replace(p_phone,'[^0-9]','','g') and d.deleted_at is null) then raise exception 'Driver phone already exists' using errcode='23505'; end if;
   if found then
     update public.driver_registration_requests set car_type=p_car_type,status='awaiting_payment',payment_amount=null,payment_confirmed_at=null,driver_id=null,expires_at=now()+interval '24 hours',updated_at=now() where id=v_request.id returning * into v_request;
   else
