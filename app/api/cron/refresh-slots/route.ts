@@ -7,14 +7,24 @@ export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET || ''
   const auth = req.headers.get('authorization') || ''
   const supplied = auth.startsWith('Bearer ') ? auth.slice(7) : ''
-  if (!secret || !supplied || !safeEqual(secret,supplied)) return NextResponse.json({error:'Unauthorized'},{status:401})
+  if (!secret || !supplied || !safeEqual(secret, supplied)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const s = getSupabaseAdmin()
-  const { data: due } = await s.from('driver_invites').select('order_id').eq('status','active').lte('expires_at',new Date().toISOString()).limit(200)
-  const orderIds = [...new Set((due||[]).map(x=>x.order_id))]
-  let refreshed=0, notified=0
+  const { data: cleanup, error: cleanupError } = await s.rpc('cleanup_stale_dispatch_orders')
+  if (cleanupError) return NextResponse.json({ error: 'Cleanup failed' }, { status: 503 })
+
+  const { data: due, error: dueError } = await s.from('driver_invites').select('order_id').eq('status', 'active').lte('expires_at', new Date().toISOString()).limit(200)
+  if (dueError) return NextResponse.json({ error: 'Refresh lookup failed' }, { status: 503 })
+
+  const orderIds = [...new Set((due || []).map(x => x.order_id))]
+  let refreshed = 0, notified = 0
   for (const id of orderIds) {
-    const { error } = await s.rpc('refresh_order_driver_slots',{p_order_id:id})
-    if (!error) { refreshed++; const r = await notifyOrderInvites(id).catch(()=>({sent:0,invited:0})); notified += r.sent }
+    const { error } = await s.rpc('refresh_order_driver_slots', { p_order_id: id })
+    if (!error) {
+      refreshed++
+      const r = await notifyOrderInvites(id).catch(() => ({ sent: 0, invited: 0 }))
+      notified += r.sent
+    }
   }
-  return NextResponse.json({refreshed,notified})
+  return NextResponse.json({ cleanup, refreshed, notified }, { headers: { 'Cache-Control': 'no-store' } })
 }
