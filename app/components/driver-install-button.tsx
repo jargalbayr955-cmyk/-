@@ -9,10 +9,10 @@ type InstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
 }
 
-function standaloneMode() {
+function browserStandaloneMode() {
   if (typeof window === 'undefined') return false
   const navigatorWithStandalone = navigator as Navigator & { standalone?: boolean }
-  return window.matchMedia('(display-mode: standalone)').matches || Boolean(navigatorWithStandalone.standalone) || isNativeDriver()
+  return window.matchMedia('(display-mode: standalone)').matches || Boolean(navigatorWithStandalone.standalone)
 }
 
 export function DriverInstallButton() {
@@ -23,7 +23,7 @@ export function DriverInstallButton() {
   const hostRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    setInstalled(standaloneMode())
+    setInstalled(isNativeDriver())
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {})
 
     const onBeforeInstall = (event: Event) => {
@@ -45,7 +45,7 @@ export function DriverInstallButton() {
   }, [])
 
   useEffect(() => {
-    if (standaloneMode()) return
+    if (isNativeDriver()) return
 
     const syncHost = () => {
       const loginButton = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(button => {
@@ -99,7 +99,7 @@ export function DriverInstallButton() {
   }, [])
 
   const install = async () => {
-    if (installed || standaloneMode()) {
+    if (isNativeDriver()) {
       setInstalled(true)
       return
     }
@@ -116,6 +116,15 @@ export function DriverInstallButton() {
     const ua = navigator.userAgent
     const ios = /iPhone|iPad|iPod/i.test(ua)
     const safari = /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua)
+
+    if (browserStandaloneMode()) {
+      const driverUrl = `${window.location.origin}/driver`
+      setHelp(ios
+        ? `Энэ суулгасан Ачилт апп дотроос дахин суулгах боломжгүй. Safari дээр ${driverUrl} нээгээд Share (□↑) → “Add to Home Screen” → Add дарна уу.`
+        : `Энэ суулгасан Ачилт апп дотроос дахин суулгах боломжгүй. Chrome дээр ${driverUrl} нээгээд ⋮ → “Install app” эсвэл “Add to Home screen” дарна уу.`)
+      return
+    }
+
     if (ios) {
       setHelp(safari
         ? 'Safari-ийн Share (□↑) → “Add to Home Screen” → Add дарна уу.'
