@@ -41,24 +41,25 @@ test('driver registration request validates details and uses the six-digit v2 da
   assert.match(confirm, /awaiting_payment/)
 })
 
-test('payment webhook tries a six-digit registration reference before driver commission and keeps legacy eight-digit registrations', () => {
+test('payment webhook reserves 0xxxxx for new registrations, keeps commissions nonzero-prefixed and accepts legacy eight-digit registrations', () => {
   const parser = read('lib/server/khan-bank-sms.ts')
   const webhook = read('lib/server/payment-webhook.ts')
   const route = read('app/api/payment/verify/route.ts')
-  assert.ok(webhook.includes('d{6}') && webhook.includes('d{8}'))
-  assert.match(parser, /\\d\{6\}\|\\d\{8\}/)
+  assert.ok(webhook.includes('\\d{6}') && webhook.includes('\\d{8}'))
+  assert.ok(parser.includes('\\d{6}|\\d{8}'))
+  assert.match(route, /\^0\\d\{5\}\$/)
+  assert.match(route, /\^\[1-9\]\\d\{5\}\$/)
   assert.match(route, /confirm_driver_registration_payment_by_code/)
   assert.match(route, /confirm_driver_commission/)
   assert.match(route, /confirm_driver_registration_payment/)
-  assert.match(route, /payment_type: 'driver_registration'/)
-  assert.match(route, /driver_registration_legacy/)
 })
 
-test('registration migrations allocate a unique six-digit code and keep it outside the commission-code namespace', () => {
+test('registration migrations allocate a unique 0xxxxx code and keep it outside the commission-code namespace', () => {
   const first = read('supabase/migrations/20261028092437_v5_8_driver_registration_six_digit_reference.sql')
   const fix = read('supabase/migrations/20261028092516_fix_v5_8_driver_registration_start_state.sql')
   const separate = read('supabase/migrations/20261028092928_v5_8_separate_registration_commission_codes.sql')
-  const sql = `${first}\n${fix}\n${separate}`
+  const reserved = read('supabase/migrations/20261028093242_v5_8_reserve_zero_prefix_for_registration_codes.sql')
+  const sql = `${first}\n${fix}\n${separate}\n${reserved}`
   assert.match(sql, /add column if not exists driver_name text/i)
   assert.match(sql, /add column if not exists photo_data_url text/i)
   assert.match(sql, /add column if not exists payment_code text/i)
@@ -71,4 +72,6 @@ test('registration migrations allocate a unique six-digit code and keep it outsi
   assert.match(sql, /false,[\s\n]*false/)
   assert.match(sql, /v_existing := found/)
   assert.match(separate, /driver_registration_requests r where r\.payment_code=v_code/)
+  assert.match(reserved, /floor\(random\(\) \* 100000\)/)
+  assert.match(reserved, /0xxxxx is reserved for driver-registration payments/)
 })
