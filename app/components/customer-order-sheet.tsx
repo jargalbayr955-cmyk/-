@@ -15,6 +15,54 @@ const vehicles = [
   { id: 'butten', label: 'Бүтэн ачигч', icon: '🚛', desc: 'Тэвш дээр бүтнээр нь ачна' },
   { id: 'chiregch', label: 'Чирэгч', icon: '🔧', desc: 'Дугуйнаас чирж тээвэрлэнэ' },
 ]
+
+function VehicleArt({ type }: { type: string }) {
+  if (type === 'butten') {
+    return <svg viewBox="0 0 180 96" width="118" height="72" role="img" aria-label="Бүтэн ачигч машин">
+      <defs>
+        <linearGradient id="flatbed-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#8fd0ff"/><stop offset="1" stopColor="#e7f5ff"/></linearGradient>
+        <linearGradient id="flatbed-road" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#66717a"/><stop offset="1" stopColor="#3d454d"/></linearGradient>
+      </defs>
+      <rect width="180" height="96" rx="14" fill="url(#flatbed-sky)"/>
+      <rect y="69" width="180" height="27" fill="url(#flatbed-road)"/>
+      <path d="M12 38h42l11 14h16v23H9V52l3-14Z" fill="#f9fbfd" stroke="#29323b" strokeWidth="2"/>
+      <path d="M19 42h29l8 10H17Z" fill="#bfe8ff"/>
+      <rect x="56" y="57" width="98" height="8" rx="3" fill="#f3b323" stroke="#252b31" strokeWidth="2"/>
+      <rect x="60" y="65" width="94" height="6" rx="2" fill="#20262c"/>
+      <circle cx="31" cy="75" r="10" fill="#151a1f"/><circle cx="31" cy="75" r="4" fill="#aeb7bf"/>
+      <circle cx="133" cy="75" r="10" fill="#151a1f"/><circle cx="133" cy="75" r="4" fill="#aeb7bf"/>
+      <path d="M88 35h43l13 12v11H78l4-14 6-9Z" fill="#111820" stroke="#05080b" strokeWidth="2"/>
+      <path d="M95 37h31l8 9H88Z" fill="#26394b"/>
+      <circle cx="92" cy="58" r="7" fill="#090c0f"/><circle cx="133" cy="58" r="7" fill="#090c0f"/>
+      <rect x="19" y="33" width="24" height="4" rx="2" fill="#ff8b1a"/>
+      <path d="M6 84h168" stroke="#f7f7f7" strokeWidth="3" strokeDasharray="18 12" opacity=".8"/>
+    </svg>
+  }
+
+  return <svg viewBox="0 0 180 96" width="118" height="72" role="img" aria-label="Чирэгч машин">
+    <defs>
+      <linearGradient id="tow-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#9cd7ff"/><stop offset="1" stopColor="#eef8ff"/></linearGradient>
+      <linearGradient id="tow-road" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#6d747b"/><stop offset="1" stopColor="#43494f"/></linearGradient>
+    </defs>
+    <rect width="180" height="96" rx="14" fill="url(#tow-sky)"/>
+    <rect y="69" width="180" height="27" fill="url(#tow-road)"/>
+    <path d="M8 39h43l10 13h15v23H7V52l1-13Z" fill="#f9fbfd" stroke="#29323b" strokeWidth="2"/>
+    <path d="M16 43h29l8 9H14Z" fill="#c4eaff"/>
+    <rect x="20" y="34" width="23" height="4" rx="2" fill="#ff8b1a"/>
+    <circle cx="28" cy="75" r="10" fill="#151a1f"/><circle cx="28" cy="75" r="4" fill="#aeb7bf"/>
+    <circle cx="67" cy="75" r="10" fill="#151a1f"/><circle cx="67" cy="75" r="4" fill="#aeb7bf"/>
+    <path d="M68 59h19l10 7" fill="none" stroke="#181d22" strokeWidth="7" strokeLinecap="round"/>
+    <path d="M83 44v18" stroke="#181d22" strokeWidth="6" strokeLinecap="round"/>
+    <path d="M82 45l11-9" stroke="#181d22" strokeWidth="6" strokeLinecap="round"/>
+    <path d="M96 65h17" stroke="#23292f" strokeWidth="5" strokeLinecap="round"/>
+    <path d="M116 48h42l12 12v13h-67v-9l6-10 7-6Z" fill="#111820" stroke="#05080b" strokeWidth="2"/>
+    <path d="M122 50h31l8 9h-46Z" fill="#26394b"/>
+    <circle cx="121" cy="73" r="8" fill="#090c0f"/><circle cx="158" cy="73" r="8" fill="#090c0f"/>
+    <path d="M103 67h16" stroke="#f0a928" strokeWidth="4" strokeLinecap="round"/>
+    <path d="M6 84h168" stroke="#f7f7f7" strokeWidth="3" strokeDasharray="18 12" opacity=".8"/>
+  </svg>
+}
+
 const titles = ['Ямар машин хэрэгтэй вэ?', 'Хаашаа хүргүүлэх вэ?', 'Ямар машин ачуулах вэ?', 'Захиалгаа шалгаарай']
 
 export function CustomerOrderSheet({ screen, location, onNavigate, onBack, onClose }: Props) {
@@ -65,7 +113,6 @@ export function CustomerOrderSheet({ screen, location, onNavigate, onBack, onClo
     if (!dialog) return
     if (!open) { dialog.close(); return }
     dialog.showModal()
-    // Opening or reopening the sheet must not summon the keyboard by itself.
     headingRef.current?.focus({ preventScroll: true })
     const viewport = window.visualViewport
     const fitViewport = () => {
@@ -91,8 +138,6 @@ export function CustomerOrderSheet({ screen, location, onNavigate, onBack, onClo
 
   function goTo(next: Step, editing = false) {
     if (requestPending.current) return
-    // Commit the next input before focusing it, while still in the tap/Enter event.
-    // This also keeps iOS keyboard focus from depending on a delayed effect.
     flushSync(() => { onNavigate((editing ? 'edit-' : '') + ['vehicle', 'destination', 'car', 'review'][next] as BookingScreen); setError('') })
     const target = next === 1 ? destinationRef.current : next === 2 ? carMarkRef.current : headingRef.current
     target?.focus({ preventScroll: true })
@@ -141,7 +186,7 @@ export function CustomerOrderSheet({ screen, location, onNavigate, onBack, onClo
         localStorage.setItem('fromLng', String(location.lng))
         localStorage.setItem('fromAddress', fromAddress)
         localStorage.setItem('dest', dest.trim())
-      } catch { /* The booking draft also has an in-memory fallback. */ }
+      } catch { }
       const details = { from_address: fromAddress, to_address: dest.trim(), from_lat: location.lat, from_lng: location.lng, car_type: carType, car_mark: carMark.trim() }
       const payload = JSON.stringify(details)
       if (bookingRequest.current?.payload !== payload) bookingRequest.current = { id: createRequestId(), payload }
@@ -167,7 +212,6 @@ export function CustomerOrderSheet({ screen, location, onNavigate, onBack, onClo
       setError('Холболтоо шалгаад дахин оролдоно уу.')
     } finally {
       deadline.dispose()
-      // Keep the button locked while a successful order opens its waiting map.
       if (!created) { requestPending.current = false; setSubmitting(false) }
     }
   }
@@ -205,7 +249,7 @@ export function CustomerOrderSheet({ screen, location, onNavigate, onBack, onClo
                 if (editing) onBack()
                 else goTo(1)
               }}>
-              <span className="current-car-icon" aria-hidden="true">{type.icon}</span>
+              <span className="current-car-icon" aria-hidden="true" style={{ width: 118, height: 72, flex: '0 0 auto', display: 'block', overflow: 'hidden', borderRadius: 14, boxShadow: '0 6px 18px rgba(0,0,0,.28)' }}><VehicleArt type={type.id} /></span>
               <span className="current-car-copy"><strong>{type.label}</strong><small>{type.desc}</small></span>
               <span aria-hidden="true">→</span>
             </button>)}
