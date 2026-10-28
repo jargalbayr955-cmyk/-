@@ -1,28 +1,35 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" role="img" aria-label="Чирэгч машин суудлын машиныг араас өргөж чирж байгаа зураг">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" role="img" aria-label="Чирэгч машин улаан суудлын машиныг араас өргөж чирж байгаа зураг">
 <defs>
-  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#83ccff"/><stop offset="1" stop-color="#edf9ff"/></linearGradient>
-  <linearGradient id="road" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#727a82"/><stop offset="1" stop-color="#434a51"/></linearGradient>
-  <linearGradient id="truck" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#dbe3ea"/></linearGradient>
-  <linearGradient id="car" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2a3541"/><stop offset="1" stop-color="#05090c"/></linearGradient>
-  <filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-opacity=".28"/></filter>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#7dcaff"/><stop offset="1" stop-color="#edf8ff"/></linearGradient>
+  <linearGradient id="road" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#707980"/><stop offset="1" stop-color="#424a51"/></linearGradient>
+  <linearGradient id="truck" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#dbe4ea"/></linearGradient>
+  <linearGradient id="redcar" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff3b3b"/><stop offset="1" stop-color="#b91520"/></linearGradient>
+  <filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-opacity=".27"/></filter>
 </defs>
 <rect width="900" height="520" rx="36" fill="url(#sky)"/>
-<path d="M0 304 C140 260 240 290 360 255 S660 240 900 285 V520 H0Z" fill="#8fba7b" opacity=".55"/>
-<g opacity=".36" fill="#8395a5"><rect x="44" y="150" width="92" height="152"/><rect x="150" y="120" width="115" height="182"/><rect x="692" y="128" width="90" height="174"/><rect x="793" y="100" width="70" height="202"/></g>
-<rect y="362" width="900" height="158" fill="url(#road)"/><path d="M34 450H210M690 450H860" stroke="#fff" stroke-width="12" stroke-linecap="round" opacity=".8"/>
+<g opacity=".36" fill="#7f96aa"><rect x="35" y="145" width="72" height="160"/><rect x="123" y="112" width="100" height="193"/><rect x="245" y="165" width="70" height="140"/><rect x="700" y="128" width="88" height="177"/><rect x="802" y="98" width="62" height="207"/></g>
+<g fill="#67aa5e"><circle cx="55" cy="300" r="50"/><circle cx="822" cy="298" r="58"/><circle cx="758" cy="310" r="42"/></g>
+<rect y="356" width="900" height="164" fill="url(#road)"/><path d="M26 451H222M684 451H870" stroke="#fff" stroke-width="11" stroke-linecap="round" opacity=".82"/>
 <g filter="url(#shadow)">
-  <path d="M90 220h170c40 0 70 31 70 70v82H65V269c0-28 12-49 25-49Z" fill="url(#truck)" stroke="#a9b4bd" stroke-width="5"/>
-  <path d="M118 233h103c30 0 54 24 54 54v15H107v-45c0-15 5-24 11-24Z" fill="#79bfe9"/>
-  <rect x="69" y="346" width="330" height="34" rx="10" fill="#303841"/><rect x="178" y="200" width="64" height="15" rx="7" fill="#ff9d18"/><rect x="191" y="192" width="39" height="9" rx="4" fill="#ff6d00"/>
-  <path d="M330 250h93l78 121h-48l-50-76h-73Z" fill="#20262d"/><path d="m397 259 51 83" stroke="#aeb8c2" stroke-width="9" stroke-linecap="round"/>
-  <path d="M450 349h105l42 26v18H427v-21c0-13 8-23 23-23Z" fill="#f4a51f"/><rect x="536" y="374" width="151" height="17" rx="8" fill="#323a42"/>
-  <g fill="#15191d" stroke="#dce3e8" stroke-width="8"><circle cx="142" cy="395" r="42"/><circle cx="354" cy="395" r="42"/></g><g fill="#76838e"><circle cx="142" cy="395" r="18"/><circle cx="354" cy="395" r="18"/></g>
-  <g transform="translate(565 260)">
-    <path d="M22 56 64 20c12-11 26-17 46-17h120c23 0 40 9 52 26l35 48 20 12v78H0v-67c0-20 7-34 22-44Z" fill="url(#car)" stroke="#3f4b58" stroke-width="5"/>
-    <path d="M76 27 46 57h96V24h-33c-14 0-24 1-33 3Zm83-3v33h107l-20-28c-6-9-16-14-31-14Z" fill="#76a9c9" opacity=".9"/>
-    <rect x="20" y="96" width="290" height="37" rx="14" fill="#111820"/>
-    <circle cx="83" cy="154" r="35" fill="#111" stroke="#d6dce1" stroke-width="7"/><circle cx="264" cy="154" r="35" fill="#111" stroke="#d6dce1" stroke-width="7"/><circle cx="83" cy="154" r="13" fill="#707d88"/><circle cx="264" cy="154" r="13" fill="#707d88"/>
+  <path d="M75 220h168c42 0 72 32 72 72v79H52V270c0-29 10-50 23-50Z" fill="url(#truck)" stroke="#aab5be" stroke-width="5"/>
+  <path d="M103 234h102c31 0 55 24 55 55v16H92v-47c0-15 5-24 11-24Z" fill="#77bee7"/>
+  <rect x="54" y="345" width="315" height="34" rx="10" fill="#313a42"/>
+  <rect x="164" y="198" width="66" height="15" rx="7" fill="#ff9d18"/><rect x="177" y="190" width="40" height="9" rx="4" fill="#ff6d00"/>
+  <g fill="#171b1f" stroke="#dce3e8" stroke-width="8"><circle cx="132" cy="395" r="43"/><circle cx="335" cy="395" r="43"/></g><g fill="#75818b"><circle cx="132" cy="395" r="18"/><circle cx="335" cy="395" r="18"/></g>
+  <path d="M313 248h91l77 119h-44l-53-76h-71Z" fill="#20262d"/>
+  <path d="m382 258 50 81" stroke="#b1bbc3" stroke-width="9" stroke-linecap="round"/>
+  <path d="M437 347h96l46 25v20H416v-22c0-14 8-23 21-23Z" fill="#f4a51f"/>
+  <path d="M521 376h110" stroke="#f4a51f" stroke-width="20" stroke-linecap="round"/>
+  <path d="M605 376h55" stroke="#f4a51f" stroke-width="12" stroke-linecap="round"/>
+
+  <g transform="translate(555 242)">
+    <path d="M20 71 68 30c13-11 29-17 50-17h126c24 0 42 9 55 27l35 49 24 14v85H0v-73c0-21 7-35 20-44Z" fill="url(#redcar)" stroke="#7c1820" stroke-width="5"/>
+    <path d="M80 35 48 70h102V31h-28c-17 0-29 1-42 4Zm89-4v39h118l-24-33c-7-10-18-15-34-15Z" fill="#32485a" opacity=".9"/>
+    <rect x="21" y="110" width="310" height="40" rx="15" fill="#8f1520" opacity=".55"/>
+    <circle cx="86" cy="177" r="37" fill="#111" stroke="#d6dce1" stroke-width="7"/><circle cx="278" cy="177" r="37" fill="#111" stroke="#d6dce1" stroke-width="7"/>
+    <circle cx="86" cy="177" r="13" fill="#707d88"/><circle cx="278" cy="177" r="13" fill="#707d88"/>
+    <path d="M10 130h48" stroke="#ffd26a" stroke-width="7" stroke-linecap="round"/>
+    <rect x="326" y="122" width="18" height="25" rx="4" fill="#f0b33d"/>
   </g>
-  <path d="M555 378h66" stroke="#f4a51f" stroke-width="20" stroke-linecap="round"/><path d="M607 378h54" stroke="#f4a51f" stroke-width="12" stroke-linecap="round"/>
 </g>
 </svg>
