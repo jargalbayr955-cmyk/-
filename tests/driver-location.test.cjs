@@ -65,6 +65,16 @@ test('stationary GPS refreshes automatically, pauses hidden refreshes and retrie
   h.cleanup()
 })
 
+test('a visible user retry requests GPS again and cleanup removes that retry listener', () => {
+  const h = locationHarness()
+  assert.equal(typeof h.winEvents['achilt-location-retry'], 'function')
+  const before = h.gets.length
+  h.winEvents['achilt-location-retry']()
+  assert.equal(h.gets.length, before + 1)
+  h.cleanup()
+  assert.equal(h.winEvents['achilt-location-retry'], undefined)
+})
+
 test('cleanup stops GPS, cancels in-flight upload and ignores late fixes and responses', async () => {
   const h = locationHarness()
   let resolve
