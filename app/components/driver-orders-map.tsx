@@ -14,6 +14,7 @@ export function DriverOrdersMap({ driver, fresh, orders, selectedId, onSelect }:
   const container = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const truckRef = useRef<Marker | null>(null)
+  const trafficLayerRef = useRef<any>(null)
   const markers = useRef(new Map<string, OrderMarker>())
   const latest = useRef({ driver, fresh, orders, selectedId, onSelect })
   const syncRef = useRef<(() => void) | null>(null)
@@ -35,6 +36,29 @@ export function DriverOrdersMap({ driver, fresh, orders, selectedId, onSelect }:
         const start = latest.current.driver || ULAANBAATAR
         const map = new ml.Map({ container: container.current, style: freeMapStyle(), center: [start.lng, start.lat], zoom: 14, attributionControl: {} })
         mapRef.current = map
+        map.addControl(new ml.NavigationControl({ showCompass: false }), 'top-right')
+
+        // Keep the driver's waiting map visually identical to the customer's pickup map.
+        const rawGoogleMap = (map as any).rawMap
+        if (rawGoogleMap && window.google?.maps) {
+          rawGoogleMap.setOptions({
+            mapTypeId: window.google.maps.MapTypeId?.HYBRID || 'hybrid',
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            zoomControl: false,
+            clickableIcons: true,
+            gestureHandling: 'greedy',
+            backgroundColor: '#0b0f12',
+          })
+          const TrafficLayer = window.google.maps.TrafficLayer
+          if (TrafficLayer) {
+            const traffic = new TrafficLayer()
+            traffic.setMap(rawGoogleMap)
+            trafficLayerRef.current = traffic
+          }
+        }
+
         const sync = () => {
           if (cancelled) return
           const { driver: position, fresh: current, orders: rows, selectedId: chosen } = latest.current
@@ -98,6 +122,7 @@ export function DriverOrdersMap({ driver, fresh, orders, selectedId, onSelect }:
     })()
     return () => {
       cancelled = true; observer?.disconnect(); syncRef.current = null
+      trafficLayerRef.current?.setMap?.(null); trafficLayerRef.current = null
       for (const item of markerStore.values()) item.marker.remove()
       markerStore.clear(); truckRef.current?.remove(); truckRef.current = null
       mapRef.current?.remove(); mapRef.current = null; framed.current = ''
