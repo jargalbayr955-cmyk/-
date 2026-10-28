@@ -19,7 +19,7 @@ test('admin dashboard counts only OTP-marked customer registrations', () => {
 test('OTP registration migration separates legacy PIN users from production OTP registrations', () => {
   const migration = read('supabase/migrations/20261029152000_admin_otp_registration_stats.sql')
   assert.match(migration, /otp_registered_at timestamptz default pg_catalog\.now\(\)/)
-  assert.match(migration, /created_at < timestamp '2026-10-28 08:55:54\.545'/)
+  assert.match(migration, /created_at < timestamp '2026-10-28 15:44:04\.830544'/)
   assert.match(migration, /set otp_registered_at = null/)
-  assert.match(migration, /created_at >= timestamp '2026-10-28 08:55:54\.545'/)
+  assert.match(migration, /created_at >= timestamp '2026-10-28 15:44:04\.830544'/)
 })
