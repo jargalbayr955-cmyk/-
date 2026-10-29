@@ -19,10 +19,12 @@ export async function POST(req: NextRequest) {
   const rawCarType = b.car_type == null ? null : String(b.car_type)
   const carType = serviceType === 'achilt' ? rawCarType : null
   const serviceValid = isServiceType(serviceType) && (serviceType === 'achilt' ? isTowType(carType) : rawCarType === null || rawCarType === '')
-  const currentName = String(driver.name || '').trim()
-  const onboarding = !currentName || currentName === 'Шинэ жолооч' || !String(driver.car_number || '').trim()
+  const existingName = String(driver.name || '').trim()
+  const onboarding = !existingName || existingName === 'Шинэ жолооч'
   const s = getSupabaseAdmin()
 
+  // Legacy/admin-created placeholder drivers still complete the stricter onboarding flow.
+  // Self-registered drivers already have a real name and may use the driver map without a vehicle number.
   if (onboarding) {
     const newPin = String(b.new_pin || '')
     if (!name || !carNumber || !serviceValid) {
@@ -61,7 +63,7 @@ export async function POST(req: NextRequest) {
   if (b.new_pin && !/^\d{6}$/.test(String(b.new_pin))) {
     return NextResponse.json({ error: 'PIN 6 оронтой байна' }, { status: 400 })
   }
-  if (!name || !carNumber || !serviceValid) {
+  if (!name || !serviceValid) {
     return NextResponse.json({ error: 'Мэдээлэл буруу байна' }, { status: 400 })
   }
 
@@ -77,7 +79,7 @@ export async function POST(req: NextRequest) {
       name,
       service_type: serviceType,
       car_type: carType,
-      car_number: carNumber,
+      car_number: carNumber || null,
       photo_url: photoUrl || null,
       ...(serviceChanged ? { available: false } : {}),
     })

@@ -17,6 +17,7 @@ export default function DriverProfilePage() {
   const [driver, setDriver] = useState<any>(null)
   const [form, setForm] = useState<ProfileForm>({ name:'', service_type:'achilt', car_type:'', car_number:'', photo_url:'', new_pin:'', confirm_pin:'' })
   const [saving, setSaving] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
@@ -45,7 +46,6 @@ export default function DriverProfilePage() {
 
   const handleSave = async () => {
     if (!form.name.trim()) return setError('Нэрээ бөглөнө үү')
-    if (!form.car_number.trim()) return setError('Машины улсын дугаараа бөглөнө үү')
     if (form.service_type === 'achilt' && !isTowType(form.car_type)) return setError('Ачилтын машины төрөл сонгоно уу')
     if (form.new_pin && form.new_pin !== form.confirm_pin) return setError('PIN тохирохгүй байна')
     if (form.new_pin && !/^\d{6}$/.test(form.new_pin)) return setError('PIN 6 оронтой байх ёстой')
@@ -76,6 +76,41 @@ export default function DriverProfilePage() {
       }
     } catch { setError('Сүлжээний алдаа. Дахин оролдоно уу.') }
     finally { setSaving(false) }
+  }
+
+  const handleLogout = async () => {
+    if (loggingOut) return
+    setLoggingOut(true)
+    setError('')
+    try {
+      let subscription: PushSubscription | null = null
+      if ('serviceWorker' in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.getRegistration()
+          subscription = await registration?.pushManager.getSubscription() || null
+        } catch {}
+      }
+
+      const res = await fetch('/api/driver/logout', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ endpoint:subscription?.endpoint || null }),
+        cache:'no-store',
+      })
+      if (!res.ok) throw new Error('logout failed')
+
+      try { await subscription?.unsubscribe() } catch {}
+      try {
+        localStorage.removeItem('driver_session')
+        localStorage.removeItem('accepted_order')
+        localStorage.removeItem('payment_info')
+      } catch {}
+      router.replace('/driver')
+      router.refresh()
+    } catch {
+      setError('Гарахад сүлжээний алдаа гарлаа. Интернетээ шалгаад дахин дарна уу.')
+      setLoggingOut(false)
+    }
   }
 
   if (!driver) return <div style={{minHeight:'100vh', background:D.bg}}/>
@@ -119,8 +154,8 @@ export default function DriverProfilePage() {
       <p style={{color:'rgba(255,255,255,.45)', fontSize:12, margin:'10px 0 16px'}}>Одоогийн сонголт: <strong style={{color:'#fff'}}>{serviceLabel(form.service_type)}{form.service_type==='achilt' && form.car_type ? ` · ${towTypeLabel(form.car_type)}` : ''}</strong></p>
 
       <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'14px', marginBottom:'12px'}}>
-        <p style={{color:D.muted, fontSize:'11px', fontWeight:'700', letterSpacing:'1px', margin:'0 0 8px'}}>МАШИНЫ ДУГААР</p>
-        <input type="text" placeholder="1234УБА" value={form.car_number} onChange={e => setForm({...form, car_number:e.target.value})} style={{...D.input, padding:'8px 0', background:'transparent', border:'none'}}/>
+        <p style={{color:D.muted, fontSize:'11px', fontWeight:'700', letterSpacing:'1px', margin:'0 0 8px'}}>МАШИНЫ ДУГААР <span style={{fontWeight:500}}>(заавал биш)</span></p>
+        <input type="text" placeholder="Жишээ: 1234УБА" value={form.car_number} onChange={e => setForm({...form, car_number:e.target.value})} style={{...D.input, padding:'8px 0', background:'transparent', border:'none'}}/>
       </div>
 
       <div style={{background:D.card, border:D.border, borderRadius:'16px', padding:'14px', marginBottom:'20px'}}>
@@ -131,9 +166,18 @@ export default function DriverProfilePage() {
       </div>
 
       {error && <p style={{color:'#ff6b6b', fontSize:'13px', textAlign:'center', marginBottom:'12px'}}>⚠️ {error}</p>}
-      <button onClick={() => void handleSave()} disabled={saving} style={{width:'100%', borderRadius:'16px', padding:'16px', background:saving?'rgba(232,67,58,0.4)':D.red, border:'none', color:D.text, fontSize:'16px', fontWeight:'800', cursor:saving?'not-allowed':'pointer', boxShadow:'0 6px 25px rgba(232,67,58,0.4)'}}>
+      <button onClick={() => void handleSave()} disabled={saving || loggingOut} style={{width:'100%', borderRadius:'16px', padding:'16px', background:saving?'rgba(232,67,58,0.4)':D.red, border:'none', color:D.text, fontSize:'16px', fontWeight:'800', cursor:saving?'not-allowed':'pointer', boxShadow:'0 6px 25px rgba(232,67,58,0.4)'}}>
         {saving ? 'Хадгалж байна...' : saved ? '✅ Хадгалагдлаа!' : 'Хадгалах'}
       </button>
+
+      <div style={{marginTop:28, paddingTop:20, borderTop:'1px solid rgba(255,255,255,.08)'}}>
+        <p style={{color:'rgba(255,255,255,.46)', fontSize:12, lineHeight:1.5, textAlign:'center', margin:'0 8px 12px'}}>
+          “Гарах” дараагүй үед энэ утсан дээрх жолоочийн нэвтрэлт хадгалагдаж, аппыг дахин нээхэд шууд газрын зураг руу орно.
+        </p>
+        <button type="button" onClick={() => void handleLogout()} disabled={loggingOut || saving} style={{width:'100%', borderRadius:16, padding:15, background:'transparent', border:'1px solid rgba(232,67,58,.55)', color:'#ff7771', fontSize:15, fontWeight:800, cursor:loggingOut?'not-allowed':'pointer'}}>
+          {loggingOut ? 'Гарч байна…' : 'Гарах'}
+        </button>
+      </div>
     </div>
     <style>{`input::placeholder{color:rgba(255,255,255,0.25);}`}</style>
   </div>
