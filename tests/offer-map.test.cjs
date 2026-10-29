@@ -7,7 +7,7 @@ const vm = require('node:vm')
 const ts = require('typescript')
 
 const point = { lat: 47.91, lng: 106.91 }
-const slot = (id, price = 85000) => ({ driver_id: 'driver-' + id, driver_name: 'Driver ' + id, lat: 47.92, lng: 106.92, distance_km: 2.4, offer: { id, price } })
+const slot = (id, price = 85000) => ({ driver_id: 'driver-' + id, driver_name: 'Driver ' + id, service_type: 'achilt', car_type: 'chiregch', lat: 47.92, lng: 106.92, distance_km: 2.4, offer: { id, price } })
 function mapHarness(initial, connection = false) {
   const hooks = [], pending = [], maps = [], markers = [], clicked = []
   let cursor = 0, dirty = false, props = { pickup: point, offers: initial, selectedDriverId: null, onSelect: id => clicked.push(id) }
@@ -62,6 +62,7 @@ function mapHarness(initial, connection = false) {
       if (name === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) }
       if (name === '@/lib/order-offers') return load('lib/order-offers.ts')
       if (name === '@/lib/driver-orders') return load('lib/driver-orders.ts')
+      if (name === '@/lib/service-types' || name === './service-types') return load('lib/service-types.ts')
       if (name === './order-offers') return load('lib/order-offers.ts')
       if (name.endsWith('free-map')) return { loadFreeMap: async () => ml, freeMapStyle: () => 'test', createDotMarker: () => new Element('pickup'), createTruckMarker: () => new Element('truck'), ULAANBAATAR: point, mapErrorMessage: String }
       throw new Error('Unexpected import: ' + name)
@@ -125,7 +126,6 @@ test('withdrawn or expired offers disappear, selected markers and click handlers
   assert.ok(h.markers.every(item => item.removed))
 })
 
-
 test('connected map starts with pickup only, then follows the selected driver without moving the camera on every update', async () => {
   const h = mapHarness([], true)
   await h.flush()
@@ -158,7 +158,7 @@ test('GPS updates during map loading use the newest position when the style beco
   h.unmount()
 })
 
-const order = (id, type = 'chiregch') => ({ id, created_at: '2026-09-22T10:00:00Z', from_address: 'Сүхбаатарын талбай', to_address: 'Авто засвар', from_lat: 47.92, from_lng: 106.92, car_type: type, car_mark: 'Prius' })
+const order = (id, type = 'chiregch') => ({ id, created_at: '2026-09-22T10:00:00Z', from_address: 'Сүхбаатарын талбай', to_address: 'Авто засвар', from_lat: 47.92, from_lng: 106.92, service_type: 'achilt', car_type: type, car_mark: 'Prius' })
 
 test('driver map shows own truck and customer pickup; both locations fit on selecting an order', async () => {
   const h = mapHarness([order('a'), order('b', 'butten')], 'orders')
