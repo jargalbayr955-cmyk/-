@@ -29,6 +29,7 @@ function componentHarness(file, name, initial = {}, replacements = {}, globals =
         if (module === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) }
         if (module === '@/lib/order-offers' || module === './order-offers') return load('lib/order-offers.ts')
         if (module === '@/lib/driver-orders') return load('lib/driver-orders.ts')
+        if (module === '@/lib/service-types' || module === './service-types') return load('lib/service-types.ts')
         if (module === './driver-orders-map') return { DriverOrdersMap: 'DriverOrdersMap' }
         if (module === 'next/link') return { default: 'a' }
         if (module === 'next/navigation') return { useRouter: () => ({ push() {} }) }
@@ -52,8 +53,8 @@ function componentHarness(file, name, initial = {}, replacements = {}, globals =
     unmount() { for (const hook of hooks) hook.cleanup?.() },
   }
 }
-const driver = { id: 'isolated-driver', name: 'Жолооч', car_type: 'chiregch', lat: 47.91, lng: 106.91, available: true, location_updated_at: new Date().toISOString() }
-const order = (id, lat = 47.92) => ({ id, created_at: '2026-09-22T12:00:00Z', from_address: 'Талбай ' + id, to_address: 'Засвар ' + id, from_lat: lat, from_lng: 106.91, car_type: id === 'a' ? 'chiregch' : 'butten', car_mark: 'Prius ' + id })
+const driver = { id: 'isolated-driver', name: 'Жолооч', service_type: 'achilt', car_type: 'chiregch', lat: 47.91, lng: 106.91, available: true, location_updated_at: new Date().toISOString() }
+const order = (id, lat = 47.92) => ({ id, created_at: '2026-09-22T12:00:00Z', from_address: 'Талбай ' + id, to_address: 'Засвар ' + id, from_lat: lat, from_lng: 106.91, service_type: 'achilt', car_type: id === 'a' ? 'chiregch' : 'butten', car_mark: 'Prius ' + id })
 const props = { driver, orders: [order('a'), order('b', 47.94)], locating: false, locationMessage: '', error: '', newOrderAlert: false, nativeDriver: false, pushReady: false, notificationsDenied: false, sentOffers: {}, sendingOffer: null, onToggleAvailable() {}, onSubscribe() {}, onProfile() {}, onOffer() {} }
 
 test('selecting customer map points shows route, car and requested truck; price drafts stay with their order', async () => {
@@ -146,7 +147,7 @@ test('customer call control is first on a confirmed order and disappears after c
   }, {
     localStorage: { getItem: () => 'order-customer' },
     setInterval(callback) { timers.push(callback); return timers.length },
-    fetch: async () => ({ ok: true, status: 200, json: async () => ({ order: { id: 'order-customer', status, driver_phone: '00000000' }, driver: null }) }),
+    fetch: async () => ({ ok: true, status: 200, json: async () => ({ order: { id: 'order-customer', status, service_type: 'achilt', driver_phone: '00000000' }, driver: null }) }),
   })
   await h.flush()
   assert.equal(h.view.props.children[0].type, 'OrderVideoCall')
