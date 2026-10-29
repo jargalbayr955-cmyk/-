@@ -15,19 +15,25 @@ type PushSubscriptionRow = {
 }
 
 async function createDelivery(s: ReturnType<typeof getSupabaseAdmin>, driverId: string, kind: PushKind, orderId?: string | null) {
-  const { data, error } = await s.from('driver_push_deliveries').insert({
-    driver_id: driverId,
-    order_id: orderId || null,
-    kind,
-    last_sent_at: new Date().toISOString(),
-    attempt_count: 1,
-    expires_at: new Date(Date.now() + 2 * 60 * 60_000).toISOString(),
-  }).select('id').single()
-  if (error) {
-    console.warn('Push delivery tracking unavailable', { kind, code: error.code })
+  try {
+    const { data, error } = await s.from('driver_push_deliveries').insert({
+      driver_id: driverId,
+      order_id: orderId || null,
+      kind,
+      last_sent_at: new Date().toISOString(),
+      attempt_count: 1,
+      expires_at: new Date(Date.now() + 2 * 60 * 60_000).toISOString(),
+    }).select('id').limit(1).maybeSingle()
+    if (error) {
+      console.warn('Push delivery tracking unavailable', { kind, code: error.code })
+      return null
+    }
+    return data?.id || null
+  } catch (error) {
+    // Delivery telemetry must never prevent the actual customer-order notification.
+    console.warn('Push delivery tracking unavailable', { kind, code: 'tracking_error' })
     return null
   }
-  return data?.id || null
 }
 
 async function sendWithRetry(
