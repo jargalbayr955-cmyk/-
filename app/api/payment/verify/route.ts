@@ -4,11 +4,6 @@ import { allowRequest, getClientIp, safeEqual } from '@/lib/server/security'
 import { getPaymentWebhookSecrets, validPaymentReceipt } from '@/lib/server/payment-webhook'
 import { parseKhanBankSms, readBankSmsConfig, type BankReceipt } from '@/lib/server/khan-bank-sms'
 
-function registrationError(error: { code?: string } | null, legacy = false) {
-  const status = error?.code === 'P0002' ? 404 : error?.code === '22023' ? 400 : error?.code === 'P0001' ? 409 : 503
-  return NextResponse.json({ error: status === 404 ? (legacy ? 'Invalid registration reference' : 'Registration code not found') : status === 409 ? 'Payment amount or reference mismatch' : 'Payment verification unavailable' }, { status })
-}
-
 function commissionError(error: { code?: string } | null) {
   const status = error?.code === 'P0002' ? 404 : error?.code === '22023' ? 400 : error?.code === 'P0001' ? 409 : 503
   return NextResponse.json({ error: status === 404 ? 'Invalid code' : status === 409 ? 'Payment amount or reference mismatch' : 'Payment verification unavailable' }, { status })
@@ -27,6 +22,7 @@ export async function POST(req: NextRequest) {
   const text = await req.text().catch(() => null)
   if (text === null) return NextResponse.json({ error: 'Invalid receipt' }, { status: 400 })
   if (text.length > 2048) return NextResponse.json({ error: 'Receipt too large' }, { status: 413 })
+
   let receipt: BankReceipt | null
   if (contentType === 'text/plain') {
     const sender = req.headers.get('x-sms-sender')?.trim()
@@ -49,10 +45,13 @@ export async function POST(req: NextRequest) {
     receipt = body
   }
 
-  if (/^0\d{5}$/.test(receipt.code)) {
-    const registration = await supabase.rpc('confirm_driver_registration_payment_by_code', { p_code: receipt.code, p_amount: receipt.amount })
-    if (registration.error) return registrationError(registration.error)
-    return NextResponse.json(registration.data, { headers: { 'Cache-Control': 'no-store' } })
+  // Driver registration payments are verified manually by the administrator.
+  // MacroDroid may still forward the bank SMS, but registration references must never mutate driver state.
+  if (/^0\d{5}$/.test(receipt.code) || /^\d{8}$/.test(receipt.code)) {
+    return NextResponse.json(
+      { success: true, ignored: true, reason: 'driver_registration_manual' },
+      { headers: { 'Cache-Control': 'no-store' } },
+    )
   }
 
   if (/^[1-9]\d{5}$/.test(receipt.code)) {
@@ -61,7 +60,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(commission.data, { headers: { 'Cache-Control': 'no-store' } })
   }
 
-  const legacyRegistration = await supabase.rpc('confirm_driver_registration_payment', { p_phone: `+976${receipt.code}`, p_amount: receipt.amount })
-  if (legacyRegistration.error) return registrationError(legacyRegistration.error, true)
-  return NextResponse.json(legacyRegistration.data, { headers: { 'Cache-Control': 'no-store' } })
+  return NextResponse.json({ error: 'Invalid payment reference' }, { status: 400 })
 }
