@@ -3,17 +3,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireDriver } from '@/lib/server/driver'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 
-export async function POST(req: NextRequest) {
+export async function POST(req?: NextRequest) {
   let driverId: string | null = null
-  try {
-    const driver = await requireDriver(req, { allowIncomplete: true })
-    driverId = driver?.id || null
-  } catch {
-    // Local logout must still succeed even if the database is temporarily unavailable.
+  if (req) {
+    try {
+      const driver = await requireDriver(req, { allowIncomplete: true })
+      driverId = driver?.id || null
+    } catch {
+      // Local logout must still succeed even if the database is temporarily unavailable.
+    }
   }
 
   if (driverId) {
-    const body = (await req.json().catch(() => null)) ?? {}
+    const body = req ? ((await req.json().catch(() => null)) ?? {}) : {}
     const endpoint = typeof body.endpoint === 'string' && /^https:\/\//i.test(body.endpoint) && body.endpoint.length <= 4096
       ? body.endpoint
       : ''
