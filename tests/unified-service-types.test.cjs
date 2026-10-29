@@ -45,8 +45,8 @@ test('non-tow services create unified location orders and towing keeps its subty
 test('driver registration, online state and dispatch are service-aware', () => {
   assert.match(read('app/api/driver/register/request/route.ts'), /start_driver_registration_v3/)
   assert.match(read('lib/server/driver.ts'), /service_type/)
-  assert.match(read('app/api/driver/availability/route.ts'), /driverServiceProfileIsComplete/)
-  assert.match(read('app/api/driver/location/route.ts'), /driverServiceProfileIsComplete/)
+  assert.match(read('app/api/driver/availability/route.ts'), /serviceProfileIsComplete/)
+  assert.match(read('app/api/driver/location/route.ts'), /serviceProfileIsComplete/)
   const migration = read('supabase/migrations/20261029043322_unified_service_types.sql')
   assert.match(migration, /d\.service_type=v_order\.service_type/)
   assert.match(migration, /o\.service_type=v_driver\.service_type/)
