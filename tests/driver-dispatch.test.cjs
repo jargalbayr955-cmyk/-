@@ -21,7 +21,7 @@ function componentHarness(file, name, initial = {}, replacements = {}, globals =
     const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText
     vm.runInNewContext(source, {
       exports, console, AbortController, AbortSignal: {}, setTimeout: () => 1, clearTimeout() {}, setInterval: () => 2, clearInterval() {},
-      window: { addEventListener() {}, removeEventListener() {} }, document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} }, navigator: {}, localStorage: { setItem() {}, removeItem() {} }, ...globals,
+      window: { addEventListener() {}, removeEventListener() {}, setInterval: () => 2, clearInterval() {} }, document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} }, navigator: {}, localStorage: { setItem() {}, removeItem() {} }, ...globals,
       require(module) {
         if (Object.hasOwn(replacements, module)) return replacements[module]
         if (module === '@/lib/client/request-signal') return load('lib/client/request-signal.ts')
