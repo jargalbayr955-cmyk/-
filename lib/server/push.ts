@@ -26,6 +26,37 @@ export async function notifySelectedDriver(orderId: string) {
   return { sent }
 }
 
+export async function notifyDriverChat(driverId: string, senderName: string) {
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY, privateKey = process.env.VAPID_PRIVATE_KEY
+  if (!publicKey || !privateKey) return { sent: 0 }
+  const s = getSupabaseAdmin()
+  const { data: recipient } = await s.from('drivers').select('id,active,deleted_at').eq('id', driverId).maybeSingle()
+  if (!recipient?.active || recipient.deleted_at) return { sent: 0 }
+  const { data: subscriptions } = await s.from('push_subscriptions').select('id,driver_id,subscription').eq('driver_id', driverId)
+  if (!subscriptions?.length) return { sent: 0 }
+
+  webpush.setVapidDetails('mailto:admin@achilt.mn', publicKey, privateKey)
+  const safeName = String(senderName || 'Жолооч').trim().slice(0, 80) || 'Жолооч'
+  // Do not expose the message body on the lock screen; the authenticated chat loads it after opening.
+  const payload = JSON.stringify({
+    type: 'DRIVER_CHAT',
+    tag: `driver-chat-${driverId}`,
+    title: 'Ачилт · Шинэ зурвас',
+    body: `${safeName}-ээс шинэ зурвас ирлээ.`,
+    url: '/driver',
+  })
+  let sent = 0
+  await Promise.allSettled(subscriptions.map(async sub => {
+    if (!isValidPushSubscription(sub.subscription)) return
+    try { await webpush.sendNotification(sub.subscription, payload, { timeout: 3000, TTL: 3600 }); sent++ }
+    catch (error: any) {
+      if ([404, 410].includes(error?.statusCode)) await s.from('push_subscriptions').delete().eq('id', sub.id)
+      else console.warn('Driver chat push delivery failed', { status: error?.statusCode || 'network' })
+    }
+  }))
+  return { sent }
+}
+
 export async function notifyOrderInvites(orderId: string) {
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
   const privateKey = process.env.VAPID_PRIVATE_KEY
