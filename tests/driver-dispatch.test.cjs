@@ -21,7 +21,7 @@ function componentHarness(file, name, initial = {}, replacements = {}, globals =
     const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText
     vm.runInNewContext(source, {
       exports, console, AbortController, AbortSignal: {}, setTimeout: () => 1, clearTimeout() {}, setInterval: () => 2, clearInterval() {},
-      window: { addEventListener() {}, removeEventListener() {} }, document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} }, navigator: {}, localStorage: { setItem() {}, removeItem() {} }, ...globals,
+      window: { addEventListener() {}, removeEventListener() {}, setInterval: () => 2, clearInterval() {} }, document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} }, navigator: {}, localStorage: { setItem() {}, removeItem() {} }, ...globals,
       require(module) {
         if (Object.hasOwn(replacements, module)) return replacements[module]
         if (module === '@/lib/client/request-signal') return load('lib/client/request-signal.ts')
@@ -31,6 +31,7 @@ function componentHarness(file, name, initial = {}, replacements = {}, globals =
         if (module === '@/lib/driver-orders') return load('lib/driver-orders.ts')
         if (module === '@/lib/service-types' || module === './service-types') return load('lib/service-types.ts')
         if (module === './driver-orders-map') return { DriverOrdersMap: 'DriverOrdersMap' }
+        if (module === './driver-chat-panel') return { DriverChatPanel: 'DriverChatPanel' }
         if (module === 'next/link') return { default: 'a' }
         if (module === 'next/navigation') return { useRouter: () => ({ push() {} }) }
         if (module === '../components/order-video-call') return { OrderVideoCall: 'OrderVideoCall' }

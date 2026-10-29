@@ -5,30 +5,42 @@ import type { Map as MapLibreMap, Marker } from 'maplibre-gl'
 import { createTruckMarker, freeMapStyle, loadFreeMap, mapErrorMessage, ULAANBAATAR } from '@/lib/client/free-map'
 import { pickupPoint, pointDistance, offerDistance, type PickupPoint } from '@/lib/order-offers'
 import { vehicleLabel, type DriverOrder } from '@/lib/driver-orders'
+import { driverServiceLabel } from '@/lib/service-types'
+import type { DriverPeer } from './driver-chat-panel'
 
 type OrderMarker = { marker: Marker; button: HTMLButtonElement; label: HTMLElement; distance: HTMLElement }
+type PeerMarker = { marker: Marker; button: HTMLButtonElement; name: HTMLElement; detail: HTMLElement }
 
-export function DriverOrdersMap({ driver, fresh, orders, selectedId, onSelect }: {
-  driver: PickupPoint | null; fresh: boolean; orders: DriverOrder[]; selectedId: string | null; onSelect: (id: string) => void
+export function DriverOrdersMap({ driver, fresh, orders, selectedId, onSelect, peers = [], selectedPeerId = null, onPeerSelect = () => {} }: {
+  driver: PickupPoint | null
+  fresh: boolean
+  orders: DriverOrder[]
+  selectedId: string | null
+  onSelect: (id: string) => void
+  peers?: DriverPeer[]
+  selectedPeerId?: string | null
+  onPeerSelect?: (id: string) => void
 }) {
   const container = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const truckRef = useRef<Marker | null>(null)
   const trafficLayerRef = useRef<any>(null)
   const markers = useRef(new Map<string, OrderMarker>())
-  const latest = useRef({ driver, fresh, orders, selectedId, onSelect })
+  const peerMarkers = useRef(new Map<string, PeerMarker>())
+  const latest = useRef({ driver, fresh, orders, selectedId, onSelect, peers, selectedPeerId, onPeerSelect })
   const syncRef = useRef<(() => void) | null>(null)
   const framed = useRef('')
   const [error, setError] = useState('')
 
   useEffect(() => {
-    latest.current = { driver, fresh, orders, selectedId, onSelect }
+    latest.current = { driver, fresh, orders, selectedId, onSelect, peers, selectedPeerId, onPeerSelect }
     syncRef.current?.()
-  }, [driver, fresh, orders, selectedId, onSelect])
+  }, [driver, fresh, orders, selectedId, onSelect, peers, selectedPeerId, onPeerSelect])
 
   useEffect(() => {
     let cancelled = false, observer: ResizeObserver | undefined
     const markerStore = markers.current
+    const peerMarkerStore = peerMarkers.current
     void (async () => {
       try {
         const ml = await loadFreeMap()
@@ -38,7 +50,6 @@ export function DriverOrdersMap({ driver, fresh, orders, selectedId, onSelect }:
         mapRef.current = map
         map.addControl(new ml.NavigationControl({ showCompass: false }), 'top-right')
 
-        // Keep the driver's waiting map visually identical to the customer's pickup map.
         const rawGoogleMap = (map as any).rawMap
         if (rawGoogleMap && window.google?.maps) {
           rawGoogleMap.setOptions({
@@ -61,7 +72,7 @@ export function DriverOrdersMap({ driver, fresh, orders, selectedId, onSelect }:
 
         const sync = () => {
           if (cancelled) return
-          const { driver: position, fresh: current, orders: rows, selectedId: chosen } = latest.current
+          const { driver: position, fresh: current, orders: rows, selectedId: chosen, peers: visiblePeers, selectedPeerId: chosenPeer } = latest.current
           if (position) {
             if (!truckRef.current) truckRef.current = new ml.Marker({ element: createTruckMarker('Та') }).setLngLat([position.lng, position.lat]).addTo(map)
             truckRef.current.setLngLat([position.lng, position.lat])
@@ -69,6 +80,36 @@ export function DriverOrdersMap({ driver, fresh, orders, selectedId, onSelect }:
             element.style.opacity = current ? '1' : '.55'
             element.setAttribute('aria-label', current ? 'Таны байршил' : 'Таны сүүлд илгээсэн байршил')
           } else { truckRef.current?.remove(); truckRef.current = null }
+
+          const peerIds = new Set<string>()
+          for (const peer of visiblePeers) {
+            if (!Number.isFinite(peer.lat) || !Number.isFinite(peer.lng)) continue
+            peerIds.add(peer.id)
+            let item = peerMarkerStore.get(peer.id)
+            if (!item) {
+              const button = document.createElement('button')
+              button.type = 'button'
+              button.style.cssText = 'border:1px solid rgba(255,255,255,.24);border-radius:14px;background:rgba(12,15,20,.94);color:#fff;padding:6px 9px;min-width:88px;max-width:150px;display:grid;gap:2px;box-shadow:0 8px 24px rgba(0,0,0,.38);cursor:pointer;text-align:center;line-height:1.05;backdrop-filter:blur(8px)'
+              const name = document.createElement('strong')
+              name.style.cssText = 'font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block'
+              const detail = document.createElement('small')
+              detail.style.cssText = 'font-size:9px;color:#a8b1bd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block'
+              button.append(name, detail)
+              button.addEventListener('click', event => { event.stopPropagation(); latest.current.onPeerSelect(peer.id) })
+              item = { button, name, detail, marker: new ml.Marker({ element: button, anchor: 'bottom' }).setLngLat([peer.lng, peer.lat]).addTo(map) }
+              peerMarkerStore.set(peer.id, item)
+            }
+            item.marker.setLngLat([peer.lng, peer.lat])
+            item.name.textContent = peer.name
+            item.detail.textContent = `${peer.available && peer.fresh ? '● Онлайн' : '○ Сүүлд'} · ${driverServiceLabel(peer.service_type, peer.car_type)}`
+            item.detail.style.color = peer.available && peer.fresh ? '#70e39b' : '#9aa4b1'
+            item.button.style.opacity = peer.fresh ? '1' : '.72'
+            item.button.style.borderColor = peer.id === chosenPeer ? '#e8433a' : peer.available && peer.fresh ? 'rgba(34,197,94,.65)' : 'rgba(255,255,255,.24)'
+            item.button.style.outline = peer.id === chosenPeer ? '2px solid rgba(232,67,58,.35)' : 'none'
+            item.button.setAttribute('aria-label', `${peer.name}, ${driverServiceLabel(peer.service_type, peer.car_type)}. Чат нээх`)
+          }
+          for (const [id, item] of peerMarkerStore) if (!peerIds.has(id)) { item.marker.remove(); peerMarkerStore.delete(id) }
+
           const ids = new Set<string>()
           for (const order of rows) {
             const point = pickupPoint(order.from_lat, order.from_lng)
@@ -93,10 +134,10 @@ export function DriverOrdersMap({ driver, fresh, orders, selectedId, onSelect }:
             item.button.setAttribute('aria-pressed', String(order.id === chosen))
           }
           for (const [id, item] of markerStore) if (!ids.has(id)) { item.marker.remove(); markerStore.delete(id) }
+
           const selected = rows.find(row => row.id === chosen)
           const pickup = selected ? pickupPoint(selected.from_lat, selected.from_lng) : null
           const key = `${pickup ? chosen : ''}:${position ? 'driver' : ''}`
-          // Fit both participants on first GPS or a newly selected order. GPS ticks don't undo a pan.
           if (framed.current !== key && (position || pickup)) {
             framed.current = key
             if (position && pickup) {
@@ -124,13 +165,14 @@ export function DriverOrdersMap({ driver, fresh, orders, selectedId, onSelect }:
       cancelled = true; observer?.disconnect(); syncRef.current = null
       trafficLayerRef.current?.setMap?.(null); trafficLayerRef.current = null
       for (const item of markerStore.values()) item.marker.remove()
-      markerStore.clear(); truckRef.current?.remove(); truckRef.current = null
+      for (const item of peerMarkerStore.values()) item.marker.remove()
+      markerStore.clear(); peerMarkerStore.clear(); truckRef.current?.remove(); truckRef.current = null
       mapRef.current?.remove(); mapRef.current = null; framed.current = ''
     }
   }, [])
 
   return <>
-    <div ref={container} className="driver-map-canvas" aria-label="Жолооч болон захиалга өгсөн хэрэглэгчдийн ачих цэгийн газрын зураг" />
+    <div ref={container} className="driver-map-canvas" aria-label="Таны байршил, бусад жолооч болон захиалгын газрын зураг" />
     {error && <p className="driver-map-error" role="alert">{error}</p>}
   </>
 }
