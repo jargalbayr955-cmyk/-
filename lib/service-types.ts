@@ -42,5 +42,8 @@ export function driverServiceLabel(serviceType: unknown, carType?: unknown) {
 }
 
 export function serviceProfileIsComplete(serviceType: unknown, carType?: unknown) {
-  return isServiceType(serviceType) && (serviceType !== 'achilt' || isTowType(carType))
+  // Backward compatibility: sessions created before service_type existed are towing sessions.
+  // Non-towing services are complete without a towing subtype; towing still requires butten/chiregch.
+  const normalized = isServiceType(serviceType) ? serviceType : 'achilt'
+  return normalized !== 'achilt' || isTowType(carType)
 }
