@@ -17,7 +17,7 @@ test('admin onboarding session refresh does not overwrite an in-progress form dr
 
 test('self-registration dialog stays mounted while the login host rerenders', () => {
   const entry = read('app/components/driver-registration-entry.tsx')
-  assert.doesNotMatch(entry, /if \(!loginButton\)[\s\S]*?setOpen\(false\)/)
+  assert.match(entry, /if \(!loginButton\) \{[\s\S]*?setTarget\(null\)[\s\S]*?return[\s\S]*?\}/)
   assert.match(entry, /const registrationDialog = open && typeof document !== 'undefined'/)
   assert.match(entry, /createPortal\(<DriverRegistrationDialog initialPhone="" onClose=\{closeRegistration\} \/>, document\.body\)/)
 })
