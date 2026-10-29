@@ -28,8 +28,14 @@ export async function POST(req: NextRequest) {
     try { autoStart = !(await driverHasBlockingWork(data.id)) }
     catch { autoStart = false }
   }
-  // GPS activation is intentionally two-phase: the UI starts location tracking now,
-  // while the database becomes available only after a fresh coordinate reaches /location.
+  if (autoStart && !storedProfile.available) {
+    const { error: startError } = await s.from('drivers')
+      .update({ available: true, is_online: false })
+      .eq('id', data.id).eq('active', true).is('deleted_at', null)
+    if (startError) autoStart = false
+  }
+  // Dispatch only considers locations newer than two minutes, so setting the online intent
+  // here cannot route work to a stale GPS point. The client immediately refreshes GPS.
   const profile = autoStart ? { ...storedProfile, available: true } : storedProfile
   const res = NextResponse.json({ driver: profile, autoStart })
   setDeviceSession(res, data.id, 'driver', session_version)
