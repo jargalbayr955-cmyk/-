@@ -29,7 +29,9 @@ test('incomplete drivers can restore session only for onboarding and are blocked
   assert.match(driver, /name === ['"]Шинэ жолооч['"]/)
   assert.match(driver, /!options\.allowIncomplete && driverNeedsOnboarding\(driver\)/)
   assert.match(session, /requireDriver\(req, \{ allowIncomplete: true \}\)/)
-  assert.match(session, /needsOnboarding: driverNeedsOnboarding\(driver\)/)
+  assert.match(session, /const needsOnboarding = driverNeedsOnboarding\(driver\)/)
+  assert.match(session, /if \(!needsOnboarding && driverServiceProfileIsComplete\(driver\)\)/)
+  assert.match(session, /needsOnboarding, autoStart/)
 })
 
 test('first driver login is forced through name, plate and a new non-default six digit PIN', () => {
