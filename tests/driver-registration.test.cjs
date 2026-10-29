@@ -67,7 +67,7 @@ test('payment webhook reserves 0xxxxx for new registrations, keeps commissions n
 })
 
 test('registration migration locks the promo amount, activates paid drivers and permits one PIN setup', () => {
-  const migration = read('supabase/migrations/20261028095500_v5_8_driver_registration_promo_self_pin.sql')
+  const migration = read('supabase/migrations/20261028101754_v5_8_driver_registration_promo_self_pin.sql')
   assert.match(migration, /add column if not exists amount_due numeric/i)
   assert.match(migration, /add column if not exists pin_set_at timestamptz/i)
   assert.match(migration, /2026-11-11 09:55:00\+00/)
