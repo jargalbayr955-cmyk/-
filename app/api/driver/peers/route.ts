@@ -4,7 +4,7 @@ import { allowRequest } from '@/lib/server/security'
 import { driverHasBlockingWork, requireDriver } from '@/lib/server/driver'
 
 const MAP_WINDOW_MS = 30 * 60_000
-const FRESH_WINDOW_MS = 5 * 60_000
+const FRESH_WINDOW_MS = 2 * 60_000
 
 export async function GET(req: NextRequest) {
   const driver = await requireDriver(req)
@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
     lat: Number(peer.lat),
     lng: Number(peer.lng),
     location_updated_at: peer.location_updated_at,
+    // Same two-minute window used by dispatch: blinking "online" means actually dispatchable.
     fresh: peer.location_updated_at ? now - new Date(peer.location_updated_at).getTime() <= FRESH_WINDOW_MS : false,
   }))
 
