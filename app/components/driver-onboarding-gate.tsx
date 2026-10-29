@@ -33,6 +33,9 @@ export function DriverOnboardingGate() {
   const [error, setError] = useState('')
   const lastStoredSession = useRef<string | null>(null)
   const checking = useRef(false)
+  const hydratedDriverId = useRef<string | null>(null)
+  const hasDriver = useRef(false)
+  const onboardingRequired = useRef(false)
 
   const checkSession = useCallback(async () => {
     if (pathname === '/driver/app' || checking.current) return
@@ -41,6 +44,9 @@ export function DriverOnboardingGate() {
       const res = await fetch('/api/driver/session', { cache: 'no-store' })
       if (!res.ok) {
         if (res.status === 401) {
+          hasDriver.current = false
+          onboardingRequired.current = false
+          hydratedDriverId.current = null
           setRequired(false)
           setDriver(null)
         }
@@ -50,12 +56,25 @@ export function DriverOnboardingGate() {
       const profile = body?.driver as DriverProfile | undefined
       const needsOnboarding = Boolean(body?.needsOnboarding)
       if (!profile?.id) return
-      setDriver(profile)
+
+      hasDriver.current = true
+      onboardingRequired.current = needsOnboarding
+      setDriver(current => current?.id === profile.id
+        && current.phone === profile.phone
+        && current.name === profile.name
+        && current.car_number === profile.car_number
+        ? current
+        : profile)
       setRequired(needsOnboarding)
-      if (needsOnboarding) {
+
+      if (!needsOnboarding) {
+        hydratedDriverId.current = null
+      } else if (hydratedDriverId.current !== profile.id) {
         const existingName = String(profile.name || '').trim()
         setName(existingName === 'Шинэ жолооч' ? '' : existingName)
         setCarNumber(String(profile.car_number || '').trim())
+        setNewPin('')
+        hydratedDriverId.current = profile.id
       }
     } catch {
       // The underlying driver screen already handles offline/session errors.
@@ -78,7 +97,7 @@ export function DriverOnboardingGate() {
       }
     }, 250)
     const loginFallback = window.setInterval(() => {
-      if (!required && !driver) void checkSession()
+      if (!hasDriver.current && !onboardingRequired.current) void checkSession()
     }, 3000)
     const onVisible = () => { if (document.visibilityState === 'visible') void checkSession() }
     window.addEventListener('focus', onVisible)
@@ -89,7 +108,7 @@ export function DriverOnboardingGate() {
       window.removeEventListener('focus', onVisible)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [checkSession, driver, pathname, required])
+  }, [checkSession, pathname])
 
   const save = async () => {
     const cleanName = name.trim()
@@ -113,6 +132,8 @@ export function DriverOnboardingGate() {
         return
       }
       try { localStorage.setItem('driver_session', JSON.stringify(body.driver)) } catch {}
+      onboardingRequired.current = false
+      hydratedDriverId.current = null
       setRequired(false)
       window.location.replace('/driver')
     } catch {
