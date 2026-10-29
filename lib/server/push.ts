@@ -74,10 +74,15 @@ async function sendWithRetry(
 
 async function activeSubscriptions(s: ReturnType<typeof getSupabaseAdmin>, driverIds: string[]) {
   if (!driverIds.length) return [] as PushSubscriptionRow[]
-  const { data } = await s.from('push_subscriptions')
+  let query = s.from('push_subscriptions')
     .select('id,driver_id,subscription,failure_count')
-    .in('driver_id', driverIds)
     .is('disabled_at', null)
+  // Single-recipient notifications keep the narrow equality lookup, while order broadcasts
+  // still fetch all requested drivers in one query and retain multi-device support.
+  query = driverIds.length === 1
+    ? query.eq('driver_id', driverIds[0])
+    : query.in('driver_id', driverIds)
+  const { data } = await query
   return (data || []) as PushSubscriptionRow[]
 }
 
