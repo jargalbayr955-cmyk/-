@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { DriverOrdersMap } from './driver-orders-map'
+import { DriverChatPanel, type DriverPeer } from './driver-chat-panel'
 import { locationIsFresh, offerDistance, pickupPoint } from '@/lib/order-offers'
 import { nearbyOrders, orderServiceLabel, type DriverOrder } from '@/lib/driver-orders'
 import { driverServiceLabel, serviceProfileIsComplete } from '@/lib/service-types'
@@ -21,6 +22,10 @@ export function DriverDispatchView(props: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [prices, setPrices] = useState<Record<string, string>>({})
   const [isIOS, setIsIOS] = useState(false)
+  const [peers, setPeers] = useState<DriverPeer[]>([])
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatPeerId, setChatPeerId] = useState<string | null>(null)
+  const [chatUnread, setChatUnread] = useState(0)
   const root = useRef<HTMLDivElement | null>(null)
   const position = pickupPoint(driver.lat, driver.lng)
   const fresh = !locationMessage && locationIsFresh(driver.location_updated_at)
@@ -40,8 +45,30 @@ export function DriverDispatchView(props: Props) {
     return () => viewport.removeEventListener('resize', resize)
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    const loadPeers = async () => {
+      try {
+        const response = await fetch('/api/driver/peers', { cache:'no-store' })
+        if (cancelled || response.status === 401) return
+        const body = await response.json().catch(() => ({}))
+        if (!response.ok || body.blocked) { if (!cancelled) setPeers([]); return }
+        if (!cancelled) setPeers(Array.isArray(body.peers) ? body.peers : [])
+      } catch {}
+    }
+    void loadPeers()
+    const timer = window.setInterval(() => void loadPeers(), 10_000)
+    return () => { cancelled = true; window.clearInterval(timer) }
+  }, [])
+
+  const openPeerChat = (id: string) => {
+    setChatPeerId(id)
+    setChatOpen(true)
+  }
+
   return <div ref={root} className="driver-dispatch-page">
-    <DriverOrdersMap driver={position} fresh={fresh} orders={orders} selectedId={selected?.id || null} onSelect={setSelectedId} />
+    <DriverOrdersMap driver={position} fresh={fresh} orders={orders} selectedId={selected?.id || null} onSelect={setSelectedId}
+      peers={peers} selectedPeerId={chatPeerId} onPeerSelect={openPeerChat} />
     <header className="driver-dispatch-header">
       <div className="driver-dispatch-toolbar">
         <div className="driver-dispatch-identity"><strong>{driver.name}</strong><span>{driverServiceLabel(driver.service_type, driver.car_type)}</span></div>
@@ -51,11 +78,15 @@ export function DriverDispatchView(props: Props) {
         }} disabled={locating}>
           {locating ? 'Түр хүлээнэ үү…' : driver.available ? 'Амрах' : 'Ажиллаж эхлэх'}
         </button>}
+        <button className="driver-profile-button" aria-label="Жолоочийн чат" title="Жолоочийн чат" onClick={() => { setChatPeerId(null); setChatOpen(true) }} style={{position:'relative'}}>
+          💬
+          {chatUnread > 0 && <span aria-label={`${chatUnread} уншаагүй зурвас`} style={{position:'absolute', top:-5, right:-5, minWidth:18, height:18, padding:'0 4px', borderRadius:10, background:'#e8433a', color:'#fff', border:'2px solid #0b0d11', display:'grid', placeItems:'center', fontSize:9, fontWeight:900}}>{chatUnread > 99 ? '99+' : chatUnread}</span>}
+        </button>
         <button className="driver-profile-button" aria-label="Миний профайл" onClick={onProfile}>👤</button>
       </div>
       <div className="driver-dispatch-status">
         <span className={driver.available && fresh ? 'driver-status-ready' : ''} role="status">
-          {driver.available ? fresh ? '● Захиалга хүлээж байна · GPS автомат' : 'Байршил тогтоож байна…' : 'Амарч байна · Захиалга авахгүй'}
+          {driver.available ? fresh ? `● Захиалга хүлээж байна · GPS автомат${peers.length ? ` · ${peers.length} жолооч` : ''}` : 'Байршил тогтоож байна…' : `Амарч байна · Захиалга авахгүй${peers.length ? ` · ${peers.length} жолооч зураг дээр` : ''}`}
         </span>
         {!nativeDriver && <button onClick={onSubscribe} aria-label={pushReady ? 'Мэдэгдэл асаалттай' : 'Захиалгын мэдэгдэл авах'}>
           {pushReady ? '🔔 Асаалттай' : notificationsDenied ? '🔕 Хаалттай' : '🔔 Мэдэгдэл авах'}
@@ -99,8 +130,10 @@ export function DriverDispatchView(props: Props) {
         {!driver.available && <p className="driver-order-note">Үнэ илгээхийн тулд ажиллах төлөвт орно уу.</p>}
       </> : <div className="driver-orders-empty">
         <h1>{driver.available ? 'Ойр байгаа захиалгыг хүлээж байна' : 'Ажиллаж эхлээд захиалга аваарай'}</h1>
-        <p>{driver.available ? 'Таны үйлчилгээний төрөлтэй захиалга ирэхэд цэг зураг дээр автоматаар гарна.' : 'Таны байршил ажиллах үед автоматаар шинэчлэгдэнэ.'}</p>
+        <p>{driver.available ? 'Таны үйлчилгээний төрөлтэй захиалга ирэхэд цэг зураг дээр автоматаар гарна. Бусад жолоочийн нэр дээр дарж чат нээнэ.' : 'Таны байршил ажиллах үед автоматаар шинэчлэгдэнэ. Бусад жолоочийн нэр дээр дарж чатлаж болно.'}</p>
       </div>}
     </section>
+
+    <DriverChatPanel peers={peers} open={chatOpen} peerId={chatPeerId} onClose={() => setChatOpen(false)} onPeerChange={setChatPeerId} onUnreadChange={setChatUnread} />
   </div>
 }
