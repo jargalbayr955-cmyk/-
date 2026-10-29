@@ -11,15 +11,15 @@ import type { DriverPeer } from './driver-chat-panel'
 type OrderMarker = { marker: Marker; button: HTMLButtonElement; label: HTMLElement; distance: HTMLElement }
 type PeerMarker = { marker: Marker; button: HTMLButtonElement; name: HTMLElement; detail: HTMLElement }
 
-export function DriverOrdersMap({ driver, fresh, orders, selectedId, onSelect, peers, selectedPeerId, onPeerSelect }: {
+export function DriverOrdersMap({ driver, fresh, orders, selectedId, onSelect, peers = [], selectedPeerId = null, onPeerSelect = () => {} }: {
   driver: PickupPoint | null
   fresh: boolean
   orders: DriverOrder[]
   selectedId: string | null
   onSelect: (id: string) => void
-  peers: DriverPeer[]
-  selectedPeerId: string | null
-  onPeerSelect: (id: string) => void
+  peers?: DriverPeer[]
+  selectedPeerId?: string | null
+  onPeerSelect?: (id: string) => void
 }) {
   const container = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
