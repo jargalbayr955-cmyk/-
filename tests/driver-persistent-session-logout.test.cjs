@@ -29,7 +29,7 @@ test('driver profile has an explicit bottom logout and vehicle number stays opti
   assert.match(profile, /\/api\/driver\/logout/)
   assert.match(profile, /pushManager\.getSubscription\(\)/)
   assert.match(profile, /subscription\?\.unsubscribe\(\)/)
-  assert.match(profile, />Гарах</)
+  assert.match(profile, /loggingOut \? 'Гарч байна…' : 'Гарах'/)
   assert.match(profile, /МАШИНЫ ДУГААР[\s\S]*заавал биш/)
   assert.doesNotMatch(profile, /if \(!form\.car_number\.trim\(\)\)/)
   assert.match(route, /driverNeedsOnboarding\(driver\)/)
