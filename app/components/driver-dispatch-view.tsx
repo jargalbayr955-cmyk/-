@@ -44,7 +44,10 @@ export function DriverDispatchView(props: Props) {
     <header className="driver-dispatch-header">
       <div className="driver-dispatch-toolbar">
         <div className="driver-dispatch-identity"><strong>{driver.name}</strong><span>{vehicleLabel(driver.car_type)}</span></div>
-        {!nativeDriver && <button className="driver-work-toggle" aria-pressed={driver.available} onClick={onToggleAvailable} disabled={locating}>
+        {!nativeDriver && <button className="driver-work-toggle" aria-pressed={driver.available} onClick={() => {
+          if (!driver.available && !pushReady && !notificationsDenied) onSubscribe()
+          onToggleAvailable()
+        }} disabled={locating}>
           {locating ? 'Түр хүлээнэ үү…' : driver.available ? 'Амрах' : 'Ажиллаж эхлэх'}
         </button>}
         <button className="driver-profile-button" aria-label="Миний профайл" onClick={onProfile}>👤</button>
