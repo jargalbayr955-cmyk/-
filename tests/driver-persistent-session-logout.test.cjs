@@ -17,8 +17,7 @@ test('driver registration and remembered session go straight back to the driver 
   assert.match(request, /payment_required: false/)
   assert.match(request, /redirect: '\/driver'/)
   assert.match(session, /DEVICE_SESSION_TTL_SECONDS/)
-  assert.match(clientSession, /driverStatus === 200/)
-  assert.match(clientSession, /return '\/driver'/)
+  assert.match(clientSession, /if \(driver\?\.ok\) return \{ destination: '\/driver', user: null \}/)
 })
 
 test('driver profile has an explicit bottom logout and vehicle number stays optional', () => {
