@@ -20,10 +20,9 @@ export type DriverSessionRecord = {
   location_updated_at: string | null
 }
 
-export function driverNeedsOnboarding(driver: Pick<DriverSessionRecord, 'name' | 'car_number'>) {
+export function driverNeedsOnboarding(driver: Pick<DriverSessionRecord, 'name'>) {
   const name = String(driver.name || '').trim()
-  const carNumber = String(driver.car_number || '').trim()
-  return !name || name === 'Шинэ жолооч' || !carNumber
+  return !name || name === 'Шинэ жолооч'
 }
 
 export function driverServiceProfileIsComplete(driver: Pick<DriverSessionRecord, 'service_type' | 'car_type'>) {
