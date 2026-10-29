@@ -24,6 +24,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Order not available' }, { status: 403 })
   }
 
+  const { data: commissionSetting, error: commissionSettingError } = await s
+    .from('settings')
+    .select('value')
+    .eq('key', 'driver_commission_enabled')
+    .maybeSingle()
+  if (commissionSettingError) return NextResponse.json({ error: 'Төлбөрийн горим шалгахад алдаа гарлаа.' }, { status: 503 })
+
+  const commissionEnabled = commissionSetting?.value !== 'false'
+  const duration = Math.max(0, Math.round((Date.now() - new Date(order.created_at).getTime()) / 60000))
+
+  // Temporary launch mode: finish the trip and immediately release the driver.
+  // No payment code or commission debt is created while the setting is disabled.
+  if (!commissionEnabled) {
+    const { data, error } = await s.rpc('complete_order_without_commission', {
+      p_order_id: order.id,
+      p_driver_id: driver.id,
+      p_duration_minutes: duration,
+    })
+    if (error) return NextResponse.json({ error: error.message }, { status: 409 })
+    const completion = Array.isArray(data) ? data[0] : data
+    if (!completion?.success) return NextResponse.json({ error: 'Захиалга дуусгаж чадсангүй. Дахин оролдоно уу.' }, { status: 503 })
+    return NextResponse.json({
+      success: true,
+      paid: true,
+      payment_required: false,
+      available: Boolean(completion.available),
+      fare_amount: Number(completion.fare_amount ?? order.final_price),
+    }, { headers: { 'Cache-Control': 'no-store' } })
+  }
+
   // A completed and paid trip must never create a new debt on a retry.
   if (order.status === 'completed') {
     const { data: payment, error: paymentError } = await s.from('payment_codes')
@@ -33,7 +63,7 @@ export async function POST(req: NextRequest) {
     if (!payment) return NextResponse.json({ error: 'Төлбөрийн мэдээлэл олдсонгүй. Админтай холбогдоно уу.' }, { status: 409 })
     return NextResponse.json({ success: true, code: payment.code, amount: Number(payment.amount), fare_amount: Number(payment.fare_amount ?? order.final_price), paid: payment.used }, { headers: { 'Cache-Control': 'no-store' } })
   }
-  const duration = Math.max(0, Math.round((Date.now() - new Date(order.created_at).getTime()) / 60000))
+
   const { data, error } = await s.rpc('complete_order_and_issue_commission', {
     p_order_id: order.id,
     p_driver_id: driver.id,
