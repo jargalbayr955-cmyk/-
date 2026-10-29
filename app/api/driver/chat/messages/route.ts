@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { allowRequest } from '@/lib/server/security'
 import { driverHasBlockingWork, requireDriver } from '@/lib/server/driver'
+import { notifyDriverChat } from '@/lib/server/push'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -135,6 +136,12 @@ export async function POST(req: NextRequest) {
   if (error) {
     if (/driver_busy/i.test(error.message || '')) return NextResponse.json({ error: 'Жолооч ажилтай болсон тул чат түр хаагдлаа' }, { status: 409 })
     return NextResponse.json({ error: 'Зурвас илгээхэд алдаа гарлаа' }, { status: 500 })
+  }
+
+  try {
+    await notifyDriverChat(peerId, driver.name || 'Жолооч')
+  } catch (cause) {
+    console.warn('Driver chat push failed after message save', { error: cause instanceof Error ? cause.message : 'unknown' })
   }
 
   return NextResponse.json({ message: { ...data, mine: true, read_at: null } }, { status: 201, headers: { 'Cache-Control': 'private, no-store' } })
