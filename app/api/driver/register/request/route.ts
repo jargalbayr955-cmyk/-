@@ -32,28 +32,37 @@ export async function POST(req: NextRequest) {
   const rawCarType = typeof body?.car_type === 'string' ? body.car_type : body?.car_type == null ? null : ''
   const carType = serviceType === 'achilt' ? rawCarType : null
   const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 100) : ''
+  const carNumber = typeof body?.car_number === 'string' ? body.car_number.trim().toUpperCase().slice(0, 30) : ''
+  const pin = typeof body?.pin === 'string' ? body.pin : ''
   const photoDataUrl = normalizeFacePhoto(body?.photo_data_url)
   const serviceValid = isServiceType(serviceType)
   const vehicleValid = serviceValid && (serviceType === 'achilt' ? isTowType(carType) : rawCarType === null || rawCarType === '')
-  if (!phone || !serviceValid || !vehicleValid || !name || photoDataUrl === undefined) {
-    return NextResponse.json({ error: photoDataUrl === undefined ? 'Нүүр зураг буруу эсвэл хэт том байна.' : 'Нэр, утасны дугаар эсвэл үйлчилгээний төрөл буруу байна.' }, { status: 400 })
+  const pinValid = /^\d{6}$/.test(pin) && pin !== '000000'
+  if (!phone || !serviceValid || !vehicleValid || !name || !carNumber || !pinValid || photoDataUrl === undefined) {
+    return NextResponse.json({
+      error: photoDataUrl === undefined
+        ? 'Нүүр зураг буруу эсвэл хэт том байна.'
+        : 'Нэр, утас, машин/техникийн дугаар эсвэл 6 оронтой PIN буруу байна.',
+    }, { status: 400 })
   }
   if (!(await allowRequest(`driver-register-phone:${phone}`, 6, 10 * 60_000))) {
     return NextResponse.json({ error: 'Энэ дугаараар олон удаа хүсэлт үүсгэлээ. Түр хүлээгээд дахин оролдоно уу.' }, { status: 429 })
   }
 
-  const { data, error } = await getSupabaseAdmin().rpc('start_driver_registration_v3', {
+  const { data, error } = await getSupabaseAdmin().rpc('start_driver_registration_v4', {
     p_phone: phone,
     p_service_type: serviceType,
     p_car_type: carType,
     p_name: name,
+    p_car_number: carNumber,
+    p_pin: pin,
     p_photo_data_url: photoDataUrl,
   })
   if (error) {
     if (error.code === '23505') return NextResponse.json({ error: 'Энэ утасны дугаар жолоочоор бүртгэлтэй байна.' }, { status: 409 })
     if (error.code === '22023') return NextResponse.json({ error: 'Бүртгэлийн мэдээлэл буруу байна.' }, { status: 400 })
     console.error('[driver/register/request] registration request failed', { code: error.code })
-    return NextResponse.json({ error: 'Бүртгэлийн хүсэлт үүсгэж чадсангүй. Дахин оролдоно уу.' }, { status: 503 })
+    return NextResponse.json({ error: 'Бүртгэл үүсгэж чадсангүй. Дахин оролдоно уу.' }, { status: 503 })
   }
 
   return NextResponse.json(data, { headers: { 'Cache-Control': 'private, no-store' } })
