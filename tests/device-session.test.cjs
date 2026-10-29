@@ -41,7 +41,6 @@ function harness() {
         is: (key, value) => { filters.push(u => u[key] === value); return builder },
         maybeSingle: async () => {
           const row = (table === 'drivers' ? drivers : users).find(u => filters.every(fn => fn(u)))
-          // Simulate the safe SELECT projections used by the routes.
           const data = row ? Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'pin')) : null
           return state.unavailable ? { data: null, error: { code: 'unavailable' } } : { data, error: null }
         },
@@ -192,9 +191,9 @@ function destination(customerStatus, driverStatus = 401, offline = false) {
   return async mode => (await exports.readSession(mode)).destination
 }
 
-test('returning customer opens the pickup map directly; new device sees the forms', async () => {
-  assert.equal(await destination(200)('entry'), '/current')
-  assert.equal(await destination(200)('guest'), '/current')
+test('returning customer opens the unified service chooser; new device sees the forms', async () => {
+  assert.equal(await destination(200)('entry'), '/services')
+  assert.equal(await destination(200)('guest'), '/services')
   assert.equal(await destination(200)('customer'), null)
   assert.equal(await destination(401)('entry'), '/start')
   assert.equal(await destination(401)('guest'), null)
