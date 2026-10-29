@@ -13,8 +13,8 @@ test('pending search back resets every customer booking field and starts from cu
     assert.match(source, new RegExp(`['\"]${key}['\"]`))
   }
   assert.match(source, /fetch\('\/api\/order\/cancel'/)
-  assert.match(source, /keepalive: true/)
-  assert.match(source, /if \(!confirmed && !finished\) \{ restartBooking\(\); return \}/)
+  assert.match(source, /keepalive\s*:\s*true/)
+  assert.match(source, /if\s*\(!confirmed\s*&&\s*!finished\)\s*\{\s*restartBooking\(\);\s*return\s*\}/)
   assert.match(source, /router\.replace\('\/current'\)/)
 })
 
