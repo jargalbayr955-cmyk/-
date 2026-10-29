@@ -1,0 +1,61 @@
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+
+const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
+
+test('driver peer map exposes names without phone numbers and is session protected', () => {
+  const route = read('app/api/driver/peers/route.ts')
+  const map = read('app/components/driver-orders-map.tsx')
+  assert.match(route, /requireDriver\(req\)/)
+  assert.match(route, /select\('id,name,service_type,car_type,available,lat,lng,location_updated_at'\)/)
+  assert.doesNotMatch(route, /select\([^\n]*phone/)
+  assert.match(map, /item\.name\.textContent = peer\.name/)
+  assert.match(map, /onPeerSelect/)
+  assert.match(map, /Чат нээх/)
+})
+
+test('driver chat is private, retained for 30 days, and automatically cleaned', () => {
+  const migration = read('supabase/migrations/20261029082000_driver_peer_map_and_chat.sql')
+  assert.match(migration, /driver_chat_threads/)
+  assert.match(migration, /driver_chat_messages/)
+  assert.match(migration, /enable row level security/)
+  assert.match(migration, /revoke all on table public\.driver_chat_messages from public, anon, authenticated/)
+  assert.match(migration, /interval '30 days'/)
+  assert.match(migration, /achilt-driver-chat-cleanup/)
+  assert.match(migration, /cleanup_driver_chat_history/)
+})
+
+test('peer chat is blocked while either driver has active work', () => {
+  const messages = read('app/api/driver/chat/messages/route.ts')
+  const migration = read('supabase/migrations/20261029082000_driver_peer_map_and_chat.sql')
+  assert.match(messages, /driverHasBlockingWork\(driver\.id\)/)
+  assert.match(messages, /driverHasBlockingWork\(peerId\)/)
+  assert.match(messages, /Ажил авсан үед зөвхөн хэрэглэгчтэй холбогдоно/)
+  assert.match(migration, /o\.status = 'confirmed'/)
+  assert.match(migration, /pc\.used = false/)
+  assert.match(migration, /raise exception 'driver_busy'/)
+})
+
+test('Messenger-style driver chat has inbox, unread state, bubbles and read receipts', () => {
+  const panel = read('app/components/driver-chat-panel.tsx')
+  const dispatch = read('app/components/driver-dispatch-view.tsx')
+  assert.match(panel, /Жолоочийн чат/)
+  assert.match(panel, /unread_count/)
+  assert.match(panel, /message\.mine \? '✓✓' : '✓'/)
+  assert.match(panel, /Зурвас 30 хоног хадгалагдана/)
+  assert.match(dispatch, /chatUnread/)
+  assert.match(dispatch, /DriverChatPanel/)
+  assert.match(dispatch, /peers=\{peers\}/)
+})
+
+test('accepted work uses the dedicated customer connection screen instead of peer dispatch chat', () => {
+  const page = read('app/driver/page.tsx')
+  const activeWork = page.indexOf('if (acceptedOrder || paymentInfo)')
+  const dispatch = page.lastIndexOf('return <DriverDispatchView')
+  assert.ok(activeWork >= 0)
+  assert.ok(dispatch > activeWork)
+  assert.match(page.slice(activeWork, dispatch), /OrderConnectionMap/)
+  assert.doesNotMatch(page.slice(activeWork, dispatch), /DriverChatPanel/)
+})
