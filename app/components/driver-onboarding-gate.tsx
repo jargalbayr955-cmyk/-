@@ -2,23 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
+import { ServiceTypePicker } from './service-type-picker'
+import { serviceLabel, towTypeLabel, type ServiceType, type TowType } from '@/lib/service-types'
 
 const inputStyle: React.CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  borderRadius: 14,
-  padding: '14px 16px',
-  background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.12)',
-  color: '#fff',
-  fontSize: 16,
-  outline: 'none',
+  width: '100%', boxSizing: 'border-box', borderRadius: 14, padding: '14px 16px',
+  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+  color: '#fff', fontSize: 16, outline: 'none',
 }
 
 type DriverProfile = {
   id: string
   phone: string
   name?: string | null
+  service_type?: string | null
+  car_type?: string | null
   car_number?: string | null
 }
 
@@ -27,6 +25,8 @@ export function DriverOnboardingGate() {
   const [driver, setDriver] = useState<DriverProfile | null>(null)
   const [required, setRequired] = useState(false)
   const [name, setName] = useState('')
+  const [serviceType, setServiceType] = useState<ServiceType | null>(null)
+  const [carType, setCarType] = useState<TowType | null>(null)
   const [carNumber, setCarNumber] = useState('')
   const [newPin, setNewPin] = useState('')
   const [saving, setSaving] = useState(false)
@@ -62,9 +62,10 @@ export function DriverOnboardingGate() {
       setDriver(current => current?.id === profile.id
         && current.phone === profile.phone
         && current.name === profile.name
+        && current.service_type === profile.service_type
+        && current.car_type === profile.car_type
         && current.car_number === profile.car_number
-        ? current
-        : profile)
+        ? current : profile)
       setRequired(needsOnboarding)
 
       if (!needsOnboarding) {
@@ -72,6 +73,8 @@ export function DriverOnboardingGate() {
       } else if (hydratedDriverId.current !== profile.id) {
         const existingName = String(profile.name || '').trim()
         setName(existingName === 'Шинэ жолооч' ? '' : existingName)
+        setServiceType(null)
+        setCarType(null)
         setCarNumber(String(profile.car_number || '').trim())
         setNewPin('')
         hydratedDriverId.current = profile.id
@@ -114,6 +117,8 @@ export function DriverOnboardingGate() {
     const cleanName = name.trim()
     const cleanCarNumber = carNumber.trim()
     if (!cleanName) return setError('Нэрээ оруулна уу.')
+    if (!serviceType) return setError('Ажиллах үйлчилгээний төрлөө сонгоно уу.')
+    if (serviceType === 'achilt' && !carType) return setError('Ачилтын машины төрлөө сонгоно уу.')
     if (!cleanCarNumber) return setError('Машины улсын дугаараа оруулна уу.')
     if (!/^\d{6}$/.test(newPin)) return setError('Шинэ PIN 6 оронтой байна.')
     if (newPin === '000000') return setError('Шинэ PIN нь 000000-оос өөр байна.')
@@ -124,7 +129,13 @@ export function DriverOnboardingGate() {
       const res = await fetch('/api/driver/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: cleanName, car_number: cleanCarNumber, new_pin: newPin }),
+        body: JSON.stringify({
+          name: cleanName,
+          service_type: serviceType,
+          car_type: serviceType === 'achilt' ? carType : null,
+          car_number: cleanCarNumber,
+          new_pin: newPin,
+        }),
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok || !body.driver) {
@@ -145,68 +156,52 @@ export function DriverOnboardingGate() {
 
   if (!required || !driver || pathname === '/driver/app') return null
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 100000, background: '#060608', overflowY: 'auto', color: '#fff' }}>
-      <div style={{ width: 'min(100% - 32px, 430px)', margin: '0 auto', padding: '44px 0 36px' }}>
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontSize: 46, marginBottom: 10 }}>🚛</div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 850 }}>Бүртгэлээ дуусгах</h1>
-          <p style={{ margin: '10px auto 0', color: 'rgba(255,255,255,0.58)', fontSize: 14, lineHeight: 1.55 }}>
-            Админ таны утасны дугаарыг бүртгэсэн байна. Нэр, машины улсын дугаар, өөрийн шинэ PIN кодоо оруулна уу.
-          </p>
-        </div>
-
-        <div style={{ padding: 14, borderRadius: 14, background: 'rgba(232,67,58,0.10)', border: '1px solid rgba(232,67,58,0.26)', marginBottom: 16 }}>
-          <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>БҮРТГЭЛТЭЙ УТАС</div>
-          <strong style={{ display: 'block', marginTop: 4, fontSize: 18 }}>{driver.phone}</strong>
-          <div style={{ color: '#ff9b95', fontSize: 12, marginTop: 6 }}>Анхны 000000 PIN-ийг одоо шинэ PIN-ээр солино.</div>
-        </div>
-
-        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, margin: '0 0 7px' }}>Нэр</label>
-        <input
-          value={name}
-          onChange={event => setName(event.target.value.slice(0, 100))}
-          placeholder="Жолоочийн нэр"
-          autoComplete="name"
-          style={{ ...inputStyle, marginBottom: 16 }}
-        />
-
-        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, margin: '0 0 7px' }}>Машины улсын дугаар</label>
-        <input
-          value={carNumber}
-          onChange={event => setCarNumber(event.target.value.slice(0, 30))}
-          placeholder="Жишээ: 1234УБА"
-          autoCapitalize="characters"
-          style={{ ...inputStyle, marginBottom: 16 }}
-        />
-
-        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, margin: '0 0 7px' }}>Шинэ PIN код</label>
-        <input
-          type="password"
-          inputMode="numeric"
-          maxLength={6}
-          value={newPin}
-          onChange={event => setNewPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
-          placeholder="6 оронтой шинэ PIN"
-          autoComplete="new-password"
-          style={{ ...inputStyle, marginBottom: 8 }}
-        />
-        <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: 12, lineHeight: 1.45, margin: '0 0 18px' }}>
-          000000 кодыг дахин ашиглахгүй. Дараагийн удаа энэ шинэ PIN-ээр нэвтэрнэ.
+  return <div style={{ position: 'fixed', inset: 0, zIndex: 100000, background: '#060608', overflowY: 'auto', color: '#fff' }}>
+    <div style={{ width: 'min(100% - 32px, 430px)', margin: '0 auto', padding: '34px 0 36px' }}>
+      <div style={{ textAlign: 'center', marginBottom: 24 }}>
+        <div style={{ fontSize: 42, marginBottom: 8 }}>🚛</div>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 850 }}>Бүртгэлээ дуусгах</h1>
+        <p style={{ margin: '10px auto 0', color: 'rgba(255,255,255,0.58)', fontSize: 14, lineHeight: 1.55 }}>
+          Админ таны утасны дугаарыг бүртгэсэн байна. Нэр, ажиллах үйлчилгээ, машины улсын дугаар, өөрийн шинэ PIN кодоо оруулна уу.
         </p>
-
-        {error && <p role="alert" style={{ color: '#ff7770', fontSize: 13, lineHeight: 1.45, margin: '0 0 12px' }}>⚠️ {error}</p>}
-
-        <button
-          type="button"
-          onClick={() => void save()}
-          disabled={saving}
-          style={{ width: '100%', border: 0, borderRadius: 14, padding: 16, background: saving ? 'rgba(232,67,58,0.48)' : '#e8433a', color: '#fff', fontSize: 16, fontWeight: 850, cursor: saving ? 'wait' : 'pointer' }}
-        >
-          {saving ? 'Хадгалж байна…' : 'Бүртгэлээ дуусгах →'}
-        </button>
       </div>
-      <style>{`input::placeholder{color:rgba(255,255,255,0.28);}`}</style>
+
+      <div style={{ padding: 14, borderRadius: 14, background: 'rgba(232,67,58,0.10)', border: '1px solid rgba(232,67,58,0.26)', marginBottom: 16 }}>
+        <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>БҮРТГЭЛТЭЙ УТАС</div>
+        <strong style={{ display: 'block', marginTop: 4, fontSize: 18 }}>{driver.phone}</strong>
+        <div style={{ color: '#ff9b95', fontSize: 12, marginTop: 6 }}>Анхны 000000 PIN-ийг одоо шинэ PIN-ээр солино.</div>
+      </div>
+
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, margin: '0 0 7px' }}>Нэр</label>
+      <input value={name} onChange={event => setName(event.target.value.slice(0, 100))} placeholder="Жолоочийн нэр" autoComplete="name" style={{ ...inputStyle, marginBottom: 16 }} />
+
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, margin: '0 0 9px' }}>Ажиллах үйлчилгээ</label>
+      <ServiceTypePicker value={serviceType} disabled={saving} onChange={value => { setServiceType(value); setCarType(null); setError('') }} />
+
+      {serviceType === 'achilt' && <div style={{ marginTop: 16 }}>
+        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, margin: '0 0 8px' }}>Ачилтын машины төрөл</label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
+          {(['butten','chiregch'] as TowType[]).map(type => <button key={type} type="button" disabled={saving} onClick={() => { setCarType(type); setError('') }}
+            style={{ borderRadius: 12, minHeight: 48, border: `1px solid ${carType === type ? '#e8433a' : 'rgba(255,255,255,.14)'}`, background: carType === type ? 'rgba(232,67,58,.15)' : 'rgba(255,255,255,.05)', color: '#fff', fontWeight: 800 }}>{towTypeLabel(type)}</button>)}
+        </div>
+      </div>}
+
+      {serviceType && <p style={{ color: 'rgba(255,255,255,.48)', fontSize: 12, margin: '10px 0 16px' }}>Сонгосон: <strong style={{ color: '#fff' }}>{serviceLabel(serviceType)}{serviceType === 'achilt' && carType ? ` · ${towTypeLabel(carType)}` : ''}</strong></p>}
+
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, margin: '0 0 7px' }}>Машины улсын дугаар</label>
+      <input value={carNumber} onChange={event => setCarNumber(event.target.value.slice(0, 30))} placeholder="Жишээ: 1234УБА" autoCapitalize="characters" style={{ ...inputStyle, marginBottom: 16 }} />
+
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, margin: '0 0 7px' }}>Шинэ PIN код</label>
+      <input type="password" inputMode="numeric" maxLength={6} value={newPin} onChange={event => setNewPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
+        placeholder="6 оронтой шинэ PIN" autoComplete="new-password" style={{ ...inputStyle, marginBottom: 8 }} />
+      <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: 12, lineHeight: 1.45, margin: '0 0 18px' }}>000000 кодыг дахин ашиглахгүй. Дараагийн удаа энэ шинэ PIN-ээр нэвтэрнэ.</p>
+
+      {error && <p role="alert" style={{ color: '#ff7770', fontSize: 13, lineHeight: 1.45, margin: '0 0 12px' }}>⚠️ {error}</p>}
+      <button type="button" onClick={() => void save()} disabled={saving}
+        style={{ width: '100%', border: 0, borderRadius: 14, padding: 16, background: saving ? 'rgba(232,67,58,0.48)' : '#e8433a', color: '#fff', fontSize: 16, fontWeight: 850, cursor: saving ? 'wait' : 'pointer' }}>
+        {saving ? 'Хадгалж байна…' : 'Бүртгэлээ дуусгах →'}
+      </button>
     </div>
-  )
+    <style>{`input::placeholder{color:rgba(255,255,255,0.28);}`}</style>
+  </div>
 }

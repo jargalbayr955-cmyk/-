@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   const identity = Array.isArray(verified) ? verified[0] : null
   const id = identity?.id
   if (!id) return NextResponse.json({ error: 'Дугаар эсвэл PIN буруу байна' }, { status: 401 })
-  const { data, error: lookupError } = await s.from('drivers').select('id,name,phone,car_type,car_number,photo_url,price,available,active,lat,lng,location_updated_at,session_version').eq('id', id).is('deleted_at', null).maybeSingle()
+  const { data, error: lookupError } = await s.from('drivers').select('id,name,phone,service_type,car_type,car_number,photo_url,price,available,active,lat,lng,location_updated_at,session_version').eq('id', id).is('deleted_at', null).maybeSingle()
   if (lookupError) return NextResponse.json({ error: 'Нэвтрэх үйлчилгээ түр боломжгүй байна. Дахин оролдоно уу.' }, { status: 503 })
   if (!data?.active) return NextResponse.json({ error: 'Жолоочийн эрх хаалттай байна' }, { status: 403 })
   if ((data.session_version ?? null) !== (identity.session_version ?? null)) return NextResponse.json({ error: 'PIN өөрчлөгдсөн байна. Дахин нэвтэрнэ үү.' }, { status: 401 })

@@ -1,5 +1,6 @@
 import { createRequestSignal } from './request-signal'
 import { clearBookingDraft } from './booking-draft'
+import { clearSelectedService } from './service-selection'
 
 export type SessionGateMode = 'entry' | 'guest' | 'customer'
 export type CustomerIdentity = { id: string; phone: string }
@@ -16,7 +17,7 @@ export async function readSession(mode: SessionGateMode, signal?: AbortSignal): 
   if (customer.ok) {
     const { user } = await customer.json()
     if (typeof user?.id !== 'string' || !user.id || !/^\+976\d{8}$/.test(user?.phone)) throw new Error('Invalid session response')
-    return { destination: mode === 'customer' ? null : '/current', user: { id: user.id, phone: user.phone } }
+    return { destination: mode === 'customer' ? null : '/services', user: { id: user.id, phone: user.phone } }
   }
   if (customer.status !== 401 || (driver && driver.status !== 401)) throw new Error('Session service unavailable')
   return { destination: mode === 'guest' ? null : '/start', user: null }
@@ -51,6 +52,7 @@ export function rememberCustomerPhone(phone: string) {
 
 export function clearCustomerBrowserState() {
   clearBookingDraft()
+  clearSelectedService()
   // Remove only private customer state. Keep the last phone number so a deliberate logout can return to OTP login quickly.
   for (const key of ['user', 'current_order_id', 'tracking_driver_id', 'fromAddress', 'from', 'fromLat', 'fromLng', 'dest', 'phone_called']) {
     try { localStorage.removeItem(key) } catch { /* Cookie auth works even when storage is blocked. */ }

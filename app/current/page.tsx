@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createDotMarker, freeMapStyle, loadFreeMap, mapErrorMessage, ULAANBAATAR } from '@/lib/client/free-map'
 import { CustomerAccount } from '../components/customer-account'
-import { CustomerOrderSheet } from '../components/customer-order-sheet'
+import { UnifiedCustomerOrderSheet } from '../components/unified-customer-order-sheet'
 import { useScreenHistory } from '@/lib/client/use-screen-history'
 import { isBookingScreen, readBookingDraft } from '@/lib/client/booking-draft'
 import { readScreen } from '@/lib/client/navigation'
+import { readSelectedService } from '@/lib/client/service-selection'
+import { serviceLabel } from '@/lib/service-types'
 
 type LocationPoint = { lat: number; lng: number }
 type LocationIssue = 'denied' | 'unavailable' | 'timeout' | 'unsupported' | ''
@@ -26,6 +28,9 @@ export default function CurrentPage() {
   const [mapError, setMapError] = useState('')
   const [trafficAvailable, setTrafficAvailable] = useState(false)
   const [trafficEnabled, setTrafficEnabled] = useState(true)
+  const [selectedServiceLabel, setSelectedServiceLabel] = useState('Үйлчилгээ')
+
+  useEffect(() => { setSelectedServiceLabel(serviceLabel(readSelectedService() || 'achilt')) }, [])
 
   const setMarker = useCallback((lat: number, lng: number, fly = false) => {
     latestLocation.current = { lat, lng }
@@ -190,7 +195,7 @@ export default function CurrentPage() {
 
   return (
     <main className="current-map-page">
-      <div ref={mapRef} className="current-map-canvas" aria-label="Ачих байршлын газрын зураг" />
+      <div ref={mapRef} className="current-map-canvas" aria-label="Үйлчилгээ авах байршлын газрын зураг" />
       <div className="current-map-vignette" />
 
       <header className="current-map-header">
@@ -198,8 +203,8 @@ export default function CurrentPage() {
           <CustomerAccount />
         </div>
         <div className="current-map-instructions">
-          <h1>Ачуулах байршлаа газрын зураг дээр сонгоно уу.</h1>
-          <p>Хамгийн ойр байгаа машинуудыг санал болгоно.</p>
+          <h1>{selectedServiceLabel} авах байршлаа газрын зураг дээр сонгоно уу.</h1>
+          <p>Таны сонгосон үйлчилгээний төрөлтэй хамгийн ойр жолооч нарыг санал болгоно.</p>
         </div>
       </header>
 
@@ -254,13 +259,13 @@ export default function CurrentPage() {
           if (draft?.orderId && draft.location) setMarker(draft.location.lat, draft.location.lng, true)
           booking.navigate('vehicle')
         }}>
-          <span className="current-search-banner-icon">🚛</span>
-          <span className="current-search-banner-copy"><strong>Жолооч хайх</strong><small>Хамгийн ойр байгаа машинуудыг санал болгоно</small></span>
+          <span className="current-search-banner-icon">📍</span>
+          <span className="current-search-banner-copy"><strong>Жолооч хайх</strong><small>{selectedServiceLabel} үйлчилгээний үнэ санал авна</small></span>
           <span className="current-search-banner-arrow">→</span>
         </button>
       </div>
 
-      <CustomerOrderSheet screen={booking.screen} location={location} onNavigate={booking.navigate} onBack={booking.back} onClose={booking.close} />
+      <UnifiedCustomerOrderSheet screen={booking.screen} location={location} onNavigate={booking.navigate} onBack={booking.back} onClose={booking.close} />
     </main>
   )
 }

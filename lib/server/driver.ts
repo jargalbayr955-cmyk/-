@@ -2,11 +2,13 @@ import 'server-only'
 import { NextRequest } from 'next/server'
 import { verifySession } from './security'
 import { getSupabaseAdmin } from './supabase-admin'
+import { serviceProfileIsComplete } from '@/lib/service-types'
 
 export type DriverSessionRecord = {
   id: string
   name: string | null
   phone: string
+  service_type: string
   car_type: string | null
   car_number: string | null
   photo_url: string | null
@@ -24,6 +26,10 @@ export function driverNeedsOnboarding(driver: Pick<DriverSessionRecord, 'name' |
   return !name || name === 'Шинэ жолооч' || !carNumber
 }
 
+export function driverServiceProfileIsComplete(driver: Pick<DriverSessionRecord, 'service_type' | 'car_type'>) {
+  return serviceProfileIsComplete(driver.service_type, driver.car_type)
+}
+
 type DriverAccessOptions = { allowIncomplete?: boolean }
 
 export async function requireDriver(req: NextRequest, options: DriverAccessOptions = {}): Promise<DriverSessionRecord | null> {
@@ -32,7 +38,7 @@ export async function requireDriver(req: NextRequest, options: DriverAccessOptio
 
   const { data, error } = await getSupabaseAdmin()
     .from('drivers')
-    .select('id,name,phone,car_type,car_number,photo_url,price,available,active,lat,lng,location_updated_at,session_version')
+    .select('id,name,phone,service_type,car_type,car_number,photo_url,price,available,active,lat,lng,location_updated_at,session_version')
     .eq('id', session.sub)
     .eq('active', true)
     .is('deleted_at', null)

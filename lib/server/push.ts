@@ -2,6 +2,7 @@ import 'server-only'
 import * as webpush from 'web-push'
 import { getSupabaseAdmin } from './supabase-admin'
 import { isValidPushSubscription } from './push-subscription'
+import { driverServiceLabel } from '@/lib/service-types'
 
 export async function notifySelectedDriver(orderId: string) {
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY, privateKey = process.env.VAPID_PRIVATE_KEY
@@ -31,14 +32,15 @@ export async function notifyOrderInvites(orderId: string) {
   if (!publicKey || !privateKey) return { sent: 0, invited: 0 }
   webpush.setVapidDetails('mailto:admin@achilt.mn', publicKey, privateKey)
   const s = getSupabaseAdmin()
-  const { data: order } = await s.from('orders').select('id,from_address,car_type,car_mark,status').eq('id',orderId).maybeSingle()
+  const { data: order } = await s.from('orders').select('id,from_address,service_type,car_type,car_mark,status').eq('id',orderId).maybeSingle()
   if (!order || order.status !== 'pending') return { sent: 0, invited: 0 }
   const { data: invites } = await s.from('driver_invites').select('id,driver_id').eq('order_id',orderId).eq('status','active').gt('expires_at',new Date().toISOString()).is('notified_at',null).limit(8)
   if (!invites?.length) return { sent: 0, invited: 0 }
   const ids = invites.map(i=>i.driver_id)
   const { data: subs } = await s.from('push_subscriptions').select('id,driver_id,subscription').in('driver_id',ids)
-  const carLabel = order.car_type === 'butten' ? 'Бүтэн ачигч' : order.car_type === 'chiregch' ? 'Чирэгч' : order.car_type
-  const payload = JSON.stringify({ title:'🚛 Танд шинэ захиалга ирлээ!', body:`${carLabel}${order.car_mark ? ` · ${order.car_mark}` : ''} — ${order.from_address}`, url:'/driver' })
+  const service = driverServiceLabel(order.service_type, order.car_type)
+  const detail = order.service_type === 'achilt' && order.car_mark ? ` · ${order.car_mark}` : ''
+  const payload = JSON.stringify({ title:'🚛 Танд шинэ захиалга ирлээ!', body:`${service}${detail} — ${order.from_address}`, url:'/driver' })
   let sent=0
   const deliveredDrivers = new Set<string>()
   await Promise.allSettled((subs||[]).map(async sub=>{

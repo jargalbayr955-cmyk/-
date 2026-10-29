@@ -9,6 +9,7 @@ export type DriverSlot = {
   driver_name: string | null
   photo_url?: string | null
   car_number?: string | null
+  service_type?: string | null
   car_type?: string | null
   offer: { id: string; price: number } | null
 }

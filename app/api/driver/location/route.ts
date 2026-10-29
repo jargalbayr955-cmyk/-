@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { allowRequest } from '@/lib/server/security'
-import { driverHasBlockingWork, requireDriver } from '@/lib/server/driver'
+import { driverHasBlockingWork, driverServiceProfileIsComplete, requireDriver } from '@/lib/server/driver'
 
 export async function POST(req: NextRequest) {
   const driver = await requireDriver(req)
@@ -24,8 +24,8 @@ export async function POST(req: NextRequest) {
   }
 
   if (available === true) {
-    if (!['butten', 'chiregch'].includes(driver.car_type || '')) {
-      return NextResponse.json({ error: 'Профайл хэсэгт машины төрлөө сонгоно уу' }, { status: 409 })
+    if (!driverServiceProfileIsComplete(driver)) {
+      return NextResponse.json({ error: 'Профайл хэсэгт үйлчилгээний төрлөө бүрэн сонгоно уу' }, { status: 409 })
     }
     try {
       if (!(await driverHasBlockingWork(driver.id))) update.available = true

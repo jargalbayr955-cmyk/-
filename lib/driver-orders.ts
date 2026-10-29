@@ -1,4 +1,5 @@
 import { pickupPoint, pointDistance, type PickupPoint } from './order-offers'
+import { driverServiceLabel } from './service-types'
 
 export type DriverOrder = {
   id: string
@@ -7,12 +8,16 @@ export type DriverOrder = {
   to_address: string | null
   from_lat: number | null
   from_lng: number | null
+  service_type: string | null
   car_type: string | null
   car_mark: string | null
   has_offered?: boolean
 }
 export function vehicleLabel(type: string | null) {
-  return type === 'butten' ? 'Бүтэн ачигч' : type === 'chiregch' ? 'Чирэгч' : 'Ачигч'
+  return type === 'butten' ? 'Бүтэн ачигч' : type === 'chiregch' ? 'Чирэгч' : 'Ачилт'
+}
+export function orderServiceLabel(order: Pick<DriverOrder, 'service_type' | 'car_type'>) {
+  return driverServiceLabel(order.service_type, order.car_type)
 }
 export function nearbyOrders(orders: DriverOrder[], driver: PickupPoint | null) {
   return orders.map(order => ({ ...order, distance: pointDistance(driver, pickupPoint(order.from_lat, order.from_lng)) }))

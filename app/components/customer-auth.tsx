@@ -51,7 +51,7 @@ function AuthForm() {
     rememberCustomerPhone(phone)
     clearCustomerBrowserState()
     notifyCustomerSessionChanged()
-    window.location.replace('/current')
+    window.location.replace('/services')
   }
 
   const sendOtp = async () => {
@@ -124,7 +124,7 @@ function AuthForm() {
       </div>
       <p className="auth-eyebrow">АЧИЛТ • ТУСЛАМЖ ОЙРХОН</p>
       <h1 id="auth-title">Тавтай морил</h1>
-      <p className="auth-intro">Утасны дугаараа баталгаажуулаад ойр жолооч нарын үнийн саналаас сонгоорой.</p>
+      <p className="auth-intro">Утасны дугаараа баталгаажуулаад хэрэгтэй үйлчилгээгээ сонгон ойр жолооч нарын үнийн саналаас сонгоорой.</p>
       {signedOut && <p className="auth-success" role="status">Амжилттай гарлаа. Энэ төхөөрөмж 90 хоногийн баталгаажуулалттай хэвээр бол доорх товчийг дарахад OTP SMS явуулахгүйгээр шууд нэвтэрнэ.</p>}
 
       {step === 'phone' ? <>

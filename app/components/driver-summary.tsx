@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { offerDistance, offerPrice } from '@/lib/order-offers'
+import { driverServiceLabel } from '@/lib/service-types'
 
-export function DriverSummary({ name, photo, plate, carType, price, distance }: {
-  name: string | null; photo?: string | null; plate?: string | null; carType?: string | null
+export function DriverSummary({ name, photo, plate, serviceType, carType, price, distance }: {
+  name: string | null; photo?: string | null; plate?: string | null; serviceType?: string | null; carType?: string | null
   price: number | null; distance: number | null
 }) {
   const [failedPhoto, setFailedPhoto] = useState<string | null>(null)
@@ -29,7 +30,7 @@ export function DriverSummary({ name, photo, plate, carType, price, distance }: 
           <img src={image} alt={`${name || 'Жолооч'}ийн зураг`} referrerPolicy="no-referrer" onError={() => setFailedPhoto(image)} />
           : <span aria-label="Жолооч зураг оруулаагүй">{name?.trim().slice(0, 1) || '🚛'}</span>}
       </div>
-      <div><strong>{name || 'Жолооч'}</strong><span>{carType === 'butten' ? 'Бүтэн ачигч' : carType === 'chiregch' ? 'Чирэгч' : 'Ачигч'}</span><b className="driver-plate">{plate || 'Улсын дугаар оруулаагүй'}</b></div>
+      <div><strong>{name || 'Жолооч'}</strong><span>{driverServiceLabel(serviceType, carType)}</span><b className="driver-plate">{plate || 'Улсын дугаар оруулаагүй'}</b></div>
     </div>
     <div className="driver-summary-quote"><div><span>Үнийн санал</span><b>{price != null ? offerPrice(price) : 'Үнэ тодорхойгүй'}</b></div><div><strong>{offerDistance(shownDistance)}</strong><span>{roadDistance != null ? 'Авто замаар' : 'Шулуун зайгаар'}</span></div></div>
   </div>
