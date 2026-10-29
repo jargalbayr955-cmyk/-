@@ -9,7 +9,7 @@ import { driverServiceLabel } from '@/lib/service-types'
 import type { DriverPeer } from './driver-chat-panel'
 
 type OrderMarker = { marker: Marker; button: HTMLButtonElement; label: HTMLElement; distance: HTMLElement }
-type PeerMarker = { marker: Marker; button: HTMLButtonElement; name: HTMLElement; detail: HTMLElement }
+type PeerMarker = { marker: Marker; button: HTMLButtonElement; name: HTMLElement; detail: HTMLElement; headlights: HTMLElement }
 
 export function DriverOrdersMap({ driver, fresh, orders, selectedId, onSelect, peers = [], selectedPeerId = null, onPeerSelect = () => {} }: {
   driver: PickupPoint | null
@@ -89,24 +89,40 @@ export function DriverOrdersMap({ driver, fresh, orders, selectedId, onSelect, p
             if (!item) {
               const button = document.createElement('button')
               button.type = 'button'
-              button.style.cssText = 'border:1px solid rgba(255,255,255,.24);border-radius:14px;background:rgba(12,15,20,.94);color:#fff;padding:6px 9px;min-width:88px;max-width:150px;display:grid;gap:2px;box-shadow:0 8px 24px rgba(0,0,0,.38);cursor:pointer;text-align:center;line-height:1.05;backdrop-filter:blur(8px)'
+              button.style.cssText = 'border:1px solid rgba(255,255,255,.24);border-radius:14px;background:rgba(12,15,20,.94);color:#fff;padding:5px 9px 6px;min-width:92px;max-width:154px;display:grid;gap:1px;box-shadow:0 8px 24px rgba(0,0,0,.38);cursor:pointer;text-align:center;line-height:1.05;backdrop-filter:blur(8px)'
+              const vehicle = document.createElement('span')
+              vehicle.textContent = '🚛'
+              vehicle.setAttribute('aria-hidden', 'true')
+              vehicle.style.cssText = 'font-size:19px;line-height:18px;display:block'
+              const headlights = document.createElement('span')
+              headlights.className = 'driver-peer-headlights'
+              headlights.textContent = '●   ●'
+              headlights.setAttribute('aria-hidden', 'true')
+              headlights.style.cssText = 'height:5px;font-size:7px;line-height:5px;color:#ffe45c;text-shadow:0 0 4px #fff59d,0 0 9px #ffd54f;letter-spacing:1px;visibility:hidden'
+              headlights.animate?.([
+                { filter:'brightness(.45)', transform:'scale(.94)' },
+                { filter:'brightness(2.4)', transform:'scale(1.12)' },
+                { filter:'brightness(.45)', transform:'scale(.94)' },
+              ], { duration:850, iterations:Infinity, easing:'ease-in-out' })
               const name = document.createElement('strong')
               name.style.cssText = 'font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block'
               const detail = document.createElement('small')
               detail.style.cssText = 'font-size:9px;color:#a8b1bd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block'
-              button.append(name, detail)
+              button.append(vehicle, headlights, name, detail)
               button.addEventListener('click', event => { event.stopPropagation(); latest.current.onPeerSelect(peer.id) })
-              item = { button, name, detail, marker: new ml.Marker({ element: button, anchor: 'bottom' }).setLngLat([peer.lng, peer.lat]).addTo(map) }
+              item = { button, name, detail, headlights, marker: new ml.Marker({ element: button, anchor: 'bottom' }).setLngLat([peer.lng, peer.lat]).addTo(map) }
               peerMarkerStore.set(peer.id, item)
             }
+            const online = peer.available && peer.fresh
             item.marker.setLngLat([peer.lng, peer.lat])
             item.name.textContent = peer.name
-            item.detail.textContent = `${peer.available && peer.fresh ? '● Онлайн' : '○ Сүүлд'} · ${driverServiceLabel(peer.service_type, peer.car_type)}`
-            item.detail.style.color = peer.available && peer.fresh ? '#70e39b' : '#9aa4b1'
+            item.detail.textContent = `${online ? '● Онлайн' : '○ Сүүлд'} · ${driverServiceLabel(peer.service_type, peer.car_type)}`
+            item.detail.style.color = online ? '#70e39b' : '#9aa4b1'
+            item.headlights.style.visibility = online ? 'visible' : 'hidden'
             item.button.style.opacity = peer.fresh ? '1' : '.72'
-            item.button.style.borderColor = peer.id === chosenPeer ? '#e8433a' : peer.available && peer.fresh ? 'rgba(34,197,94,.65)' : 'rgba(255,255,255,.24)'
+            item.button.style.borderColor = peer.id === chosenPeer ? '#e8433a' : online ? 'rgba(34,197,94,.65)' : 'rgba(255,255,255,.24)'
             item.button.style.outline = peer.id === chosenPeer ? '2px solid rgba(232,67,58,.35)' : 'none'
-            item.button.setAttribute('aria-label', `${peer.name}, ${driverServiceLabel(peer.service_type, peer.car_type)}. Чат нээх`)
+            item.button.setAttribute('aria-label', `${peer.name}, ${driverServiceLabel(peer.service_type, peer.car_type)}, ${online ? 'онлайн' : 'сүүлд харагдсан'}. Чат нээх`)
           }
           for (const [id, item] of peerMarkerStore) if (!peerIds.has(id)) { item.marker.remove(); peerMarkerStore.delete(id) }
 
