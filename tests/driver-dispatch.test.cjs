@@ -31,6 +31,7 @@ function componentHarness(file, name, initial = {}, replacements = {}, globals =
         if (module === '@/lib/driver-orders') return load('lib/driver-orders.ts')
         if (module === '@/lib/service-types' || module === './service-types') return load('lib/service-types.ts')
         if (module === './driver-orders-map') return { DriverOrdersMap: 'DriverOrdersMap' }
+        if (module === './driver-chat-panel') return { DriverChatPanel: 'DriverChatPanel' }
         if (module === 'next/link') return { default: 'a' }
         if (module === 'next/navigation') return { useRouter: () => ({ push() {} }) }
         if (module === '../components/order-video-call') return { OrderVideoCall: 'OrderVideoCall' }
