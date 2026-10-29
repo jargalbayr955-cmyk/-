@@ -43,7 +43,7 @@ test('non-tow services create unified location orders and towing keeps its subty
 })
 
 test('driver registration, online state and dispatch are service-aware', () => {
-  assert.match(read('app/api/driver/register/request/route.ts'), /start_driver_registration_v4/)
+  assert.match(read('app/api/driver/register/request/route.ts'), /start_driver_registration_v5/)
   assert.match(read('lib/server/driver.ts'), /service_type/)
   assert.match(read('app/api/driver/availability/route.ts'), /serviceProfileIsComplete/)
   assert.match(read('app/api/driver/location/route.ts'), /serviceProfileIsComplete/)
