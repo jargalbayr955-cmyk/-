@@ -46,7 +46,7 @@ test('driver registration request validates unified service details and stores a
   const serviceMigration = read('supabase/migrations/20261029043322_unified_service_types.sql')
   assert.match(request, /normalizeMnPhone/)
   assert.match(request, /isServiceType/)
-  assert.match(request, /start_driver_registration_v2/)
+  assert.match(request, /start_driver_registration_v3/)
   assert.match(request, /p_service_type/)
   assert.match(request, /p_car_type/)
   assert.match(request, /p_name/)
