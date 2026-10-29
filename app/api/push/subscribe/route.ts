@@ -11,7 +11,9 @@ export async function POST(req: NextRequest) {
   if (!(await allowRequest(`push-subscribe:${driver.id}`, 20, 60_000))) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
-  const subscription = (await req.json().catch(() => null)) ?? null
+  const payload = (await req.json().catch(() => null)) ?? null
+  // Keep older web clients compatible while all new clients send the subscription directly.
+  const subscription = payload && typeof payload === 'object' && 'subscription' in payload ? payload.subscription : payload
   if (!isValidPushSubscription(subscription)) return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 })
 
   const endpointHash = createHash('md5').update(subscription.endpoint).digest('hex')
