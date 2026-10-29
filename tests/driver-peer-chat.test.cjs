@@ -50,6 +50,19 @@ test('Messenger-style driver chat has inbox, unread state, bubbles and read rece
   assert.match(dispatch, /peers=\{peers\}/)
 })
 
+test('driver chat push is privacy-safe and never sounds the urgent order horn', () => {
+  const messages = read('app/api/driver/chat/messages/route.ts')
+  const push = read('lib/server/push.ts')
+  const sw = read('public/sw.js')
+  assert.match(messages, /notifyDriverChat\(peerId, driver\.name \|\| 'Жолооч'\)/)
+  assert.doesNotMatch(messages, /notifyDriverChat\([^\n]*body/)
+  assert.match(push, /type: 'DRIVER_CHAT'/)
+  assert.match(push, /Do not expose the message body on the lock screen/)
+  assert.match(sw, /const isDriverChat = data\.type === 'DRIVER_CHAT'/)
+  assert.match(sw, /if \(isDriverChat\) \{[\s\S]*client\.postMessage\(\{ type: 'DRIVER_CHAT' \}\)[\s\S]*return/)
+  assert.match(sw, /if \(data\.type !== 'ORDER_SELECTED'\) client\.postMessage\(\{ type: 'PLAY_HORN' \}\)/)
+})
+
 test('accepted work uses the dedicated customer connection screen instead of peer dispatch chat', () => {
   const page = read('app/driver/page.tsx')
   const activeWork = page.indexOf('if (acceptedOrder || paymentInfo)')
