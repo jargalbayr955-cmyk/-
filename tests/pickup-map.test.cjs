@@ -51,6 +51,8 @@ function pickupMap() {
       if (name.endsWith('use-screen-history')) return { useScreenHistory: () => ({ screen: 'map', navigate() {}, back() {}, close() {} }) }
       if (name.endsWith('booking-draft')) return { readBookingDraft: () => null, isBookingScreen: () => true }
       if (name.endsWith('/navigation')) return { readScreen: () => ({ value: 'map' }) }
+      if (name.endsWith('service-selection')) return { readSelectedService: () => 'achilt' }
+      if (name === '@/lib/service-types') return { serviceLabel: value => value === 'achilt' ? 'Ачилт' : 'Үйлчилгээ' }
       if (name === 'next/navigation') return { useRouter: () => ({}) }
       if (name.includes('free-map')) return {
         loadFreeMap: () => loadingMap,
@@ -58,6 +60,7 @@ function pickupMap() {
         ULAANBAATAR: { lat: 47.9184, lng: 106.9177 }, mapErrorMessage: String,
       }
       if (name.includes('access-shortcuts')) return { AdminAccess: () => null, BrandAccess: () => null }
+      if (name.includes('unified-customer-order-sheet')) return { UnifiedCustomerOrderSheet: () => null }
       if (name.includes('customer-order-sheet')) return { CustomerOrderSheet: () => null }
       if (name.includes('customer-account')) return { CustomerAccount: () => null }
       throw new Error('Unexpected import: ' + name)
