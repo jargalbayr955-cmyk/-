@@ -32,7 +32,7 @@ test('driver profile has an explicit bottom logout and vehicle number stays opti
   assert.match(profile, /loggingOut \? 'Гарч байна…' : 'Гарах'/)
   assert.match(profile, /МАШИНЫ ДУГААР[\s\S]*заавал биш/)
   assert.doesNotMatch(profile, /if \(!form\.car_number\.trim\(\)\)/)
-  assert.match(route, /driverNeedsOnboarding\(driver\)/)
+  assert.match(route, /const onboarding = !existingName \|\| existingName === 'Шинэ жолооч'/)
   assert.match(route, /car_number: carNumber \|\| null/)
 })
 
@@ -60,4 +60,4 @@ test('background order notification reliability remains enabled while the driver
   assert.match(serviceWorker, /showNotification/)
   assert.match(serviceWorker, /\/api\/push\/ack/)
   assert.match(nativeService, /scheduleWithFixedDelay\(this::tick, 0, 10, TimeUnit\.SECONDS\)/)
-}
+})
