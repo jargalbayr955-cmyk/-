@@ -91,7 +91,7 @@ export function OrderConnectionMap({ pickup, driver, driverLabel = 'Жолооч
           }
         }
 
-        // This fallback is only for the non-Google/legacy renderer. Production Google Maps never shows a straight connector.
+        // Straight connection is a legacy non-Google fallback only. Production Google mode waits for a real road route.
         const setLegacyConnectionData = (p: PickupPoint | null, d: PickupPoint | null) => {
           if (!map.isStyleLoaded()) return
           const data: GeoJSON.FeatureCollection = {
@@ -122,30 +122,54 @@ export function OrderConnectionMap({ pickup, driver, driverLabel = 'Жолооч
           lastRouteAt.current = Date.now()
           try {
             const routesLibrary = await window.google.maps.importLibrary('routes')
+            let routePath: Array<{ lat: number; lng: number }> = []
+            let distanceMeters = 0
+            let durationMinutes: number | null = null
+
             const Route = routesLibrary?.Route
-            if (!Route?.computeRoutes) throw new Error('Routes unavailable')
-            const result = await Route.computeRoutes({
-              origin: { lat: d.lat, lng: d.lng },
-              destination: { lat: p.lat, lng: p.lng },
-              travelMode: 'DRIVING',
-              routingPreference: 'TRAFFIC_AWARE',
-              language: 'mn',
-              fields: ['path', 'distanceMeters', 'durationMillis'],
-            })
+            if (Route?.computeRoutes) {
+              try {
+                const result = await Route.computeRoutes({
+                  origin: { lat: d.lat, lng: d.lng },
+                  destination: { lat: p.lat, lng: p.lng },
+                  travelMode: 'DRIVING',
+                  routingPreference: 'TRAFFIC_AWARE',
+                  language: 'mn',
+                  fields: ['path', 'distanceMeters', 'durationMillis'],
+                })
+                const route = result?.routes?.[0]
+                routePath = (route?.path || []).map(readGooglePoint).filter(Boolean) as Array<{ lat: number; lng: number }>
+                distanceMeters = Number(route?.distanceMeters || 0)
+                durationMinutes = Number.isFinite(Number(route?.durationMillis)) ? Math.round(Number(route.durationMillis) / 60000) : null
+              } catch { /* Fall through to the legacy road directions service below. */ }
+            }
+
+            if (routePath.length < 2 || !Number.isFinite(distanceMeters) || distanceMeters <= 0) {
+              const DirectionsService = routesLibrary?.DirectionsService || window.google.maps.DirectionsService
+              if (!DirectionsService) throw new Error('Road routing unavailable')
+              const service = new DirectionsService()
+              const legacy = await service.route({
+                origin: { lat: d.lat, lng: d.lng },
+                destination: { lat: p.lat, lng: p.lng },
+                travelMode: window.google.maps.TravelMode?.DRIVING || 'DRIVING',
+                drivingOptions: { departureTime: new Date(), trafficModel: 'bestguess' },
+              })
+              const legacyRoute = legacy?.routes?.[0]
+              routePath = (legacyRoute?.overview_path || []).map(readGooglePoint).filter(Boolean) as Array<{ lat: number; lng: number }>
+              const legs = Array.isArray(legacyRoute?.legs) ? legacyRoute.legs : []
+              distanceMeters = legs.reduce((sum: number, leg: any) => sum + Number(leg?.distance?.value || 0), 0)
+              const durationSeconds = legs.reduce((sum: number, leg: any) => sum + Number(leg?.duration_in_traffic?.value || leg?.duration?.value || 0), 0)
+              durationMinutes = durationSeconds > 0 ? Math.round(durationSeconds / 60) : null
+            }
+
             if (cancelled || seq !== routeSeq.current) return
-            const route = result?.routes?.[0]
-            const path = (route?.path || []).map(readGooglePoint).filter(Boolean) as Array<{ lat: number; lng: number }>
-            if (path.length < 2 || !Number.isFinite(Number(route?.distanceMeters))) throw new Error('No driving route')
-            const km = Number(route.distanceMeters) / 1000
-            setRoadData(path.map(point => [point.lng, point.lat]))
+            if (routePath.length < 2 || !Number.isFinite(distanceMeters) || distanceMeters <= 0) throw new Error('No driving route')
+            const km = distanceMeters / 1000
+            setRoadData(routePath.map(point => [point.lng, point.lat]))
             setRoadDistanceKm(km)
             setError('')
             window.dispatchEvent(new CustomEvent('achilt:road-route', {
-              detail: {
-                source: 'order-connection',
-                distanceKm: km,
-                durationMinutes: Number.isFinite(Number(route?.durationMillis)) ? Math.round(Number(route.durationMillis) / 60000) : null,
-              },
+              detail: { source: 'order-connection', distanceKm: km, durationMinutes },
             }))
 
             if (label === 'Та') {

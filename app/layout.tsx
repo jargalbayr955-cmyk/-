@@ -3,6 +3,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
 import { NavigationHistory } from './components/navigation-history';
 import { TapHaptics } from './components/tap-haptics';
+import { CustomerPresence } from './components/customer-presence';
 
 export const metadata: Metadata = {
   title: "Ачилт",
@@ -33,7 +34,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="mn">
-      <body style={{fontFamily: "Arial, sans-serif"}} className="min-h-full flex flex-col"><NavigationHistory /><TapHaptics />{children}</body>
+      <body style={{fontFamily: "Arial, sans-serif"}} className="min-h-full flex flex-col"><NavigationHistory /><TapHaptics /><CustomerPresence />{children}</body>
     </html>
   );
 }
