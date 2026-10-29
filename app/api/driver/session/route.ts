@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { driverHasBlockingWork, driverNeedsOnboarding, driverServiceProfileIsComplete, requireDriver } from '@/lib/server/driver'
 import { renewDeviceSession } from '@/lib/server/device-session'
+import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,8 +13,14 @@ export async function GET(req: NextRequest) {
       try { autoStart = !(await driverHasBlockingWork(driver.id)) }
       catch { autoStart = false }
     }
-    // `available: true` here starts the client GPS watcher. The database is not made
-    // available until /api/driver/location receives a fresh valid coordinate.
+    if (autoStart && !driver.available) {
+      // Persist the intent immediately so order polling cannot flip the client back to idle.
+      // Dispatch itself already requires a GPS fix newer than two minutes.
+      const { error } = await getSupabaseAdmin().from('drivers')
+        .update({ available: true, is_online: false })
+        .eq('id', driver.id).eq('active', true).is('deleted_at', null)
+      if (error) autoStart = false
+    }
     const profile = autoStart ? { ...driver, available: true } : driver
     const res = NextResponse.json({ driver: profile, needsOnboarding, autoStart })
     renewDeviceSession(req, res, driver.id, 'driver')
