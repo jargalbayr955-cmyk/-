@@ -56,6 +56,9 @@ async function prepareFacePhoto(file: File) {
 export function DriverRegistrationDialog({ initialPhone, onClose }: { initialPhone: string; onClose: () => void }) {
   const [phone, setPhone] = useState(/^\d{8}$/.test(initialPhone) ? initialPhone : '')
   const [name, setName] = useState('')
+  const [carNumber, setCarNumber] = useState('')
+  const [pin, setPin] = useState('')
+  const [pinConfirm, setPinConfirm] = useState('')
   const [photoDataUrl, setPhotoDataUrl] = useState('')
   const [serviceType, setServiceType] = useState<ServiceType | null>(null)
   const [carType, setCarType] = useState<TowType | null>(null)
@@ -66,6 +69,8 @@ export function DriverRegistrationDialog({ initialPhone, onClose }: { initialPho
   const pending = useRef(false)
   const phoneRef = useRef<HTMLInputElement>(null)
   const nameRef = useRef<HTMLInputElement>(null)
+  const carNumberRef = useRef<HTMLInputElement>(null)
+  const pinRef = useRef<HTMLInputElement>(null)
   const photoRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -108,6 +113,9 @@ export function DriverRegistrationDialog({ initialPhone, onClose }: { initialPho
     setError('')
     if (!name.trim()) { setError('Нэрээ оруулна уу.'); nameRef.current?.focus(); return }
     if (!/^\d{8}$/.test(phone)) { setError('8 оронтой утасны дугаараа оруулна уу.'); phoneRef.current?.focus(); return }
+    if (!carNumber.trim()) { setError('Машин / техникийн дугаараа оруулна уу.'); carNumberRef.current?.focus(); return }
+    if (!/^\d{6}$/.test(pin) || pin === '000000') { setError('000000-аас өөр 6 оронтой PIN сонгоно уу.'); pinRef.current?.focus(); return }
+    if (pin !== pinConfirm) { setError('PIN давталт таарахгүй байна.'); pinRef.current?.focus(); return }
     pending.current = true; setBusy(true)
     try {
       const response = await fetch('/api/driver/register/request', {
@@ -116,13 +124,15 @@ export function DriverRegistrationDialog({ initialPhone, onClose }: { initialPho
         body: JSON.stringify({
           phone,
           name: name.trim(),
+          car_number: carNumber.trim().toUpperCase(),
+          pin,
           service_type: serviceType,
           car_type: serviceType === 'achilt' ? carType : null,
           photo_data_url: photoDataUrl || null,
         }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body.error || 'Бүртгэлийн хүсэлт үүсгэж чадсангүй.')
+      if (!response.ok) throw new Error(body.error || 'Бүртгэл үүсгэж чадсангүй.')
       setStep('payment')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Холболтоо шалгаад дахин оролдоно уу.')
@@ -160,11 +170,21 @@ export function DriverRegistrationDialog({ initialPhone, onClose }: { initialPho
         <p style={{ color:'#c6ced8', lineHeight:1.5, marginBottom:14 }}>Сонгосон төрөл: <strong>{selectionSummary}</strong></p>
         <label htmlFor="driver-register-name" style={{ display:'block', marginBottom:7, fontWeight:800 }}>Нэр</label>
         <input ref={nameRef} id="driver-register-name" type="text" autoComplete="name" value={name} disabled={busy} onChange={e => { setName(e.target.value.slice(0,100)); setError('') }} placeholder="Өөрийн нэр" style={{ ...input, marginBottom:14 }} />
+
         <label htmlFor="driver-register-phone" style={{ display:'block', marginBottom:7, fontWeight:800 }}>Утасны дугаар</label>
-        <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+        <div style={{ display:'flex', gap:8, marginBottom:14 }}>
           <span style={{ display:'grid', placeItems:'center', padding:'0 12px', borderRadius:12, background:'#171c24', border:'1px solid rgba(255,255,255,.14)', fontWeight:800 }}>+976</span>
           <input ref={phoneRef} id="driver-register-phone" type="tel" inputMode="numeric" autoComplete="tel-national" value={phone} disabled={busy} onChange={e => { setPhone(phoneInput(e.target.value)); setError('') }} placeholder="8 оронтой дугаар" style={{ ...input, flex:1, minWidth:0 }} />
         </div>
+
+        <label htmlFor="driver-register-car-number" style={{ display:'block', marginBottom:7, fontWeight:800 }}>Машин / техникийн дугаар</label>
+        <input ref={carNumberRef} id="driver-register-car-number" type="text" autoCapitalize="characters" value={carNumber} disabled={busy} onChange={e => { setCarNumber(e.target.value.toUpperCase().slice(0,30)); setError('') }} placeholder="Жишээ: 1234 УБА" style={{ ...input, marginBottom:14 }} />
+
+        <label htmlFor="driver-register-pin" style={{ display:'block', marginBottom:7, fontWeight:800 }}>6 оронтой PIN</label>
+        <input ref={pinRef} id="driver-register-pin" type="password" inputMode="numeric" autoComplete="new-password" maxLength={6} value={pin} disabled={busy} onChange={e => { setPin(e.target.value.replace(/\D/g,'').slice(0,6)); setError('') }} placeholder="Өөрийн PIN" style={{ ...input, marginBottom:10 }} />
+        <input aria-label="PIN давтах" type="password" inputMode="numeric" autoComplete="new-password" maxLength={6} value={pinConfirm} disabled={busy} onChange={e => { setPinConfirm(e.target.value.replace(/\D/g,'').slice(0,6)); setError('') }} placeholder="PIN давтах" style={{ ...input, marginBottom:16 }} />
+        <p style={{ color:'#8d98a6', fontSize:12, lineHeight:1.45, margin:'-8px 0 14px' }}>000000 PIN ашиглахгүй. Энэ PIN-ээрээ шууд нэвтэрнэ.</p>
+
         <p style={{ margin:'0 0 8px', fontWeight:800 }}>Нүүр зураг <span style={{ color:'#8d98a6', fontWeight:700 }}>(алгасаж болно)</span></p>
         <div style={{ display:'flex', alignItems:'center', gap:14, border:'1px solid rgba(255,255,255,.14)', background:'#171c24', borderRadius:16, padding:12, marginBottom:14 }}>
           <div style={{ width:78, height:78, borderRadius:'50%', overflow:'hidden', flex:'0 0 auto', background:'#272d36', display:'grid', placeItems:'center', fontSize:28, fontWeight:900 }}>{photoDataUrl ? <img src={photoDataUrl} alt="Нүүр зураг" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : (name.trim().charAt(0).toUpperCase() || '👤')}</div>
@@ -179,7 +199,11 @@ export function DriverRegistrationDialog({ initialPhone, onClose }: { initialPho
       </>}
 
       {step === 'payment' && <>
-        <p style={{ color:'#c6ced8', lineHeight:1.5, margin:'14px 0 0' }}>Бүртгэл: <strong>{selectionSummary}</strong></p>
+        <div style={{ borderRadius:16, padding:15, background:'#10251a', border:'1px solid rgba(84,214,139,.34)', margin:'14px 0 12px' }}>
+          <strong style={{ display:'block', color:'#72e1a3', fontSize:18, marginBottom:5 }}>✓ Бүртгэл амжилттай</strong>
+          <p style={{ margin:0, color:'#d5e9dd', lineHeight:1.5 }}>Админаас зөвшөөрөл хүлээхгүй. Утасны дугаар болон өөрийн сонгосон PIN-ээр шууд нэвтэрнэ.</p>
+        </div>
+        <p style={{ color:'#c6ced8', lineHeight:1.5, margin:'14px 0 0' }}>Бүртгэл: <strong>{selectionSummary}</strong> · <strong>{carNumber}</strong></p>
         <div style={{ borderRadius:16, padding:16, background:'#122318', border:'1px solid rgba(84,214,139,.28)', margin:'12px 0', textAlign:'center' }}>
           <p style={{ margin:'0 0 6px', color:'#9fb4a8', fontSize:13, fontWeight:900 }}>БҮРТГҮҮЛЭХ ДҮН</p>
           <strong style={{ display:'block', fontSize:32, color:'#72e1a3' }}>{REGISTRATION_FEE.toLocaleString('mn-MN')}₮</strong>
@@ -197,7 +221,7 @@ export function DriverRegistrationDialog({ initialPhone, onClose }: { initialPho
           <p style={{ margin:'0 0 8px', color:'#f1dfc4', lineHeight:1.55 }}>Гүйлгээний утгад утасны дугаараа оруулна уу.</p>
           <strong style={{ display:'block', fontSize:30, letterSpacing:'.08em', color:'#ffd166' }}>{phone}</strong>
         </div>
-        <button type="button" onClick={onClose} style={{ ...secondary, width:'100%', marginTop:14 }}>Хаах</button>
+        <button type="button" onClick={onClose} style={{ ...primary, marginTop:14 }}>Нэвтрэх рүү буцах</button>
       </>}
 
       {error && <div role="alert" style={{ marginTop:12, padding:12, borderRadius:12, background:'#391917', border:'1px solid rgba(255,105,97,.32)', color:'#ffaaa5' }}>{error}</div>}
