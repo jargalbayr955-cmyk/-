@@ -8,7 +8,7 @@ const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
 test('admin creates a phone-only driver with fixed initial PIN 000000', () => {
   const route = read('app/api/admin/drivers/route.ts')
   const page = read('app/admin/page.tsx')
-  const migration = read('supabase/migrations/20261029152100_fix_admin_phone_only_driver_creation.sql')
+  const migration = read('supabase/migrations/20261028171154_fix_admin_phone_only_driver_creation.sql')
   assert.match(route, /if \(action === ['"]add['"]\)/)
   assert.match(route, /const pin = ['"]000000['"]/) 
   assert.match(route, /p_name: ['"]Шинэ жолооч['"]/) 
@@ -48,7 +48,7 @@ test('first driver login is forced through name, plate and a new non-default six
 })
 
 test('database onboarding changes the initial PIN atomically and keeps the driver unavailable until setup finishes', () => {
-  const migration = read('supabase/migrations/20261029130000_admin_driver_onboarding.sql')
+  const migration = read('supabase/migrations/20261028160900_admin_driver_onboarding.sql')
   assert.match(migration, /complete_admin_driver_onboarding/)
   assert.match(migration, /p_pin = '000000'/)
   assert.match(migration, /pin_hash = extensions\.crypt\(p_pin/)
