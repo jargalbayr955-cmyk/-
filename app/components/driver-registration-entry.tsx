@@ -24,7 +24,6 @@ export function DriverRegistrationEntry() {
           hostRef.current = null
           setTarget(null)
         }
-        setOpen(false)
         return
       }
 
@@ -69,9 +68,7 @@ export function DriverRegistrationEntry() {
     setOpen(false)
   }
 
-  if (!target) return null
-
-  return createPortal(<>
+  const registrationButton = target ? createPortal(
     <div style={{ marginTop: 12, textAlign: 'center' }}>
       <button
         type="button"
@@ -85,7 +82,13 @@ export function DriverRegistrationEntry() {
       <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: 12, lineHeight: 1.45, margin: '8px 4px 0' }}>
         Шинээр жолооч болох бол эндээс бүртгэлээ эхлүүлнэ үү.
       </p>
-    </div>
-    {open && <DriverRegistrationDialog initialPhone="" onClose={closeRegistration} />}
-  </>, target)
+    </div>,
+    target,
+  ) : null
+
+  const registrationDialog = open && typeof document !== 'undefined'
+    ? createPortal(<DriverRegistrationDialog initialPhone="" onClose={closeRegistration} />, document.body)
+    : null
+
+  return <>{registrationButton}{registrationDialog}</>
 }
