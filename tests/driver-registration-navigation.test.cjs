@@ -8,11 +8,18 @@ const registration = fs.readFileSync(path.join(root, 'app/components/driver-regi
 const entry = fs.readFileSync(path.join(root, 'app/components/driver-registration-entry.tsx'), 'utf8')
 const auth = fs.readFileSync(path.join(root, 'app/components/customer-auth.tsx'), 'utf8')
 
-test('driver registration payment copy is customer-facing and automatic', () => {
-  assert.match(registration, /ГҮЙЛГЭЭНИЙ УТГАД ЗААВАЛ БИЧНЭ/)
-  assert.match(registration, /Энэ 6 оронтой тоог гүйлгээний утгад заавал бичнэ үү\. Төлбөр ормогц автоматаар баталгаажна\./)
+test('driver registration payment copy is a simple manual bank-transfer instruction', () => {
+  assert.match(registration, /БҮРТГҮҮЛЭХ ДҮН/)
+  assert.match(registration, /REGISTRATION_FEE = 25_000/)
+  assert.match(registration, /IBAN/)
+  assert.match(registration, /ДАНСНЫ НЭР/)
+  assert.match(registration, /ДАНС/)
+  assert.match(registration, /ГҮЙЛГЭЭНИЙ УТГА/)
+  assert.match(registration, /Гүйлгээний утгад утасны дугаараа оруулна уу\./)
   assert.doesNotMatch(registration, /MacroDroid/)
-  assert.doesNotMatch(registration, /код болон дүнг тааруулмагц/)
+  assert.doesNotMatch(registration, /6 оронтой/)
+  assert.doesNotMatch(registration, /автоматаар баталгааж/)
+  assert.doesNotMatch(registration, /Автоматаар шалгаж байна/)
 })
 
 test('phone back closes driver registration before leaving the driver login page', () => {
