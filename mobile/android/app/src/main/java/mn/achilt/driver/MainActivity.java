@@ -24,17 +24,27 @@ public final class MainActivity extends Activity {
     private WebView web;
     private TextView status;
     private Button work;
-    private boolean changing, visible;
+    private boolean changing, visible, askedWorkPermissions, pausedByUser;
+    private long lastAutoAttempt, lastPermissionReminder;
     private PermissionRequest mediaRequest;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService network = Executors.newSingleThreadExecutor();
     private final Runnable refresh = new Runnable() {
         @Override public void run() {
             String last = DriverWorkService.lastUpload == 0 ? "" : getString(R.string.location_age, Math.max(0, (System.currentTimeMillis() - DriverWorkService.lastUpload) / 1000));
-            status.setText(getString(R.string.work_status, DriverWorkService.status, DriverWorkService.running() ? last : ""));
-            work.setText(DriverWorkService.running() ? "Амарч эхлэх" : "Ажиллаж эхлэх");
+            String currentStatus = DriverWorkService.status;
+            if (!DriverWorkService.running() && !pausedByUser && !notificationReady() && !DriverApi.cookie().isEmpty())
+                currentStatus = "⚠ Мэдэгдэл асаана уу · Захиалга алдах эрсдэлтэй";
+            status.setText(getString(R.string.work_status, currentStatus, DriverWorkService.running() ? last : ""));
+            if (DriverWorkService.running()) work.setText("Амрах");
+            else if (pausedByUser) work.setText("Онлайн болох");
+            else if (!notificationReady()) work.setText("Мэдэгдэл асаах");
+            else work.setText("Онлайн автоматаар");
             work.setEnabled(!changing && (!DriverWorkService.busy() || DriverWorkService.running()));
-            if (visible) main.postDelayed(this, 1000);
+            if (visible) {
+                autoStartIfPossible();
+                main.postDelayed(this, 1000);
+            }
         }
     };
 
@@ -55,8 +65,15 @@ public final class MainActivity extends Activity {
         toolbar.setPadding(dp(12), dp(8), dp(12), dp(8));
         toolbar.setGravity(Gravity.CENTER_VERTICAL);
         work = new Button(this);
-        work.setText("Ажиллаж эхлэх"); work.setTextColor(Color.WHITE);
-        work.setOnClickListener(view -> { if (DriverWorkService.running()) stopWork(); else explainAndStart(); });
+        work.setText("Онлайн автоматаар"); work.setTextColor(Color.WHITE);
+        work.setOnClickListener(view -> {
+            if (DriverWorkService.running()) stopWork();
+            else {
+                pausedByUser = false;
+                if (askedWorkPermissions && !notificationReady()) openPermissionSettings();
+                else permissionsAndStart();
+            }
+        });
         toolbar.addView(work, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         Button menu = new Button(this);
         menu.setText("⋮"); menu.setContentDescription("Тохиргоо, гарах");
@@ -72,18 +89,14 @@ public final class MainActivity extends Activity {
         settings.setAllowFileAccess(false); settings.setAllowContentAccess(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setGeolocationEnabled(false);
-        settings.setUserAgentString(settings.getUserAgentString() + " AchiltDriverAndroid/2");
+        settings.setUserAgentString(settings.getUserAgentString() + " AchiltDriverAndroid/3");
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, false);
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
         // No JavascriptInterface, message bridge, arbitrary URL intent or certificate bypass.
         web.setWebChromeClient(new WebChromeClient() {
-            @Override public void onPermissionRequest(PermissionRequest request) {
-                runOnUiThread(() -> requestMedia(request));
-            }
-            @Override public void onPermissionRequestCanceled(PermissionRequest request) {
-                if (mediaRequest == request) mediaRequest = null;
-            }
+            @Override public void onPermissionRequest(PermissionRequest request) { runOnUiThread(() -> requestMedia(request)); }
+            @Override public void onPermissionRequestCanceled(PermissionRequest request) { if (mediaRequest == request) mediaRequest = null; }
             @Override public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
                 new AlertDialog.Builder(MainActivity.this).setMessage(message).setPositiveButton("За", (d,w) -> result.confirm()).setOnCancelListener(d -> result.cancel()).show();
                 return true;
@@ -107,7 +120,10 @@ public final class MainActivity extends Activity {
             @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame()) message("Хуудас нээгдсэнгүй. Интернэтээ шалгаад ⋮ → Шинэчлэх дарна уу.");
             }
-            @Override public void onPageFinished(WebView view, String url) { CookieManager.getInstance().flush(); }
+            @Override public void onPageFinished(WebView view, String url) {
+                CookieManager.getInstance().flush();
+                main.postDelayed(MainActivity.this::autoStartIfPossible, 700);
+            }
         });
         root.addView(web, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         setContentView(root); web.loadUrl(DriverApi.ORIGIN + "/driver");
@@ -116,8 +132,7 @@ public final class MainActivity extends Activity {
     }
 
     private boolean trustedMedia(PermissionRequest request) {
-        if (!WorkPolicy.trusted(DriverApi.ORIGIN, request.getOrigin().toString()) ||
-            web.getUrl() == null || !WorkPolicy.trusted(DriverApi.ORIGIN, web.getUrl())) return false;
+        if (!WorkPolicy.trusted(DriverApi.ORIGIN, request.getOrigin().toString()) || web.getUrl() == null || !WorkPolicy.trusted(DriverApi.ORIGIN, web.getUrl())) return false;
         if (request.getResources().length == 0) return false;
         for (String resource : request.getResources())
             if (!PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource) && !PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) return false;
@@ -146,10 +161,48 @@ public final class MainActivity extends Activity {
     }
     private void denyMedia() { if (mediaRequest != null) { mediaRequest.deny(); mediaRequest = null; } }
 
-    private void explainAndStart() {
-        new AlertDialog.Builder(this).setTitle("Байршлаа хуваалцаж ажиллах")
-            .setMessage("«Ажиллаж эхлэх» үед Ачилт таны байршлыг ойр захиалга сонгох, авсан захиалгын байршлыг шинэчлэхэд серверт илгээнэ. Дэлгэц түгжээтэй болон өөр апп ашиглаж байхад үргэлжилнэ.\n\n«Амарч эхлэх» эсвэл «Гарах» үед зогсоно. Дата, батарей зарцуулна. Шинэ захиалгыг ойролцоогоор 20 секунд тутам шалгана.")
-            .setNegativeButton("Болих", null).setPositiveButton("Зөвшөөрч эхлэх", (d,w) -> permissionsAndStart()).show();
+    private boolean notificationReady() {
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return false;
+        return getSystemService(NotificationManager.class).areNotificationsEnabled();
+    }
+    private boolean locationReady() {
+        return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            && getSystemService(LocationManager.class).isProviderEnabled(LocationManager.GPS_PROVIDER);
+    }
+    private void openPermissionSettings() {
+        message("Мэдэгдэл болон байршлыг Зөвшөөрөх болгосны дараа Ачилт автоматаар онлайн болно.");
+        startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
+    }
+    private void permissionReminder(String text) {
+        long now = SystemClock.elapsedRealtime();
+        status.setText(text);
+        if (now - lastPermissionReminder < 25_000) return;
+        lastPermissionReminder = now;
+        Toast.makeText(this, text, Toast.LENGTH_LONG).show();
+        try {
+            if (Build.VERSION.SDK_INT >= 31) getSystemService(VibratorManager.class).getDefaultVibrator().vibrate(VibrationEffect.createOneShot(120, VibrationEffect.DEFAULT_AMPLITUDE));
+            else getSystemService(Vibrator.class).vibrate(120);
+        } catch (Exception ignored) {}
+    }
+    private void autoStartIfPossible() {
+        if (!visible || changing || pausedByUser || DriverWorkService.running() || DriverWorkService.busy()) return;
+        String cookie = DriverApi.cookie();
+        if (cookie.isEmpty()) return;
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastAutoAttempt < 5_000) return;
+        lastAutoAttempt = now;
+        if (!notificationReady() || checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            if (!askedWorkPermissions) {
+                askedWorkPermissions = true;
+                permissionsAndStart();
+            } else permissionReminder("⚠ Мэдэгдэл, байршлын зөвшөөрлөө асаана уу. ⋮ → Зөвшөөрөл");
+            return;
+        }
+        if (!getSystemService(LocationManager.class).isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+            permissionReminder("⚠ GPS / Байршлаа асаана уу. Асаасны дараа автоматаар онлайн болно.");
+            return;
+        }
+        permissionsAndStart();
     }
     private void permissionsAndStart() {
         ArrayList<String> missing = new ArrayList<>();
@@ -158,13 +211,14 @@ public final class MainActivity extends Activity {
         }
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
             missing.add(Manifest.permission.POST_NOTIFICATIONS);
-        if (!missing.isEmpty()) { requestPermissions(missing.toArray(new String[0]), 1); return; }
-        if (!getSystemService(NotificationManager.class).areNotificationsEnabled()) {
-            message("Мэдэгдлээ зөвшөөрнө үү: ⋮ → Зөвшөөрөл."); return;
+        if (!missing.isEmpty()) {
+            if (askedWorkPermissions && !shouldShowRequestPermissionRationale(missing.get(0))) { openPermissionSettings(); return; }
+            askedWorkPermissions = true;
+            requestPermissions(missing.toArray(new String[0]), 1); return;
         }
+        if (!notificationReady()) { permissionReminder("⚠ Мэдэгдлээ асаана уу. ⋮ → Зөвшөөрөл"); return; }
         if (!getSystemService(LocationManager.class).isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-            message("Утасны байршил / GPS-ээ асаагаад дахин эхлүүлнэ үү.");
-            startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)); return;
+            permissionReminder("⚠ Утасны GPS / Байршлаа асаана уу."); return;
         }
         if (changing || DriverWorkService.busy()) return;
         changing = true;
@@ -172,17 +226,22 @@ public final class MainActivity extends Activity {
             try {
                 String cookie = DriverApi.cookie();
                 JSONObject session = DriverApi.call("/api/driver/session", null, cookie);
+                if (session.optBoolean("needsOnboarding")) throw new DriverApi.Failure(409, "Жолоочийн бүртгэлээ бүрэн дуусгана уу.");
                 String id = session.getJSONObject("driver").getString("id");
                 main.post(() -> {
                     changing = false;
-                    if (!visible) { message("Аппаа нээгээд «Ажиллаж эхлэх» дарна уу."); return; }
+                    if (!visible || pausedByUser) return;
                     try {
                         DriverWorkService.lastUpload = 0;
                         startForegroundService(new Intent(this, DriverWorkService.class).putExtra("driverId", id));
-                    } catch (RuntimeException error) { message("Ажил эхэлсэнгүй. Зөвшөөрлөө шалгаад дахин оролдоно уу."); }
+                    } catch (RuntimeException error) { message("Ажил автоматаар эхэлсэнгүй. Зөвшөөрлөө шалгана уу."); }
                 });
             } catch (Exception error) {
-                main.post(() -> { changing = false; message(error instanceof DriverApi.Failure ? error.getMessage() : "Сүлжээний алдаа. Дахин оролдоно уу."); });
+                main.post(() -> {
+                    changing = false;
+                    if (error instanceof DriverApi.Failure && ((DriverApi.Failure) error).status == 401) return;
+                    message(error instanceof DriverApi.Failure ? error.getMessage() : "Сүлжээ саатсан. Автоматаар дахин оролдоно.");
+                });
             }
         });
     }
@@ -195,10 +254,11 @@ public final class MainActivity extends Activity {
             else { denyMedia(); message("Видео дуудлагад камер, микрофоны зөвшөөрөл хэрэгтэй. ⋮ → Зөвшөөрөл хэсгээс өөрчилнө үү."); }
             return;
         }
-        if (code == 1 && allowed) permissionsAndStart();
-        else message("Байршлын нарийвчилсан болон мэдэгдлийн зөвшөөрөл хэрэгтэй. ⋮ → Зөвшөөрөл хэсгээс өөрчилнө үү.");
+        if (code == 1 && allowed) { askedWorkPermissions = false; permissionsAndStart(); }
+        else { askedWorkPermissions = true; permissionReminder("⚠ Байршил болон мэдэгдлийн зөвшөөрөл хэрэгтэй. ⋮ → Зөвшөөрөл"); }
     }
     private void stopWork() {
+        pausedByUser = true;
         changing = true;
         DriverWorkService.stop(() -> { changing = false; web.reload(); });
     }
@@ -208,7 +268,7 @@ public final class MainActivity extends Activity {
         menu.setOnMenuItemClickListener(item -> {
             switch (item.getTitle().toString()) {
                 case "Шинэчлэх": web.reload(); break;
-                case "Зөвшөөрөл": startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()))); break;
+                case "Зөвшөөрөл": openPermissionSettings(); break;
                 case "Гарах": new AlertDialog.Builder(this).setMessage("Ажлаа зогсоож, энэ төхөөрөмжөөс гарах уу?")
                     .setNegativeButton("Болих", null).setPositiveButton("Гарах", (d,w) -> logout()).show(); break;
             }
@@ -218,6 +278,7 @@ public final class MainActivity extends Activity {
     }
     private void logout() {
         if (changing) return;
+        pausedByUser = true;
         changing = true;
         DriverWorkService.stop(() -> network.execute(() -> {
             try {
@@ -239,7 +300,10 @@ public final class MainActivity extends Activity {
     }
     private void message(String text) { Toast.makeText(this, text, Toast.LENGTH_LONG).show(); status.setText(text); }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
-    @Override protected void onResume() { super.onResume(); visible = true; main.removeCallbacks(refresh); main.post(refresh); web.onResume(); }
+    @Override protected void onResume() {
+        super.onResume(); visible = true; main.removeCallbacks(refresh); main.post(refresh); web.onResume();
+        main.postDelayed(this::autoStartIfPossible, 600);
+    }
     @Override protected void onPause() { visible = false; main.removeCallbacks(refresh); CookieManager.getInstance().flush(); web.onPause(); super.onPause(); }
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent); setIntent(intent); web.loadUrl(DriverApi.ORIGIN + "/driver"); }
     // Android 13+ uses the registered platform callback above, including Android 16 gestures.
