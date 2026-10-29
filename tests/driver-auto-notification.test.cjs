@@ -5,9 +5,71 @@ const path = require('node:path')
 
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
 
-test('starting work automatically requests push notifications before enabling availability', () => {
+test('eligible driver login and session restore auto-start without a manual work button', () => {
+  const login = read('app/api/driver/login/route.ts')
+  const session = read('app/api/driver/session/route.ts')
   const view = read('app/components/driver-dispatch-view.tsx')
-  assert.match(view, /if \(!driver\.available && !pushReady && !notificationsDenied\) onSubscribe\(\)/)
-  assert.match(view, /onSubscribe\(\)[\s\S]{0,80}onToggleAvailable\(\)/)
-  assert.match(view, /driver\.available \? 'Амрах' : 'Ажиллаж эхлэх'/)
+  assert.match(login, /autoStart = !\(await driverHasBlockingWork\(data\.id\)\)/)
+  assert.match(login, /update\(\{ available: true, is_online: false \}\)/)
+  assert.match(session, /autoStart = !\(await driverHasBlockingWork\(driver\.id\)\)/)
+  assert.match(session, /update\(\{ available: true, is_online: false \}\)/)
+  assert.match(view, /driver\.available \? 'Амрах' : 'Онлайн болох'/)
+  assert.doesNotMatch(view, /driver\.available \? 'Амрах' : 'Ажиллаж эхлэх'/)
+})
+
+test('automatic online still requires a fresh GPS before dispatch', () => {
+  const location = read('app/api/driver/location/route.ts')
+  const availability = read('app/api/driver/availability/route.ts')
+  const migration = read('supabase/migrations/20261029043322_unified_service_types.sql')
+  assert.match(location, /update\.available = true/)
+  assert.match(location, /location_updated_at: now/)
+  assert.match(availability, /FRESH_LOCATION_MS = 2 \* 60_000/)
+  // Existing dispatch hardening must keep its two-minute GPS gate.
+  assert.match(migration, /location_updated_at[^\n]*2 minutes|2 minutes[^\n]*location_updated_at/)
+})
+
+test('notification stays visible as a frequent reminder until push is healthy', () => {
+  const view = read('app/components/driver-dispatch-view.tsx')
+  assert.match(view, /window\.setInterval\(remind, 25_000\)/)
+  assert.match(view, /navigator\.vibrate\?\.\(\[70, 80, 70\]\)/)
+  assert.match(view, /Захиалгын мэдэгдэл асаагаагүй байна/)
+  assert.match(view, /Settings → Notifications → Achilt/)
+  assert.match(view, /Notification\.permission === 'granted'/)
+  assert.match(view, /\/api\/driver\/heartbeat/)
+})
+
+test('push delivery is multi-device, retried and acknowledged by the service worker', () => {
+  const subscribe = read('app/api/push/subscribe/route.ts')
+  const push = read('lib/server/push.ts')
+  const sw = read('public/sw.js')
+  const migration = read('supabase/migrations/20261029113000_driver_online_push_reliability.sql')
+  assert.match(subscribe, /endpoint_hash/)
+  assert.match(subscribe, /devices: count \|\| 0/)
+  assert.match(push, /attempt <= 3/)
+  assert.match(push, /urgency: 'high'/)
+  assert.match(push, /driver_push_deliveries/)
+  assert.match(sw, /\/api\/push\/ack/)
+  assert.match(sw, /requireInteraction: isUrgentOrder/)
+  assert.match(migration, /push_subscriptions_driver_endpoint_uidx/)
+  assert.match(migration, /driver_push_deliveries/)
+})
+
+test('online peer vehicle has blinking headlights and online means dispatch-fresh GPS', () => {
+  const map = read('app/components/driver-orders-map.tsx')
+  const peers = read('app/api/driver/peers/route.ts')
+  assert.match(map, /driver-peer-headlights/)
+  assert.match(map, /headlights\.animate\?\./)
+  assert.match(map, /item\.headlights\.style\.visibility = online \? 'visible' : 'hidden'/)
+  assert.match(peers, /FRESH_WINDOW_MS = 2 \* 60_000/)
+})
+
+test('native Android auto-starts authenticated work and polls orders every ten seconds', () => {
+  const activity = read('mobile/android/app/src/main/java/mn/achilt/driver/MainActivity.java')
+  const service = read('mobile/android/app/src/main/java/mn/achilt/driver/DriverWorkService.java')
+  assert.match(activity, /autoStartIfPossible\(\)/)
+  assert.match(activity, /main\.postDelayed\(this::autoStartIfPossible, 600\)/)
+  assert.match(activity, /Мэдэгдэл асаах/)
+  assert.match(service, /scheduleWithFixedDelay\(this::tick, 0, 10, TimeUnit\.SECONDS\)/)
+  assert.match(service, /\/api\/driver\/heartbeat/)
+  assert.match(service, /IMPORTANCE_HIGH/)
 })

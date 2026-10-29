@@ -11,7 +11,7 @@ import org.json.*;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** User-started, visible location service. No boot receiver or hidden auto-start. */
+/** Visible foreground location/order service. It may auto-start after an authenticated login. */
 public final class DriverWorkService extends Service implements LocationListener {
     static volatile DriverWorkService instance;
     static volatile String status = "Амарч байна · Байршил илгээхгүй";
@@ -27,7 +27,7 @@ public final class DriverWorkService extends Service implements LocationListener
     private volatile boolean stopping;
     private boolean starting = true;
     private String cookie, driverId;
-    private long startedAt, sessionCheckedAt;
+    private long startedAt, sessionCheckedAt, heartbeatAt;
 
     static boolean running() { return instance != null && !instance.stopping; }
     static boolean busy() { return instance != null; }
@@ -45,7 +45,9 @@ public final class DriverWorkService extends Service implements LocationListener
         work.setDescription("Ажиллаж байх үед байршил илгээж байгааг харуулна.");
         notifications.createNotificationChannel(work);
         NotificationChannel orders = new NotificationChannel(ORDERS, "Шинэ захиалга", NotificationManager.IMPORTANCE_HIGH);
+        orders.setDescription("Шинэ захиалга болон хэрэглэгч таны саналыг сонгосон үед яаралтай мэдэгдэнэ.");
         orders.enableVibration(true);
+        orders.setVibrationPattern(new long[]{0, 300, 100, 300, 100, 500});
         notifications.createNotificationChannel(orders);
         wake = getSystemService(PowerManager.class).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Achilt:DriverWork");
         wake.setReferenceCounted(false);
@@ -65,11 +67,11 @@ public final class DriverWorkService extends Service implements LocationListener
             else startForeground(1, workNotification());
             if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
                 throw new SecurityException();
-            // Started from the visible activity, so a location FGS retains access when the screen locks.
-            locations.requestLocationUpdates(LocationManager.GPS_PROVIDER, 15_000, 0, this, Looper.getMainLooper());
+            // A location FGS retains access when the screen locks or another app is foregrounded.
+            locations.requestLocationUpdates(LocationManager.GPS_PROVIDER, 10_000, 0, this, Looper.getMainLooper());
             if (locations.isProviderEnabled(LocationManager.NETWORK_PROVIDER))
-                locations.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 15_000, 0, this, Looper.getMainLooper());
-            worker.scheduleWithFixedDelay(this::tick, 0, 20, TimeUnit.SECONDS);
+                locations.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 10_000, 0, this, Looper.getMainLooper());
+            worker.scheduleWithFixedDelay(this::tick, 0, 10, TimeUnit.SECONDS);
         } catch (Exception error) { finish("GPS зөвшөөрлөө шалгаад дахин эхлүүлнэ үү.", true, null); }
         return START_NOT_STICKY;
     }
@@ -84,14 +86,25 @@ public final class DriverWorkService extends Service implements LocationListener
     @Override public void onProviderEnabled(String provider) {}
     @Override public void onStatusChanged(String provider, int status, Bundle extras) {}
 
+    private void sendHeartbeat(long now) {
+        if (heartbeatAt != 0 && now - heartbeatAt < 30_000) return;
+        try {
+            DriverApi.call("/api/driver/heartbeat", new JSONObject().put("notification_health", "native"), cookie);
+            heartbeatAt = now;
+        } catch (Exception ignored) {
+            // Order/GPS calls below remain authoritative; a transient heartbeat failure must not stop work.
+        }
+    }
+
     private void tick() {
         if (stopping) return;
         // A bounded lock keeps each work interval alive; cleanup always releases it.
         wake.acquire(90_000);
         try {
+            NotificationChannel orderChannel = notifications.getNotificationChannel(ORDERS);
             if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
                 || !notifications.areNotificationsEnabled()
-                || notifications.getNotificationChannel(ORDERS).getImportance() == NotificationManager.IMPORTANCE_NONE) {
+                || orderChannel == null || orderChannel.getImportance() == NotificationManager.IMPORTANCE_NONE) {
                 finish("Байршил, мэдэгдлийн зөвшөөрлөө шалгана уу.", true, null); return;
             }
             if (!Objects.equals(cookie, DriverApi.cookie())) {
@@ -105,6 +118,7 @@ public final class DriverWorkService extends Service implements LocationListener
                 }
                 sessionCheckedAt = now;
             }
+            sendHeartbeat(now);
             if (stopping) return;
             JSONObject orders = DriverApi.call("/api/driver/orders", null, cookie);
             boolean accepted = orders.optJSONObject("acceptedOrder") != null;
@@ -122,7 +136,6 @@ public final class DriverWorkService extends Service implements LocationListener
                 }
             } else {
                 JSONObject body = new JSONObject().put("lat", position.getLatitude()).put("lng", position.getLongitude());
-                // Only the initial explicit start may make the driver available. Heartbeats never do.
                 if (starting && !accepted) body.put("available", true);
                 JSONObject result = DriverApi.call("/api/driver/location", body, cookie);
                 if (starting && !accepted && !result.optBoolean("available")) {
@@ -137,7 +150,7 @@ public final class DriverWorkService extends Service implements LocationListener
             if (error.status == 401 || error.status == 403) finish("Нэвтрэх эрх дууссан. Дахин нэвтэрнэ үү.", false, null);
             else status = error.status == 409 ? error.getMessage() : "Холболт саатсан · Дахин холбогдож байна";
             if (error.status == 409) finish(error.getMessage(), true, null);
-        } catch (Exception error) { status = "Сүлжээ тасарсан · Байршил шинэчлэгдээгүй"; }
+        } catch (Exception error) { status = "Сүлжээ тасарсан · Автоматаар дахин холбогдож байна"; }
         finally { if (!stopping) notifications.notify(1, workNotification()); }
     }
 
@@ -149,14 +162,14 @@ public final class DriverWorkService extends Service implements LocationListener
             String id = order.getString("id");
             live.add(id);
             if (!order.optBoolean("has_offered") && seen.add(id)) {
-                notifyOrder(id, "Шинэ ачилтын захиалга", "Үнийн санал өгөхийн тулд нээнэ үү.");
+                notifyOrder(id, "Шинэ захиалга ирлээ", "Үнийн санал өгөхийн тулд нээнэ үү.");
             }
         }
         JSONObject accepted = body.optJSONObject("acceptedOrder");
         if (accepted != null) {
             String id = "accepted:" + accepted.getString("id");
             live.add(id);
-            if (seen.add(id)) notifyOrder(id, "Таны саналыг сонголоо", "Захиалгаа нээж дэлгэрэнгүйг харна уу.");
+            if (seen.add(id)) notifyOrder(id, "Таны саналыг сонголоо", "Захиалгаа нээж хэрэглэгчтэй холбогдоно уу.");
         }
         for (String old : new HashSet<>(seen)) if (!live.contains(old)) { notifications.cancel(old, 2); seen.remove(old); }
     }
@@ -168,12 +181,14 @@ public final class DriverWorkService extends Service implements LocationListener
         return new Notification.Builder(this, WORK).setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Ачилт Жолооч").setContentText(status).setContentIntent(openApp())
             .setOngoing(true).setOnlyAlertOnce(true).setCategory(Notification.CATEGORY_SERVICE)
-            .addAction(new Notification.Action.Builder(null, "Амарч эхлэх", stop).build()).build();
+            .addAction(new Notification.Action.Builder(null, "Амрах", stop).build()).build();
     }
     private void notifyOrder(String id, String title, String text) {
         notifications.notify(id, 2, new Notification.Builder(this, ORDERS).setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title).setContentText(text).setContentIntent(openApp()).setAutoCancel(true)
-            .setVisibility(Notification.VISIBILITY_PRIVATE).setTimeoutAfter(600_000).build());
+            .setVisibility(Notification.VISIBILITY_PRIVATE).setCategory(Notification.CATEGORY_REMINDER)
+            .setPriority(Notification.PRIORITY_MAX).setDefaults(Notification.DEFAULT_VIBRATE)
+            .setTimeoutAfter(600_000).build());
     }
 
     private synchronized void finish(String message, boolean offline, Runnable after) {

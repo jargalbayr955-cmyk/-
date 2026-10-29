@@ -31,3 +31,23 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+
+  android-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: mobile/android
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+      - name: Test and compile Android driver
+        run: ./gradlew testDebugUnitTest assembleDebug --no-daemon

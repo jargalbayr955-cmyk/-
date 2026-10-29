@@ -18,13 +18,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid coordinates' }, { status: 400 })
   }
 
+  const now = new Date().toISOString()
   const update: Record<string, unknown> = {
     lat: latitude,
     lng: longitude,
-    location_updated_at: new Date().toISOString(),
+    location_updated_at: now,
+    last_heartbeat_at: now,
+    is_online: true,
   }
 
-  if (available === true) {
+  if (available === false) {
+    update.available = false
+    update.is_online = false
+  } else if (!driver.available || available === true) {
+    // Login/session restore auto-starts the client watcher, but this is the only point
+    // where an idle driver becomes dispatchable: a fresh valid GPS fix must arrive first.
     if (!serviceProfileIsComplete(driver.service_type, driver.car_type)) {
       return NextResponse.json({ error: 'Профайл хэсэгт үйлчилгээний төрлөө бүрэн сонгоно уу' }, { status: 409 })
     }
@@ -33,8 +41,6 @@ export async function POST(req: NextRequest) {
     } catch {
       return NextResponse.json({ error: 'Driver state check failed' }, { status: 500 })
     }
-  } else if (available === false) {
-    update.available = false
   }
 
   const { error } = await getSupabaseAdmin()
@@ -45,5 +51,5 @@ export async function POST(req: NextRequest) {
     .is('deleted_at', null)
 
   if (error) return NextResponse.json({ error: 'Location update failed' }, { status: 500 })
-  return NextResponse.json({ success: true, available: update.available ?? driver.available })
+  return NextResponse.json({ success: true, available: update.available ?? driver.available, location_updated_at: now })
 }

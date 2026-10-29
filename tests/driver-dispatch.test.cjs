@@ -21,6 +21,7 @@ function componentHarness(file, name, initial = {}, replacements = {}, globals =
     const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText
     vm.runInNewContext(source, {
       exports, console, AbortController, AbortSignal: {}, setTimeout: () => 1, clearTimeout() {}, setInterval: () => 2, clearInterval() {},
+      fetch: async () => ({ ok: true, status: 200, json: async () => ({}) }),
       window: { addEventListener() {}, removeEventListener() {}, setInterval: () => 2, clearInterval() {} }, document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} }, navigator: {}, localStorage: { setItem() {}, removeItem() {} }, ...globals,
       require(module) {
         if (Object.hasOwn(replacements, module)) return replacements[module]
@@ -88,7 +89,7 @@ test('withdrawn selection switches to an existing order and empty/offline state 
   h.update({ driver: { ...driver, available: false } })
   assert.equal(h.nodes().find(node => node.props?.type === 'submit').props.disabled, true)
   h.update({ orders: [] })
-  assert.match(h.text(), /Ажиллаж эхлэх.*Захиалга авахгүй.*Ажиллаж эхлээд захиалга аваарай/)
+  assert.match(h.text(), /Онлайн болох.*Захиалга авахгүй.*Амарч байна.*Онлайн болох товчоор/)
   assert.equal(h.nodes().filter(node => node.type === 'DriverOrdersMap').length, 1)
   h.unmount()
 })
