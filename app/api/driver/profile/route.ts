@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { allowRequest } from '@/lib/server/security'
 import { setDeviceSession } from '@/lib/server/device-session'
-import { driverNeedsOnboarding, requireDriver } from '@/lib/server/driver'
+import { requireDriver } from '@/lib/server/driver'
 import { isServiceType, isTowType } from '@/lib/service-types'
 
 export async function POST(req: NextRequest) {
@@ -19,7 +19,8 @@ export async function POST(req: NextRequest) {
   const rawCarType = b.car_type == null ? null : String(b.car_type)
   const carType = serviceType === 'achilt' ? rawCarType : null
   const serviceValid = isServiceType(serviceType) && (serviceType === 'achilt' ? isTowType(carType) : rawCarType === null || rawCarType === '')
-  const onboarding = driverNeedsOnboarding(driver)
+  const existingName = String(driver.name || '').trim()
+  const onboarding = !existingName || existingName === 'Шинэ жолооч'
   const s = getSupabaseAdmin()
 
   // Legacy/admin-created placeholder drivers still complete the stricter onboarding flow.
