@@ -43,7 +43,7 @@ test('Messenger-style driver chat has inbox, unread state, bubbles and read rece
   const dispatch = read('app/components/driver-dispatch-view.tsx')
   assert.match(panel, /Жолоочийн чат/)
   assert.match(panel, /unread_count/)
-  assert.match(panel, /message\.mine \? '✓✓' : '✓'/)
+  assert.match(panel, /message\.read_at \? '✓✓' : '✓'/)
   assert.match(panel, /Зурвас 30 хоног хадгалагдана/)
   assert.match(dispatch, /chatUnread/)
   assert.match(dispatch, /DriverChatPanel/)
