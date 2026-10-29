@@ -11,7 +11,7 @@ test('driver registration and remembered session go straight back to the driver 
   const session = read('lib/server/device-session.ts')
   const clientSession = read('lib/client/session.ts')
 
-  assert.match(registration, /window\.location\.replace\(body\.redirect \|\| '\/driver'\)/)
+  assert.match(registration, /window\.location\.replace\(typeof body\.redirect === 'string' \? body\.redirect : '\/driver'\)/)
   assert.doesNotMatch(registration, /payment/i)
   assert.match(request, /setDeviceSession\(response, driver\.id, 'driver', session_version\)/)
   assert.match(request, /payment_required: false/)
