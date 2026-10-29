@@ -8,19 +8,17 @@ const registration = fs.readFileSync(path.join(root, 'app/components/driver-regi
 const entry = fs.readFileSync(path.join(root, 'app/components/driver-registration-entry.tsx'), 'utf8')
 const auth = fs.readFileSync(path.join(root, 'app/components/customer-auth.tsx'), 'utf8')
 
-test('driver registration payment copy is a simple manual bank-transfer instruction', () => {
-  assert.match(registration, /БҮРТГҮҮЛЭХ ДҮН/)
-  assert.match(registration, /REGISTRATION_FEE = 25_000/)
-  assert.match(registration, /IBAN/)
-  assert.match(registration, /ДАНСНЫ НЭР/)
-  assert.match(registration, /ДАНС/)
-  assert.match(registration, /ГҮЙЛГЭЭНИЙ УТГА/)
-  assert.match(registration, /Гүйлгээний утгад утасны дугаараа оруулна уу\./)
-  assert.match(registration, /6 оронтой PIN/)
-  assert.doesNotMatch(registration, /6 оронтой кодыг гүйлгээний утгад/)
-  assert.doesNotMatch(registration, /MacroDroid/)
-  assert.doesNotMatch(registration, /автоматаар баталгааж/)
-  assert.doesNotMatch(registration, /Автоматаар шалгаж байна/)
+test('successful driver registration skips payment and goes straight to driver map', () => {
+  assert.match(registration, /Бүртгүүлээд шууд жолоочийн газрын зураг руу орно/)
+  assert.match(registration, /Төлбөр болон админы зөвшөөрөл хүлээхгүй/)
+  assert.match(registration, /window\.location\.replace/)
+  assert.match(registration, /body\.redirect/)
+  assert.match(registration, /'\/driver'/)
+  assert.doesNotMatch(registration, /БҮРТГҮҮЛЭХ ДҮН/)
+  assert.doesNotMatch(registration, /REGISTRATION_FEE/)
+  assert.doesNotMatch(registration, /IBAN/)
+  assert.doesNotMatch(registration, /ГҮЙЛГЭЭНИЙ УТГА/)
+  assert.doesNotMatch(registration, /6 оронтой PIN/)
 })
 
 test('phone back closes driver registration before leaving the driver login page', () => {
