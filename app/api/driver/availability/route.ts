@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { allowRequest } from '@/lib/server/security'
-import { driverHasBlockingWork, driverServiceProfileIsComplete, requireDriver } from '@/lib/server/driver'
+import { driverHasBlockingWork, requireDriver } from '@/lib/server/driver'
+import { serviceProfileIsComplete } from '@/lib/service-types'
 
 export async function POST(req: NextRequest) {
   const driver = await requireDriver(req)
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
   if (typeof available !== 'boolean') return NextResponse.json({ error: 'Invalid value' }, { status: 400 })
 
   if (available) {
-    if (!driverServiceProfileIsComplete(driver)) {
+    if (!serviceProfileIsComplete(driver.service_type, driver.car_type)) {
       return NextResponse.json({ error: 'Профайл хэсэгт үйлчилгээний төрлөө бүрэн сонгоно уу' }, { status: 409 })
     }
     try {
