@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     s.from('orders').select('id,created_at,completed_at,from_address,to_address,driver_id,driver_name,driver_phone,car_type,car_mark,status,final_price,duration_minutes').eq('status', 'completed').gte('created_at', since).order('created_at', { ascending: false }).limit(100),
     s.from('settings').select('key,value').in('key', ['hero_url', 'bank_name', 'bank_account']),
     s.rpc('admin_pending_driver_payments'),
-    s.from('users').select('id', { count: 'exact', head: true }).not('otp_registered_at', 'is', null),
+    s.from('users').select('id', { count: 'exact', head: true }).gte('otp_registered_at', '1970-01-01T00:00:00.000Z'),
   ])
 
   if ([driversR, activeR, historyR, settingsR, pendingR, otpUsersR].some(result => result.error)) {
