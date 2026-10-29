@@ -17,7 +17,7 @@ export type DriverFilter = 'all' | 'available' | 'paused'
 export const adminSections = [
   { id: 'overview', label: 'Ерөнхий тойм', description: 'Хүлээгдэж буй ажил, хурдан үйлдэл' },
   { id: 'payments', label: 'Төлбөр · Эрх нээх', description: 'Шимтгэл шалгаж, жолоочийн эрх нээх' },
-  { id: 'drivers', label: 'Жолооч нар', description: 'Бүртгэл, утас, улсын дугаар, PIN' },
+  { id: 'drivers', label: 'Бүртгүүлсэн жолооч нар', description: 'Бүх жолоочийн бүртгэл, нэр, утас, улсын дугаар, төлөв, PIN' },
   { id: 'active', label: 'Явагдаж буй захиалга', description: 'Жолооч сонгогдсон захиалгууд' },
   { id: 'history', label: 'Дууссан захиалга', description: 'Сүүлийн 24 цагт үүсэж, дууссан захиалга' },
   { id: 'map', label: 'Жолоочийн байршил', description: 'Захиалга авахад бэлэн жолооч нар' },
