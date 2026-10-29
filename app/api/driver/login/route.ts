@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { setDeviceSession } from '@/lib/server/device-session'
+import { driverHasBlockingWork, driverNeedsOnboarding, driverServiceProfileIsComplete } from '@/lib/server/driver'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { allowRequest, getClientIp, isSessionConfigured, normalizeMnPhone } from '@/lib/server/security'
 
@@ -21,8 +22,16 @@ export async function POST(req: NextRequest) {
   if (lookupError) return NextResponse.json({ error: 'Нэвтрэх үйлчилгээ түр боломжгүй байна. Дахин оролдоно уу.' }, { status: 503 })
   if (!data?.active) return NextResponse.json({ error: 'Жолоочийн эрх хаалттай байна' }, { status: 403 })
   if ((data.session_version ?? null) !== (identity.session_version ?? null)) return NextResponse.json({ error: 'PIN өөрчлөгдсөн байна. Дахин нэвтэрнэ үү.' }, { status: 401 })
-  const { session_version, ...profile } = data
-  const res = NextResponse.json({ driver: profile })
+  const { session_version, ...storedProfile } = data
+  let autoStart = false
+  if (!driverNeedsOnboarding(storedProfile) && driverServiceProfileIsComplete(storedProfile)) {
+    try { autoStart = !(await driverHasBlockingWork(data.id)) }
+    catch { autoStart = false }
+  }
+  // GPS activation is intentionally two-phase: the UI starts location tracking now,
+  // while the database becomes available only after a fresh coordinate reaches /location.
+  const profile = autoStart ? { ...storedProfile, available: true } : storedProfile
+  const res = NextResponse.json({ driver: profile, autoStart })
   setDeviceSession(res, data.id, 'driver', session_version)
   return res
 }
