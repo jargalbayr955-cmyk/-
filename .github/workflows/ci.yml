@@ -35,12 +35,16 @@ jobs:
   android-native:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: mobile/android
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
       - name: Use Java 17
         uses: actions/setup-java@v4
         with:
@@ -58,3 +62,22 @@ jobs:
           path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
+      - name: Publish preview APK on the PR branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        working-directory: .
+        run: |
+          if [ "$(git log -1 --pretty=%s)" = "Update compiled driver APK" ]; then
+            echo "Compiled APK is already the branch head; skip republishing."
+            exit 0
+          fi
+          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk public/downloads/AchiltDriver-5.5.3-preview.apk
+          sha256sum public/downloads/AchiltDriver-5.5.3-preview.apk > public/downloads/AchiltDriver-5.5.3-preview.apk.sha256
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/downloads/AchiltDriver-5.5.3-preview.apk public/downloads/AchiltDriver-5.5.3-preview.apk.sha256
+          if git diff --cached --quiet; then
+            echo "APK is unchanged."
+            exit 0
+          fi
+          git commit -m "Update compiled driver APK"
+          git push origin HEAD:${{ github.head_ref }}
