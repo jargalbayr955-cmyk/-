@@ -156,6 +156,19 @@ public final class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return false;
         return getSystemService(NotificationManager.class).areNotificationsEnabled();
     }
+    private boolean backgroundLocationReady() {
+        return Build.VERSION.SDK_INT < 29 || checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+    private void maybeExplainBackgroundLocation() {
+        if (!visible || backgroundLocationReady() || DriverWorkState.backgroundPrompted(this)) return;
+        DriverWorkState.markBackgroundPrompted(this);
+        new AlertDialog.Builder(this)
+            .setTitle("Restart хийсэн ч онлайн хэвээр байх")
+            .setMessage("Утсаа дахин асаасан ч захиалга тасрахгүй сэргээхийн тулд Байршил / Location дээр “Allow all the time / Үргэлж зөвшөөрөх” сонголтыг өгнө үү. Энэ зөвшөөрөлгүй байсан ч апп нээлттэй үед хэвийн ажиллана.")
+            .setNegativeButton("Дараа", null)
+            .setPositiveButton("Тохиргоо нээх", (d,w) -> openPermissionSettings())
+            .show();
+    }
     private void openPermissionSettings() {
         message("Мэдэгдэл болон байршлыг Зөвшөөрөх болгосны дараа Ачилт автоматаар онлайн болно.");
         startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
@@ -215,18 +228,23 @@ public final class MainActivity extends Activity {
                 JSONObject session = DriverApi.call("/api/driver/session", null, cookie);
                 if (session.optBoolean("needsOnboarding")) throw new DriverApi.Failure(409, "Жолоочийн бүртгэлээ бүрэн дуусгана уу.");
                 String id = session.getJSONObject("driver").getString("id");
+                DriverWorkState.remember(this, id);
                 main.post(() -> {
                     changing = false;
                     if (!visible) return;
                     try {
                         DriverWorkService.lastUpload = 0;
                         startForegroundService(new Intent(this, DriverWorkService.class).putExtra("driverId", id));
+                        maybeExplainBackgroundLocation();
                     } catch (RuntimeException error) { message("Ажил автоматаар эхэлсэнгүй. Зөвшөөрлөө шалгана уу."); }
                 });
             } catch (Exception error) {
                 main.post(() -> {
                     changing = false;
-                    if (error instanceof DriverApi.Failure && ((DriverApi.Failure) error).status == 401) return;
+                    if (error instanceof DriverApi.Failure && ((DriverApi.Failure) error).status == 401) {
+                        DriverWorkState.clear(this);
+                        return;
+                    }
                     message(error instanceof DriverApi.Failure ? error.getMessage() : "Сүлжээ саатсан. Автоматаар дахин оролдоно.");
                 });
             }
@@ -261,6 +279,7 @@ public final class MainActivity extends Activity {
     private void logout() {
         if (changing) return;
         changing = true;
+        DriverWorkState.clear(this);
         DriverWorkService.stop(() -> network.execute(() -> {
             try {
                 String cookie = DriverApi.cookie();

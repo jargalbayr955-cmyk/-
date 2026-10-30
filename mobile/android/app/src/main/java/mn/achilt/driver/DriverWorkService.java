@@ -57,11 +57,24 @@ public final class DriverWorkService extends Service implements LocationListener
         instance = this;
         cookie = DriverApi.cookie();
         if (intent != null && intent.getStringExtra("driverId") != null) driverId = intent.getStringExtra("driverId");
+        if ((driverId == null || driverId.isEmpty()) && DriverWorkState.enabled(this)) driverId = DriverWorkState.driverId(this);
         startedAt = SystemClock.elapsedRealtime();
         status = "ОНЛАЙН · GPS байршил тогтоож байна…";
         try {
             if (Build.VERSION.SDK_INT >= 29) startForeground(1, workNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
             else startForeground(1, workNotification());
+        } catch (RuntimeException error) {
+            stopping = true;
+            stopSelf();
+            if (instance == this) instance = null;
+            return START_NOT_STICKY;
+        }
+        if (!DriverWorkState.enabled(this) || cookie == null || cookie.isEmpty()) {
+            DriverWorkState.clear(this);
+            finish("Нэвтрэх шаардлагатай. Аппаа нээнэ үү.", null);
+            return START_NOT_STICKY;
+        }
+        try {
             if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
                 throw new SecurityException();
             // A location FGS retains access when the screen locks or another app is foregrounded.
@@ -69,7 +82,10 @@ public final class DriverWorkService extends Service implements LocationListener
             if (locations.isProviderEnabled(LocationManager.NETWORK_PROVIDER))
                 locations.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 10_000, 0, this, Looper.getMainLooper());
             worker.scheduleWithFixedDelay(this::tick, 0, 10, TimeUnit.SECONDS);
-        } catch (Exception error) { finish("GPS зөвшөөрлөө шалгаад аппаа нээнэ үү.", null); }
+        } catch (Exception error) {
+            finish("GPS зөвшөөрлөө шалгаад аппаа нээнэ үү.", null);
+            return START_NOT_STICKY;
+        }
         return START_STICKY;
     }
 
@@ -108,17 +124,25 @@ public final class DriverWorkService extends Service implements LocationListener
                 || orderChannel == null || orderChannel.getImportance() == NotificationManager.IMPORTANCE_NONE) {
                 finish("Байршил, мэдэгдлийн зөвшөөрлөө шалгана уу.", null); return;
             }
-            if (!Objects.equals(cookie, DriverApi.cookie())) {
+            String currentCookie = DriverApi.cookie();
+            if (!Objects.equals(cookie, currentCookie)) {
+                if (currentCookie == null || currentCookie.isEmpty()) DriverWorkState.clear(this);
                 finish("Нэвтрэлт өөрчлөгдсөн. Аппаа нээгээд дахин нэвтэрнэ үү.", null); return;
             }
             long now = SystemClock.elapsedRealtime();
             if (sessionCheckedAt == 0 || now - sessionCheckedAt >= 60 * 60_000) {
                 JSONObject session = DriverApi.call("/api/driver/session", null, cookie);
+                if (session.optBoolean("needsOnboarding")) {
+                    DriverWorkState.clear(this);
+                    finish("Жолоочийн бүртгэлээ бүрэн дуусгана уу.", null); return;
+                }
                 String currentId = session.getJSONObject("driver").getString("id");
                 if (driverId == null || driverId.isEmpty()) driverId = currentId;
                 else if (!Objects.equals(driverId, currentId)) {
+                    DriverWorkState.clear(this);
                     finish("Нэвтрэлт өөрчлөгдсөн байна.", null); return;
                 }
+                DriverWorkState.remember(this, currentId);
                 sessionCheckedAt = now;
             }
             sendHeartbeat(now);
@@ -144,8 +168,10 @@ public final class DriverWorkService extends Service implements LocationListener
             }
             if (!stopping) alertOrders(orders);
         } catch (DriverApi.Failure error) {
-            if (error.status == 401 || error.status == 403) finish("Нэвтрэх эрх дууссан. Дахин нэвтэрнэ үү.", null);
-            else status = error.status == 409 ? error.getMessage() : "ОНЛАЙН · Холболт саатсан · Автоматаар дахин холбогдож байна";
+            if (error.status == 401 || error.status == 403) {
+                DriverWorkState.clear(this);
+                finish("Нэвтрэх эрх дууссан. Дахин нэвтэрнэ үү.", null);
+            } else status = error.status == 409 ? error.getMessage() : "ОНЛАЙН · Холболт саатсан · Автоматаар дахин холбогдож байна";
         } catch (Exception error) { status = "ОНЛАЙН · Сүлжээ тасарсан · Автоматаар дахин холбогдож байна"; }
         finally { if (!stopping) notifications.notify(1, workNotification()); }
     }
