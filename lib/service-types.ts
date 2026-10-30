@@ -97,8 +97,9 @@ export function normalizeServiceDetails(serviceType: unknown, value: unknown): R
   const source = value as Record<string, unknown>
   const result: Record<string, string> = {}
   for (const field of SERVICE_DETAIL_FIELDS[serviceType]) {
-    if (source[field.key] !== undefined && typeof source[field.key] !== 'string') return null
-    const text = typeof source[field.key] === 'string' ? source[field.key].trim() : ''
+    const raw = source[field.key]
+    if (raw !== undefined && typeof raw !== 'string') return null
+    const text = typeof raw === 'string' ? raw.trim() : ''
     if ((field.required && !text) || text.length > field.maxLength) return null
     if (text) result[field.key] = text
   }
@@ -109,6 +110,9 @@ export function serviceDetailEntries(serviceType: unknown, value: unknown) {
   if (!isServiceType(serviceType) || serviceType === 'achilt' || !value || typeof value !== 'object' || Array.isArray(value)) return []
   const source = value as Record<string, unknown>
   return SERVICE_DETAIL_FIELDS[serviceType]
-    .map(field => ({ label: field.label.replace(' · ЗААВАЛ БИШ', ''), value: typeof source[field.key] === 'string' ? source[field.key].trim() : '' }))
+    .map(field => {
+      const raw = source[field.key]
+      return { label: field.label.replace(' · ЗААВАЛ БИШ', ''), value: typeof raw === 'string' ? raw.trim() : '' }
+    })
     .filter(item => item.value)
 }
