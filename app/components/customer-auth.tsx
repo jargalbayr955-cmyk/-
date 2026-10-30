@@ -5,6 +5,7 @@ import { clearCustomerBrowserState, notifyCustomerSessionChanged, phoneInput, re
 import { requestCustomerOtp, verifyCustomerOtp } from '@/lib/client/customer-auth'
 import { SessionGate } from './session-gate'
 import { BrandAccess } from './access-shortcuts'
+import styles from './customer-auth.module.css'
 
 export function CustomerAuth() {
   return <SessionGate mode="guest"><AuthForm /></SessionGate>
@@ -111,25 +112,16 @@ function AuthForm() {
     setTimeout(() => phoneRef.current?.focus(), 0)
   }
 
-  return <main className="auth-shell">
-    <section className="auth-card" aria-labelledby="auth-title">
+  return <main className={`auth-shell ${styles.shell}`}>
+    <section className={`auth-card ${styles.card}`} aria-labelledby="auth-title">
       <div style={{ marginBottom: 10 }}>
         <BrandAccess className="auth-brand-mark" />
       </div>
       <h1 id="auth-title">Тавтай морил</h1>
       <img
-        src="/welcome-achilt-banner.svg"
+        src="/api/welcome-banner?v=3"
         alt="Ачилт үйлчилгээ — хамгийн ойр, хямд, хурдан"
-        style={{
-          width: '100%',
-          height: 'auto',
-          aspectRatio: '16 / 9',
-          objectFit: 'cover',
-          display: 'block',
-          margin: '16px 0 22px',
-          borderRadius: 18,
-          boxShadow: '0 18px 42px rgba(0,0,0,.46), 0 0 0 1px rgba(255,138,60,.16)'
-        }}
+        className={styles.banner}
       />
 
       {step === 'phone' ? <>
