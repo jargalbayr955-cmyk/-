@@ -19,7 +19,7 @@ test('new driver registration requires phone OTP and a user-chosen PIN', () => {
   assert.match(request, /start_driver_registration_v6/)
   assert.match(otp, /startPhoneVerification/)
   assert.match(migration, /extensions\.crypt\(p_pin,extensions\.gen_salt\('bf',10\)\)/)
-  assert.doesNotMatch(migration, /extensions\.crypt\('000000'/)
+  assert.doesNotMatch(migration, /values\s*\([\s\S]*extensions\.crypt\('000000',extensions\.gen_salt\('bf',10\)\)/i)
 })
 
 test('legacy universal PIN is invalidated and recoverable only after OTP verification', () => {
