@@ -41,3 +41,12 @@ test('legacy universal PIN is invalidated only after OTP recovery is deployed', 
   assert.match(cleanupMigration, /pin_hash=extensions\.crypt\(pg_catalog\.gen_random_uuid\(\)::text/)
   assert.match(cleanupMigration, /<> 'Шинэ жолооч'/)
 })
+
+test('legacy 000000 login is blocked for completed drivers but preserved for admin first-login onboarding', () => {
+  const login = read('app/api/driver/login/route.ts')
+  assert.match(login, /const submittedPin = String\(pin \|\| ''\)/)
+  assert.match(login, /submittedPin === '000000'/)
+  assert.match(login, /String\(data\.name \|\| ''\)\.trim\(\) !== 'Шинэ жолооч'/)
+  assert.match(login, /PIN мартсан \/ сэргээх/)
+  assert.match(login, /recover: true/)
+})
