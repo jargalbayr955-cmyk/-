@@ -70,11 +70,11 @@ jobs:
             echo "Compiled APK is already the branch head; skip republishing."
             exit 0
           fi
-          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk public/downloads/AchiltDriver-5.5.3-preview.apk
-          sha256sum public/downloads/AchiltDriver-5.5.3-preview.apk > public/downloads/AchiltDriver-5.5.3-preview.apk.sha256
+          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk public/downloads/AchiltDriver-5.5.4-preview.apk
+          sha256sum public/downloads/AchiltDriver-5.5.4-preview.apk > public/downloads/AchiltDriver-5.5.4-preview.apk.sha256
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/downloads/AchiltDriver-5.5.3-preview.apk public/downloads/AchiltDriver-5.5.3-preview.apk.sha256
+          git add public/downloads/AchiltDriver-5.5.4-preview.apk public/downloads/AchiltDriver-5.5.4-preview.apk.sha256
           if git diff --cached --quiet; then
             echo "APK is unchanged."
             exit 0
