@@ -191,9 +191,9 @@ function destination(customerStatus, driverStatus = 401, offline = false) {
   return async mode => (await exports.readSession(mode)).destination
 }
 
-test('returning customer opens the unified service chooser; new device sees the forms', async () => {
-  assert.equal(await destination(200)('entry'), '/services')
-  assert.equal(await destination(200)('guest'), '/services')
+test('returning customer opens the map first; new device still sees the login form', async () => {
+  assert.equal(await destination(200)('entry'), '/current')
+  assert.equal(await destination(200)('guest'), '/current')
   assert.equal(await destination(200)('customer'), null)
   assert.equal(await destination(401)('entry'), '/start')
   assert.equal(await destination(401)('guest'), null)
