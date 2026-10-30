@@ -21,27 +21,28 @@ export async function POST(req?: NextRequest) {
       : ''
     const now = new Date().toISOString()
     const s = getSupabaseAdmin()
-    const cleanup: PromiseLike<unknown>[] = [
-      s.from('drivers')
-        .update({
-          available: false,
-          is_online: false,
-          notification_health: 'logged_out',
-          notification_checked_at: now,
-        })
-        .eq('id', driverId)
-        .is('deleted_at', null),
-    ]
+    const driverUpdate = await s.from('drivers')
+      .update({
+        available: false,
+        is_online: false,
+        notification_health: 'unknown',
+        notification_checked_at: now,
+      })
+      .eq('id', driverId)
+      .is('deleted_at', null)
+
+    if (driverUpdate.error) {
+      console.error('[driver/logout] failed to mark driver offline', { code: driverUpdate.error.code })
+    }
+
     if (endpoint) {
       const endpointHash = createHash('md5').update(endpoint).digest('hex')
-      cleanup.push(
-        s.from('push_subscriptions')
-          .delete()
-          .eq('driver_id', driverId)
-          .eq('endpoint_hash', endpointHash),
-      )
+      const removal = await s.from('push_subscriptions')
+        .delete()
+        .eq('driver_id', driverId)
+        .eq('endpoint_hash', endpointHash)
+      if (removal.error) console.warn('[driver/logout] push endpoint cleanup failed', { code: removal.error.code })
     }
-    await Promise.allSettled(cleanup)
   }
 
   const res = NextResponse.json({ success: true }, { headers: { 'Cache-Control': 'private, no-store' } })

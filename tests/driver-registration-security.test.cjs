@@ -1,0 +1,43 @@
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+
+const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
+
+test('new driver registration requires phone OTP and a user-chosen PIN', () => {
+  const registration = read('app/components/driver-registration.tsx')
+  const request = read('app/api/driver/register/request/route.ts')
+  const otp = read('app/api/driver/register/otp/route.ts')
+  const migration = read('supabase/migrations/20261030100000_driver_pin_security.sql')
+
+  assert.match(registration, /OTP код авах/)
+  assert.match(registration, /Нэвтрэх PIN/)
+  assert.match(registration, /pin === '000000'/)
+  assert.match(request, /checkPhoneVerification/)
+  assert.match(request, /verification\.data\.status !== 'approved'/)
+  assert.match(request, /start_driver_registration_v6/)
+  assert.match(otp, /startPhoneVerification/)
+  assert.match(migration, /extensions\.crypt\(p_pin,extensions\.gen_salt\('bf',10\)\)/)
+  assert.doesNotMatch(migration, /values\s*\([\s\S]*extensions\.crypt\('000000',extensions\.gen_salt\('bf',10\)\)/i)
+})
+
+test('legacy universal PIN is invalidated only after OTP recovery is deployed', () => {
+  const entry = read('app/components/driver-registration-entry.tsx')
+  const recoverPage = read('app/driver/recover/page.tsx')
+  const recoverRequest = read('app/api/driver/recover/request/route.ts')
+  const recoverVerify = read('app/api/driver/recover/verify/route.ts')
+  const securityMigration = read('supabase/migrations/20261030100000_driver_pin_security.sql')
+  const cleanupMigration = read('supabase/migrations/20261030101500_invalidate_legacy_self_registration_pin.sql')
+
+  assert.match(entry, /PIN мартсан \/ сэргээх/)
+  assert.match(recoverPage, /\/api\/driver\/recover\/request/)
+  assert.match(recoverPage, /\/api\/driver\/recover\/verify/)
+  assert.match(recoverRequest, /startPhoneVerification/)
+  assert.match(recoverVerify, /checkPhoneVerification/)
+  assert.match(recoverVerify, /reset_driver_pin_verified/)
+  assert.doesNotMatch(securityMigration, /pin_hash = extensions\.crypt\('000000', pin_hash\)/)
+  assert.match(cleanupMigration, /pin_hash = extensions\.crypt\('000000', pin_hash\)/)
+  assert.match(cleanupMigration, /pin_hash=extensions\.crypt\(pg_catalog\.gen_random_uuid\(\)::text/)
+  assert.match(cleanupMigration, /<> 'Шинэ жолооч'/)
+})
