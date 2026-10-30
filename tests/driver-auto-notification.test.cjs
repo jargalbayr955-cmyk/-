@@ -5,27 +5,28 @@ const path = require('node:path')
 
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
 
-test('explicit login can auto-start, while session restore preserves an intentional rest state', () => {
+test('signed-in configured drivers stay work-enabled and there is no rest control', () => {
   const login = read('app/api/driver/login/route.ts')
   const session = read('app/api/driver/session/route.ts')
+  const location = read('app/api/driver/location/route.ts')
   const view = read('app/components/driver-dispatch-view.tsx')
-  assert.match(login, /autoStart = !\(await driverHasBlockingWork\(data\.id\)\)/)
   assert.match(login, /update\(\{ available: true, is_online: false \}\)/)
-  assert.match(session, /driver\.available && driverServiceProfileIsComplete\(driver\)/)
-  assert.match(session, /autoStart = !\(await driverHasBlockingWork\(driver\.id\)\)/)
-  assert.doesNotMatch(session, /update\(\{ available: true, is_online: false \}\)/)
-  assert.match(session, /Session restore must not turn a resting driver back online/)
-  assert.match(view, /driver\.available \? 'Амрах' : 'Онлайн болох'/)
-  assert.doesNotMatch(view, /driver\.available \? 'Амрах' : 'Ажиллаж эхлэх'/)
+  assert.match(session, /const autoStart = !needsOnboarding && driverServiceProfileIsComplete\(driver\)/)
+  assert.match(session, /update\(\{ available: true, is_online: false \}\)/)
+  assert.match(location, /available: true/)
+  assert.doesNotMatch(view, /Амрах/)
+  assert.doesNotMatch(view, /Онлайн болох/)
+  assert.doesNotMatch(view, /onToggleAvailable/)
+  assert.match(view, /ОНЛАЙН/)
 })
 
 test('automatic online still requires a fresh GPS before dispatch', () => {
   const location = read('app/api/driver/location/route.ts')
-  const availability = read('app/api/driver/availability/route.ts')
+  const heartbeat = read('app/api/driver/heartbeat/route.ts')
   const migration = read('supabase/migrations/20261029043322_unified_service_types.sql')
-  assert.match(location, /update\.available = true/)
   assert.match(location, /location_updated_at: now/)
-  assert.match(availability, /FRESH_LOCATION_MS = 2 \* 60_000/)
+  assert.match(location, /available: true/)
+  assert.match(heartbeat, /FRESH_LOCATION_MS = 2 \* 60_000/)
   // Existing dispatch hardening must keep its two-minute GPS gate.
   assert.match(migration, /location_updated_at[^\n]*2 minutes|2 minutes[^\n]*location_updated_at/)
 })
@@ -38,6 +39,15 @@ test('notification stays visible as a frequent reminder until push is healthy', 
   assert.match(view, /Settings → Notifications → Achilt/)
   assert.match(view, /Notification\.permission === 'granted'/)
   assert.match(view, /\/api\/driver\/heartbeat/)
+})
+
+test('driver chat uses screen history so Back unwinds peer -> list -> map', () => {
+  const view = read('app/components/driver-dispatch-view.tsx')
+  assert.match(view, /useScreenHistory<DriverScreen>\('driver-dispatch', 'map'/)
+  assert.match(view, /driverScreen\.navigate\('chat'\)/)
+  assert.match(view, /driverScreen\.navigate\(`chat:\$\{id\}`\)/)
+  assert.match(view, /onClose=\{driverScreen\.close\}/)
+  assert.match(read('app/components/navigation-history.tsx'), /achiltBackBoundary/)
 })
 
 test('push delivery is multi-device, retried and acknowledged by the service worker', () => {
