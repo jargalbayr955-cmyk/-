@@ -40,14 +40,32 @@ test('reboot recovery never revives logged-out or expired driver sessions', () =
   assert.match(service, /DriverWorkState\.remember\(this, currentId\)/)
 })
 
-test('download page and CI publish the hardened 5.5.4 APK', () => {
+test('native Android can bootstrap a missing active session from only its signed driver trust cookie', () => {
+  const policy = read('mobile/android/app/src/main/java/mn/achilt/driver/WorkPolicy.java')
+  const api = read('mobile/android/app/src/main/java/mn/achilt/driver/DriverApi.java')
+  const session = read('app/api/driver/session/route.ts')
+
+  assert.match(policy, /driverTrustCookie/)
+  assert.match(policy, /driverProof/)
+  assert.match(policy, /driverAuthHeader/)
+  assert.match(api, /WorkPolicy\.driverProof\(allCookies\(\)\)/)
+  assert.match(api, /\(session \|\| logout\) \? WorkPolicy\.driverAuthHeader\(before\) : WorkPolicy\.driverCookie\(before\)/)
+  assert.match(api, /achilt_driver_session=/)
+  assert.match(api, /achilt_driver_trust=/)
+  assert.match(api, /!session && !logout && WorkPolicy\.driverCookie\(before\)\.isEmpty\(\)/)
+  assert.match(api, /logout \|\| \(session && hasTrust\)/)
+  assert.doesNotMatch(session, /setTrustedDriverDevice/)
+  assert.match(session, /if \(restoredVersion\) setDeviceSession\(res, driver\.id, 'driver', restoredVersion\)/)
+})
+
+test('download page and CI publish the hardened 5.5.5 APK', () => {
   const gradle = read('mobile/android/app/build.gradle')
   const page = read('app/driver/app/page.tsx')
   const ci = read('.github/workflows/ci.yml')
 
-  assert.match(gradle, /versionCode 554/)
-  assert.match(gradle, /versionName '5\.5\.4-preview'/)
-  assert.match(page, /AchiltDriver-5\.5\.4-preview\.apk/)
-  assert.match(page, /Android апп татах · 5\.5\.4 · APK/)
-  assert.match(ci, /AchiltDriver-5\.5\.4-preview\.apk/)
+  assert.match(gradle, /versionCode 555/)
+  assert.match(gradle, /versionName '5\.5\.5-preview'/)
+  assert.match(page, /AchiltDriver-5\.5\.5-preview\.apk/)
+  assert.match(page, /Android апп татах · 5\.5\.5 · APK/)
+  assert.match(ci, /AchiltDriver-5\.5\.5-preview\.apk/)
 })

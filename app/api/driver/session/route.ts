@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { driverHasBlockingWork, driverNeedsOnboarding, driverServiceProfileIsComplete, requireDriver, type DriverSessionRecord } from '@/lib/server/driver'
-import { clearTrustedDriverDevice, readTrustedDriverDevice, renewDeviceSession, setDeviceSession, setTrustedDriverDevice } from '@/lib/server/device-session'
+import { clearTrustedDriverDevice, readTrustedDriverDevice, renewDeviceSession, setDeviceSession } from '@/lib/server/device-session'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
-import { verifySession } from '@/lib/server/security'
 
 function unauthorized(clearTrust = false) {
   const res = NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'private, no-store' } })
@@ -52,12 +51,11 @@ export async function GET(req: NextRequest) {
       if (!error) profile = { ...driver, available: shouldBeAvailable }
     }
 
-    const active = verifySession(req.cookies.get('achilt_driver_session')?.value, 'driver')
-    const version = restoredVersion || active?.version || null
     const res = NextResponse.json({ driver: profile, needsOnboarding, autoStart })
     if (restoredVersion) setDeviceSession(res, driver.id, 'driver', restoredVersion)
     else renewDeviceSession(req, res, driver.id, 'driver')
-    setTrustedDriverDevice(res, driver.id, version)
+    // Do not rotate the trusted-device proof on every session poll. Native Android keeps
+    // that signed proof stable while the server may renew the shorter active session.
     return res
   } catch {
     return NextResponse.json({ error: 'Нэвтрэлт шалгах боломжгүй байна. Дахин оролдоно уу.' }, { status: 503, headers: { 'Cache-Control': 'private, no-store' } })
