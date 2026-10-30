@@ -12,8 +12,9 @@ export default function DriverAppDownload() {
       <p style={{color:'#ff8078', fontWeight:700}}>ANDROID · ТУРШИЛТЫН ХУВИЛБАР</p>
       <h1 style={{fontSize:32}}>Ачилт Жолооч</h1>
       <p style={{lineHeight:1.7, color:'#c4c4cc'}}>Нэвтэрсэн жолооч автоматаар онлайн ажиллана. Дэлгэц түгжээтэй эсвэл өөр апп ашиглаж байх үед ч байршлаа шинэчилж, шинэ захиалгын мэдэгдэл авах зориулалттай.</p>
+      <p style={{lineHeight:1.7, color:'#c4c4cc'}}>Нэг удаа зөв нэвтэрсэн төхөөрөмж жолоочийг 90 хоног хүртэл аюулгүй санана. Апп хаах эсвэл утсаа restart хийсний дараа session алга болсон байсан ч санасан төхөөрөмжөөс автоматаар сэргээнэ. ⋮ → Гарах дарвал энэ төхөөрөмжийн саналт цэвэрлэгдэнэ.</p>
       <p style={{lineHeight:1.7, color:'#c4c4cc'}}>Апп дотроос жолоочоор бүртгүүлэх эсвэл бүртгэлтэй утас, PIN-ээр нэвтэрч болно. “Амрах / Онлайн болох” товч байхгүй.</p>
-      <a href="/downloads/AchiltDriver-5.5.4-preview.apk" download style={{display:'block', textAlign:'center', background:'#e8433a', color:'white', padding:18, borderRadius:14, textDecoration:'none', fontWeight:700, margin:'24px 0'}}>Android апп татах · 5.5.4 · APK</a>
+      <a href="/downloads/AchiltDriver-5.5.5-preview.apk" download style={{display:'block', textAlign:'center', background:'#e8433a', color:'white', padding:18, borderRadius:14, textDecoration:'none', fontWeight:700, margin:'24px 0'}}>Android апп татах · 5.5.5 · APK</a>
       <p style={{color:'#aaa', fontSize:14}}>Android 8 болон түүнээс дээш. iPhone-д суухгүй.</p>
       <p style={{lineHeight:1.7, color:'#c4c4cc'}}>Видео дуудлага ашиглах үед камер, микрофоны зөвшөөрөл тусад нь асууна. Байршил болон мэдэгдлийн зөвшөөрлийг Allow / Зөвшөөрөх болгосон байх шаардлагатай.</p>
       <ol style={{paddingLeft:24, lineHeight:1.9}}>

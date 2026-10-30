@@ -18,12 +18,33 @@ final class WorkPolicy {
     static boolean keepWorking(boolean available, boolean accepted, boolean unpaid) {
         return !unpaid && (available || accepted);
     }
-    static String driverCookie(String header) {
+    private static String namedCookie(String header, String name) {
         if (header == null) return "";
+        String prefix = name + "=";
         for (String part : header.split(";")) {
             String cookie = part.trim();
-            if (cookie.startsWith("achilt_driver_session=") && cookie.length() > "achilt_driver_session=".length()) return cookie;
+            if (cookie.startsWith(prefix) && cookie.length() > prefix.length()) return cookie;
         }
         return "";
+    }
+    /** Active API session cookie. This is the only credential sent to normal driver APIs. */
+    static String driverCookie(String header) {
+        return namedCookie(header, "achilt_driver_session");
+    }
+    /** Long-lived signed device proof. It is used only to restore / clear a driver session. */
+    static String driverTrustCookie(String header) {
+        return namedCookie(header, "achilt_driver_trust");
+    }
+    /** Stable local proof used to detect account switches while native requests are running. */
+    static String driverProof(String header) {
+        String trusted = driverTrustCookie(header);
+        return trusted.isEmpty() ? driverCookie(header) : trusted;
+    }
+    /** Forward only driver-role cookies and never admin/customer cookies. */
+    static String driverAuthHeader(String header) {
+        String session = driverCookie(header), trusted = driverTrustCookie(header);
+        if (session.isEmpty()) return trusted;
+        if (trusted.isEmpty()) return session;
+        return session + "; " + trusted;
     }
 }

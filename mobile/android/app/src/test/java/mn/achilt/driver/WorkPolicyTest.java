@@ -28,10 +28,17 @@ public class WorkPolicyTest {
         assertFalse(WorkPolicy.keepWorking(false, false, false));
         assertFalse(WorkPolicy.keepWorking(true, true, true));
     }
-    @Test public void nativeTransportNeverForwardsOtherRoleCookies() {
+    @Test public void nativeTransportSeparatesActiveSessionFromTrustedDeviceProof() {
         assertEquals("", WorkPolicy.driverCookie(null));
         assertEquals("", WorkPolicy.driverCookie("achilt_driver_session="));
         assertEquals("", WorkPolicy.driverCookie("other_achilt_driver_session=bad"));
-        assertEquals("achilt_driver_session=driver-token", WorkPolicy.driverCookie("achilt_admin_session=private; achilt_driver_session=driver-token; achilt_customer_session=private"));
+        String header = "achilt_admin_session=private; achilt_driver_session=driver-token; achilt_customer_session=private; achilt_driver_trust=device-token";
+        assertEquals("achilt_driver_session=driver-token", WorkPolicy.driverCookie(header));
+        assertEquals("achilt_driver_trust=device-token", WorkPolicy.driverTrustCookie(header));
+        assertEquals("achilt_driver_trust=device-token", WorkPolicy.driverProof(header));
+        assertEquals("achilt_driver_session=driver-token; achilt_driver_trust=device-token", WorkPolicy.driverAuthHeader(header));
+        assertEquals("achilt_driver_trust=device-token", WorkPolicy.driverProof("achilt_driver_trust=device-token"));
+        assertEquals("achilt_driver_session=driver-token", WorkPolicy.driverProof("achilt_driver_session=driver-token"));
+        assertEquals("", WorkPolicy.driverAuthHeader("achilt_admin_session=private; achilt_customer_session=private"));
     }
 }
