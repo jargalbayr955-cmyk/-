@@ -23,7 +23,7 @@ export function DriverInstallButton() {
   const hostRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    setInstalled(isNativeDriver())
+    setInstalled(isNativeDriver() || browserStandaloneMode())
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {})
 
     const onBeforeInstall = (event: Event) => {
@@ -45,7 +45,7 @@ export function DriverInstallButton() {
   }, [])
 
   useEffect(() => {
-    if (isNativeDriver()) return
+    if (isNativeDriver() || browserStandaloneMode()) return
 
     const syncHost = () => {
       const loginButton = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(button => {
@@ -99,7 +99,7 @@ export function DriverInstallButton() {
   }, [])
 
   const install = async () => {
-    if (isNativeDriver()) {
+    if (isNativeDriver() || browserStandaloneMode()) {
       setInstalled(true)
       return
     }
@@ -109,21 +109,13 @@ export function DriverInstallButton() {
       await installPrompt.prompt()
       const choice = await installPrompt.userChoice
       setInstallPrompt(null)
-      if (choice.outcome === 'accepted') setHelp('Суулгаж байна. Дараа нь утасны нүүрэн дээрх “Ачилт” icon-оос шууд нээнэ.')
+      if (choice.outcome === 'accepted') setHelp('Суулгаж байна. Дараа нь утасны нүүрэн дээрх “Ачилт” icon-оос шууд жолоочийн нүүр нээгдэнэ.')
       return
     }
 
     const ua = navigator.userAgent
     const ios = /iPhone|iPad|iPod/i.test(ua)
     const safari = /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua)
-
-    if (browserStandaloneMode()) {
-      const driverUrl = `${window.location.origin}/driver`
-      setHelp(ios
-        ? `Энэ суулгасан Ачилт апп дотроос дахин суулгах боломжгүй. Safari дээр ${driverUrl} нээгээд Share (□↑) → “Add to Home Screen” → Add дарна уу.`
-        : `Энэ суулгасан Ачилт апп дотроос дахин суулгах боломжгүй. Chrome дээр ${driverUrl} нээгээд ⋮ → “Install app” эсвэл “Add to Home screen” дарна уу.`)
-      return
-    }
 
     if (ios) {
       setHelp(safari
@@ -148,7 +140,7 @@ export function DriverInstallButton() {
         }}
       >📲 Жолооч апп утас дээр суулгах</button>
       <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: 12, lineHeight: 1.45, margin: '8px 4px 0' }}>
-        Нэг удаа суулгаад утасны нүүрэн дээрх Ачилт icon-оос шууд нээнэ.
+        Нэг удаа суулгаад утасны нүүрэн дээрх Ачилт icon-оос жолоочийн нүүрийг шууд нээнэ.
       </p>
       {help && <p role="status" style={{ color: '#ffd166', fontSize: 12, lineHeight: 1.5, margin: '8px 4px 0' }}>{help}</p>}
     </div>,
