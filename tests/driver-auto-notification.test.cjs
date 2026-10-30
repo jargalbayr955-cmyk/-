@@ -15,7 +15,7 @@ test('signed-in configured drivers stay work-enabled and there is no rest contro
   assert.match(session, /driverHasBlockingWork\(driver\.id\)/)
   assert.match(session, /const autoStart = configured && !blocked/)
   assert.match(session, /available: shouldBeAvailable, is_online: false/)
-  assert.match(location, /available: !blocked/)
+  assert.match(location, /blocked \? \{\} : \{ available: true \}/)
   assert.doesNotMatch(view, /Амрах/)
   assert.doesNotMatch(view, /Онлайн болох/)
   assert.doesNotMatch(view, /onToggleAvailable/)
@@ -27,7 +27,7 @@ test('automatic online still requires a fresh GPS before dispatch', () => {
   const heartbeat = read('app/api/driver/heartbeat/route.ts')
   const migration = read('supabase/migrations/20261029043322_unified_service_types.sql')
   assert.match(location, /location_updated_at: now/)
-  assert.match(location, /available: !blocked/)
+  assert.match(location, /blocked \? \{\} : \{ available: true \}/)
   assert.match(heartbeat, /FRESH_LOCATION_MS = 2 \* 60_000/)
   // Existing dispatch hardening must keep its two-minute GPS gate.
   assert.match(migration, /location_updated_at[^\n]*2 minutes|2 minutes[^\n]*location_updated_at/)
