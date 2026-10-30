@@ -6,11 +6,21 @@ export type SessionGateMode = 'entry' | 'guest' | 'customer'
 export type CustomerIdentity = { id: string; phone: string }
 export type SessionState = { destination: string | null; user: CustomerIdentity | null }
 
+export const CUSTOMER_SESSION_EVENT = 'achilt:customer-session-changed'
+export const CUSTOMER_SESSION_STORAGE_KEY = 'achilt_customer_session_changed'
+export const CUSTOMER_LAST_PHONE_STORAGE_KEY = 'achilt_last_customer_phone'
+export const CUSTOMER_RESTORE_BLOCK_STORAGE_KEY = 'achilt_customer_restore_blocked'
+
+function customerRestoreBlocked() {
+  try { return sessionStorage.getItem(CUSTOMER_RESTORE_BLOCK_STORAGE_KEY) === '1' } catch { return false }
+}
+
 // A network/database failure is not proof that the user has signed out.
 export async function readSession(mode: SessionGateMode, signal?: AbortSignal): Promise<SessionState> {
   const options: RequestInit = { cache: 'no-store', credentials: 'same-origin', signal }
+  const customerUrl = customerRestoreBlocked() ? '/api/customer/session?restore=0' : '/api/customer/session'
   const [customer, driver] = await Promise.all([
-    fetch('/api/customer/session', options),
+    fetch(customerUrl, options),
     mode === 'entry' ? fetch('/api/driver/session', options) : Promise.resolve(null),
   ])
   if (driver?.ok) return { destination: '/driver', user: null }
@@ -31,10 +41,6 @@ export function displayPhone(phone: string) {
   return phone.replace(/^(\+976)(\d{4})(\d{4})$/, '$1 $2 $3')
 }
 
-export const CUSTOMER_SESSION_EVENT = 'achilt:customer-session-changed'
-export const CUSTOMER_SESSION_STORAGE_KEY = 'achilt_customer_session_changed'
-export const CUSTOMER_LAST_PHONE_STORAGE_KEY = 'achilt_last_customer_phone'
-
 export function readRememberedCustomerPhone() {
   try {
     const phone = phoneInput(localStorage.getItem(CUSTOMER_LAST_PHONE_STORAGE_KEY) || '')
@@ -53,7 +59,7 @@ export function rememberCustomerPhone(phone: string) {
 export function clearCustomerBrowserState() {
   clearBookingDraft()
   clearSelectedService()
-  // Remove only private customer state. Keep the last phone number so a deliberate logout can return to OTP login quickly.
+  // Remove only private customer state. Keep the last phone number so a deliberate logout can use trusted-device login without OTP.
   for (const key of ['user', 'current_order_id', 'tracking_driver_id', 'fromAddress', 'from', 'fromLat', 'fromLng', 'dest', 'phone_called']) {
     try { localStorage.removeItem(key) } catch { /* Cookie auth works even when storage is blocked. */ }
   }
@@ -76,6 +82,10 @@ export async function logoutCustomer() {
   finally { deadline.dispose() }
   if (!response.ok) throw new Error('Logout failed')
   clearCustomerBrowserState()
-  try { sessionStorage.setItem('achilt_signed_out', '1') } catch {}
+  try {
+    sessionStorage.setItem('achilt_signed_out', '1')
+    // Keep the trusted-device cookie, but do not auto-restore during this deliberate logout tab/session.
+    sessionStorage.setItem(CUSTOMER_RESTORE_BLOCK_STORAGE_KEY, '1')
+  } catch {}
   notifyCustomerSessionChanged()
 }

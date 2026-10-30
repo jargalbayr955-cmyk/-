@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { setDeviceSession } from '@/lib/server/device-session'
+import { setDeviceSession, setTrustedDriverDevice } from '@/lib/server/device-session'
 import { driverHasBlockingWork, driverNeedsOnboarding, driverServiceProfileIsComplete } from '@/lib/server/driver'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { allowRequest, getClientIp, isSessionConfigured, normalizeMnPhone } from '@/lib/server/security'
@@ -51,5 +51,6 @@ export async function POST(req: NextRequest) {
   const profile = autoStart ? { ...storedProfile, available: true } : storedProfile
   const res = NextResponse.json({ driver: profile, autoStart })
   setDeviceSession(res, data.id, 'driver', session_version)
+  setTrustedDriverDevice(res, data.id, session_version)
   return res
 }

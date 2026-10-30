@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
+import { clearTrustedDriverDevice } from '@/lib/server/device-session'
 import { requireDriver } from '@/lib/server/driver'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 
@@ -53,5 +54,7 @@ export async function POST(req?: NextRequest) {
     path: '/',
     maxAge: 0,
   })
+  // Driver logout is an explicit stop-working action, so unlike customer logout it also forgets this device.
+  clearTrustedDriverDevice(res)
   return res
 }
