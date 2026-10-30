@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { allowRequest } from '@/lib/server/security'
 import { driverHasBlockingWork, requireDriver } from '@/lib/server/driver'
+import { driverRoomProfile } from '@/lib/driver-room'
 
 const MAP_WINDOW_MS = 30 * 60_000
 const FRESH_WINDOW_MS = 2 * 60_000
@@ -21,19 +22,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Жолоочийн төлөв шалгахад алдаа гарлаа' }, { status: 500 })
   }
 
+  const room = driverRoomProfile(driver.service_type, driver.car_type)
+  if (!room) {
+    return NextResponse.json({ peers: [], blocked: false, room: null }, { headers: { 'Cache-Control': 'private, no-store' } })
+  }
+
   const cutoff = new Date(Date.now() - MAP_WINDOW_MS).toISOString()
-  const { data, error } = await getSupabaseAdmin()
+  let query = getSupabaseAdmin()
     .from('drivers')
     .select('id,name,service_type,car_type,available,lat,lng,location_updated_at')
     .eq('active', true)
     .is('deleted_at', null)
     .neq('id', driver.id)
+    .eq('service_type', room.serviceType)
     .not('lat', 'is', null)
     .not('lng', 'is', null)
     .gte('location_updated_at', cutoff)
     .order('name', { ascending: true })
     .limit(300)
+  if (room.carType) query = query.eq('car_type', room.carType)
 
+  const { data, error } = await query
   if (error) return NextResponse.json({ error: 'Жолоочдын байршил татахад алдаа гарлаа' }, { status: 500 })
 
   const now = Date.now()
@@ -46,9 +55,12 @@ export async function GET(req: NextRequest) {
     lat: Number(peer.lat),
     lng: Number(peer.lng),
     location_updated_at: peer.location_updated_at,
-    // Same two-minute window used by dispatch: blinking "online" means actually dispatchable.
     fresh: peer.location_updated_at ? now - new Date(peer.location_updated_at).getTime() <= FRESH_WINDOW_MS : false,
   }))
 
-  return NextResponse.json({ peers, blocked: false }, { headers: { 'Cache-Control': 'private, no-store' } })
+  return NextResponse.json({
+    peers,
+    blocked: false,
+    room: { key: room.key, label: room.label },
+  }, { headers: { 'Cache-Control': 'private, no-store' } })
 }

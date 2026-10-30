@@ -1,0 +1,53 @@
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+
+const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
+
+test('group chat is private, direction scoped and retained for 30 days', () => {
+  const migration = read('supabase/migrations/20261030134000_driver_group_chat_by_service.sql')
+  const route = read('app/api/driver/chat/group/route.ts')
+  assert.match(migration, /driver_group_messages/)
+  assert.match(migration, /driver_group_chat_reads/)
+  assert.match(migration, /enable row level security/)
+  assert.match(migration, /revoke all on table public\.driver_group_messages from public, anon, authenticated/)
+  assert.match(migration, /interval '30 days'/)
+  assert.match(migration, /achilt-driver-group-chat-cleanup/)
+  assert.match(route, /requireDriver\(req\)/)
+  assert.match(route, /driverRoomProfile\(driver\.service_type, driver\.car_type\)/)
+  assert.doesNotMatch(route, /payload\.room/)
+  assert.match(route, /body\.length > 2000/)
+})
+
+test('peer map API only returns drivers from the same registered direction', () => {
+  const route = read('app/api/driver/peers/route.ts')
+  assert.match(route, /driverRoomProfile\(driver\.service_type, driver\.car_type\)/)
+  assert.match(route, /\.eq\('service_type', room\.serviceType\)/)
+  assert.match(route, /if \(room\.carType\) query = query\.eq\('car_type', room\.carType\)/)
+  assert.doesNotMatch(route, /select\([^\n]*phone/)
+})
+
+test('Achilt group chat is Messenger-like and send action gives a light haptic', () => {
+  const panel = read('app/components/driver-group-chat-panel.tsx')
+  const dispatch = read('app/components/driver-dispatch-view.tsx')
+  assert.match(panel, /Ачилт чат/)
+  assert.match(panel, /navigator\.vibrate\?\.\(18\)/)
+  assert.match(panel, /aria-label="Зурвас илгээх"/)
+  assert.match(panel, /1_800/)
+  assert.match(panel, /env\(safe-area-inset-bottom\)/)
+  assert.match(dispatch, /Ачилт чат/)
+  assert.match(dispatch, /DriverGroupChatPanel/)
+})
+
+test('driver peer tap measures road distance and keeps private chat available', () => {
+  const helper = read('lib/client/road-distance.ts')
+  const dispatch = read('app/components/driver-dispatch-view.tsx')
+  assert.match(helper, /Route\.computeRoutes/)
+  assert.match(helper, /travelMode: 'DRIVING'/)
+  assert.match(helper, /distanceMeters/)
+  assert.match(dispatch, /roadDistanceBetween/)
+  assert.match(dispatch, /Замын зай/)
+  assert.match(dispatch, /Хувийн чат нээх/)
+  assert.match(dispatch, /onPeerSelect=\{focusPeer\}/)
+})
