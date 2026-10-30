@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
-export const runtime = 'nodejs'
+export const dynamic = 'force-static'
+export const revalidate = false
 
 export async function GET() {
   try {
