@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { allowRequest } from '@/lib/server/security'
-import { requireDriver } from '@/lib/server/driver'
+import { driverHasBlockingWork, requireDriver } from '@/lib/server/driver'
 import { serviceProfileIsComplete } from '@/lib/service-types'
 
 export async function POST(req: NextRequest) {
@@ -21,14 +21,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Профайл хэсэгт үйлчилгээний төрлөө бүрэн сонгоно уу' }, { status: 409 })
   }
 
+  let blocked = false
+  try { blocked = await driverHasBlockingWork(driver.id) }
+  catch { return NextResponse.json({ error: 'Driver work state unavailable' }, { status: 503 }) }
+
   const now = new Date().toISOString()
   const update = {
     lat: latitude,
     lng: longitude,
     location_updated_at: now,
     last_heartbeat_at: now,
-    available: true,
-    is_online: true,
+    // There is no manual rest mode anymore. A driver is dispatch-available whenever
+    // there is no active trip or unpaid commission; GPS continues to update either way.
+    ...(blocked ? {} : { available: true }),
+    is_online: !blocked,
   }
 
   const { error } = await getSupabaseAdmin()
@@ -39,5 +45,5 @@ export async function POST(req: NextRequest) {
     .is('deleted_at', null)
 
   if (error) return NextResponse.json({ error: 'Location update failed' }, { status: 500 })
-  return NextResponse.json({ success: true, available: true, location_updated_at: now })
+  return NextResponse.json({ success: true, available: blocked ? false : true, location_updated_at: now })
 }
