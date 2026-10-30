@@ -56,13 +56,19 @@ self.addEventListener('notificationclick', function(event) {
   const fullUrl = self.location.origin + targetUrl
 
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-      // Аль хэдийн нээлттэй driver tab байвал тэр tab-г focus хийх
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async function(clientList) {
       for (const client of clientList) {
-        if (client.url.includes('/driver') && 'focus' in client) {
-          client.postMessage({ type: 'NEW_ORDER', orderId: event.notification.data?.order_id || null })
-          return client.focus()
+        if (!client.url.startsWith(self.location.origin) || !('focus' in client)) continue
+        client.postMessage({ type: 'NEW_ORDER', orderId: event.notification.data?.order_id || null })
+        if ('navigate' in client && client.url !== fullUrl) {
+          try {
+            const navigated = await client.navigate(fullUrl)
+            return navigated ? navigated.focus() : client.focus()
+          } catch {
+            return client.focus()
+          }
         }
+        return client.focus()
       }
       return clients.openWindow(fullUrl)
     })
