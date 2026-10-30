@@ -1,22 +1,46 @@
 import { pickupPoint } from '@/lib/order-offers'
 
 export const BOOKING_DRAFT_KEY = 'achilt_booking_draft'
-export type BookingScreen = 'map' | 'vehicle' | 'destination' | 'car' | 'review' | 'detail' | 'edit-vehicle' | 'edit-destination' | 'edit-car'
-export const isBookingScreen = (value: string): value is BookingScreen => ['map', 'vehicle', 'destination', 'car', 'review', 'detail', 'edit-vehicle', 'edit-destination', 'edit-car'].includes(value)
-export type BookingDraft = { carType: string; dest: string; carMark: string; extraAddress: string; location: { lat: number; lng: number } | null; orderId: string | null; request?: { id: string; payload: string } }
+export type BookingScreen = 'map' | 'service' | 'service-details' | 'vehicle' | 'destination' | 'car' | 'review' | 'detail' | 'edit-vehicle' | 'edit-destination' | 'edit-car'
+export const isBookingScreen = (value: string): value is BookingScreen => ['map', 'service', 'service-details', 'vehicle', 'destination', 'car', 'review', 'detail', 'edit-vehicle', 'edit-destination', 'edit-car'].includes(value)
+export type BookingDraft = {
+  carType: string
+  dest: string
+  carMark: string
+  extraAddress: string
+  serviceDetails?: Record<string, string>
+  location: { lat: number; lng: number } | null
+  orderId: string | null
+  request?: { id: string; payload: string }
+}
 let memoryDraft: BookingDraft | null = null
 let useMemoryDraft = false
+
+function cleanServiceDetails(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const result: Record<string, string> = {}
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (/^[a-z_]{1,40}$/.test(key) && typeof item === 'string') result[key] = item.slice(0, 500)
+  }
+  return result
+}
+
 export function readBookingDraft(): BookingDraft | null {
   if (useMemoryDraft) return memoryDraft
   try {
     const value = JSON.parse(sessionStorage.getItem(BOOKING_DRAFT_KEY) || 'null')
     if (!value || !['', 'butten', 'chiregch'].includes(value.carType) || !['dest', 'carMark', 'extraAddress'].every(key => typeof value[key] === 'string')) return null
-    return { ...value, location: pickupPoint(value.location?.lat, value.location?.lng), orderId: typeof value.orderId === 'string' ? value.orderId : null }
+    return {
+      ...value,
+      serviceDetails: cleanServiceDetails(value.serviceDetails),
+      location: pickupPoint(value.location?.lat, value.location?.lng),
+      orderId: typeof value.orderId === 'string' ? value.orderId : null,
+    }
   } catch { return memoryDraft }
 }
 export function saveBookingDraft(draft: BookingDraft) {
-  memoryDraft = draft
-  try { sessionStorage.setItem(BOOKING_DRAFT_KEY, JSON.stringify(draft)); useMemoryDraft = false } catch { useMemoryDraft = true }
+  memoryDraft = { ...draft, serviceDetails: cleanServiceDetails(draft.serviceDetails) }
+  try { sessionStorage.setItem(BOOKING_DRAFT_KEY, JSON.stringify(memoryDraft)); useMemoryDraft = false } catch { useMemoryDraft = true }
 }
 export function clearBookingDraft() {
   memoryDraft = null
