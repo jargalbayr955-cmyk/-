@@ -22,7 +22,7 @@ test('admin creates a phone-only driver with fixed initial PIN 000000', () => {
   assert.match(migration, /session_version = pg_catalog\.gen_random_uuid\(\)/)
 })
 
-test('incomplete drivers can restore session only for onboarding and normal drivers are work-enabled', () => {
+test('incomplete drivers restore only for onboarding; configured drivers are always eligible when not blocked', () => {
   const driver = read('lib/server/driver.ts')
   const session = read('app/api/driver/session/route.ts')
   assert.match(driver, /driverNeedsOnboarding/)
@@ -30,8 +30,10 @@ test('incomplete drivers can restore session only for onboarding and normal driv
   assert.match(driver, /!options\.allowIncomplete && driverNeedsOnboarding\(driver\)/)
   assert.match(session, /requireDriver\(req, \{ allowIncomplete: true \}\)/)
   assert.match(session, /const needsOnboarding = driverNeedsOnboarding\(driver\)/)
-  assert.match(session, /const autoStart = !needsOnboarding && driverServiceProfileIsComplete\(driver\)/)
-  assert.match(session, /update\(\{ available: true, is_online: false \}\)/)
+  assert.match(session, /const configured = !needsOnboarding && driverServiceProfileIsComplete\(driver\)/)
+  assert.match(session, /driverHasBlockingWork\(driver\.id\)/)
+  assert.match(session, /const autoStart = configured && !blocked/)
+  assert.match(session, /available: shouldBeAvailable, is_online: false/)
   assert.match(session, /needsOnboarding, autoStart/)
 })
 
