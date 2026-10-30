@@ -20,11 +20,13 @@ test('group chat is private, direction scoped and retained for 30 days', () => {
   assert.match(route, /body\.length > 2000/)
 })
 
-test('peer map API only returns drivers from the same registered direction', () => {
+test('peer map keeps every active recent driver visible while chat rooms stay direction scoped', () => {
   const route = read('app/api/driver/peers/route.ts')
-  assert.match(route, /driverRoomProfile\(driver\.service_type, driver\.car_type\)/)
-  assert.match(route, /\.eq\('service_type', room\.serviceType\)/)
-  assert.match(route, /if \(room\.carType\) query = query\.eq\('car_type', room\.carType\)/)
+  assert.match(route, /requireDriver\(req\)/)
+  assert.match(route, /select\('id,name,service_type,car_type,available,lat,lng,location_updated_at'\)/)
+  assert.doesNotMatch(route, /driverRoomProfile/)
+  assert.doesNotMatch(route, /\.eq\('service_type'/)
+  assert.doesNotMatch(route, /\.eq\('car_type'/)
   assert.doesNotMatch(route, /select\([^\n]*phone/)
 })
 

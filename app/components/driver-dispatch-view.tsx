@@ -49,6 +49,10 @@ export function DriverDispatchView(props: Props) {
   const sorted = nearbyOrders(orders, position)
   const selected = sorted.find(order => order.id === selectedId) || sorted[0] || null
   const selectedPeer = peers.find(peer => peer.id === selectedPeerId) || null
+  const selectedPeerLat = selectedPeer?.lat ?? null
+  const selectedPeerLng = selectedPeer?.lng ?? null
+  const driverLat = position?.lat ?? null
+  const driverLng = position?.lng ?? null
   const offered = selected && (sentOffers[selected.id] || selected.has_offered)
   const locationDenied = /зөвшөөрөл хаалттай/i.test(locationMessage)
   const profileReady = serviceProfileIsComplete(driver.service_type, driver.car_type)
@@ -81,18 +85,18 @@ export function DriverDispatchView(props: Props) {
   }, [])
 
   useEffect(() => {
-    if (!selectedPeer || !position) {
+    if (selectedPeerLat == null || selectedPeerLng == null || driverLat == null || driverLng == null) {
       setRoadMeters(null); setRoadLoading(false); setRoadError('')
       return
     }
     let cancelled = false
     setRoadLoading(true); setRoadMeters(null); setRoadError('')
-    void roadDistanceBetween(position, { lat: selectedPeer.lat, lng: selectedPeer.lng })
+    void roadDistanceBetween({ lat: driverLat, lng: driverLng }, { lat: selectedPeerLat, lng: selectedPeerLng })
       .then(meters => { if (!cancelled) setRoadMeters(meters) })
       .catch(() => { if (!cancelled) setRoadError('Замын зайг одоогоор тооцоолж чадсангүй') })
       .finally(() => { if (!cancelled) setRoadLoading(false) })
     return () => { cancelled = true }
-  }, [selectedPeer?.id, selectedPeer?.lat, selectedPeer?.lng, driver.lat, driver.lng])
+  }, [selectedPeerId, selectedPeerLat, selectedPeerLng, driverLat, driverLng])
 
   useEffect(() => {
     if (selectedPeerId && !peers.some(peer => peer.id === selectedPeerId)) setSelectedPeerId(null)
@@ -173,7 +177,7 @@ export function DriverDispatchView(props: Props) {
   }
 
   return <div ref={root} className="driver-dispatch-page">
-    <DriverOrdersMap driver={position} fresh={fresh} orders={orders} selectedId={selected?.id || null} onSelect={selectOrder}
+    <DriverOrdersMap driver={position} fresh={fresh} orders={orders} selectedId={selectedPeer ? null : selected?.id || null} onSelect={selectOrder}
       peers={peers} selectedPeerId={selectedPeerId} onPeerSelect={focusPeer} />
     <header className="driver-dispatch-header">
       <div className="driver-dispatch-toolbar">
@@ -186,7 +190,7 @@ export function DriverDispatchView(props: Props) {
       </div>
       <div className="driver-dispatch-status">
         <span className={fresh ? 'driver-status-ready' : ''} role="status">
-          {fresh ? `● ОНЛАЙН · Захиалга хүлээж байна · GPS автомат${peers.length ? ` · ${peers.length} ижил чиглэлийн жолооч` : ''}` : '● ОНЛАЙН · GPS байршил шинэчлэгдэж байна…'}
+          {fresh ? `● ОНЛАЙН · Захиалга хүлээж байна · GPS автомат${peers.length ? ` · ${peers.length} жолооч` : ''}` : '● ОНЛАЙН · GPS байршил шинэчлэгдэж байна…'}
         </span>
         {!nativeDriver && <button onClick={onSubscribe} aria-label={pushReady ? 'Мэдэгдэл асаалттай' : 'Захиалгын мэдэгдэл авах'}>
           {pushReady ? '🔔 Асаалттай' : notificationsDenied ? '🔕 Хаалттай' : '🔔 Мэдэгдэл асаах'}
@@ -220,7 +224,7 @@ export function DriverDispatchView(props: Props) {
       {selectedPeer ? <div style={{display:'grid', gap:10}}>
         <div style={{display:'flex', alignItems:'flex-start', gap:10}}>
           <div style={{flex:1, minWidth:0}}>
-            <div style={{fontSize:11, color:'#8993a0', fontWeight:800, marginBottom:3}}>ТАНЫ ЧИГЛЭЛИЙН ЖОЛООЧ</div>
+            <div style={{fontSize:11, color:'#8993a0', fontWeight:800, marginBottom:3}}>ЖОЛООЧ</div>
             <h1 style={{margin:0, fontSize:20, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{selectedPeer.name}</h1>
             <div style={{marginTop:4, color:selectedPeer.available && selectedPeer.fresh ? '#65d98b' : '#9aa4b1', fontSize:12}}>
               {selectedPeer.available && selectedPeer.fresh ? '● Онлайн' : '○ Сүүлд харагдсан'} · {driverServiceLabel(selectedPeer.service_type, selectedPeer.car_type)}
