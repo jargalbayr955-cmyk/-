@@ -17,7 +17,6 @@ function AuthForm() {
   const [step, setStep] = useState<'phone' | 'otp'>('phone')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [signedOut, setSignedOut] = useState(false)
   const [resendAt, setResendAt] = useState(0)
   const [, setTick] = useState(0)
   const pending = useRef(false)
@@ -27,12 +26,7 @@ function AuthForm() {
   useEffect(() => {
     const rememberedPhone = readRememberedCustomerPhone()
     if (rememberedPhone) setPhone(rememberedPhone)
-    try {
-      if (sessionStorage.getItem('achilt_signed_out') === '1') {
-        setSignedOut(true)
-        sessionStorage.removeItem('achilt_signed_out')
-      }
-    } catch {}
+    try { sessionStorage.removeItem('achilt_signed_out') } catch {}
   }, [])
 
   useEffect(() => {
@@ -122,10 +116,8 @@ function AuthForm() {
       <div style={{ marginBottom: 10 }}>
         <BrandAccess className="auth-brand-mark" />
       </div>
-      <p className="auth-eyebrow">АЧИЛТ • ТУСЛАМЖ ОЙРХОН</p>
       <h1 id="auth-title">Тавтай морил</h1>
-      <p className="auth-intro">Утасны дугаараа баталгаажуулаад шууд газрын зураг дээр байршлаа сонгоно. Дараа нь “Жолооч хайх” дээр хэрэгтэй үйлчилгээгээ сонгоно.</p>
-      {signedOut && <p className="auth-success" role="status">Амжилттай гарлаа. Энэ төхөөрөмж 90 хоногийн баталгаажуулалттай хэвээр бол доорх товчийг дарахад OTP SMS явуулахгүйгээр шууд нэвтэрнэ.</p>}
+      <img className="auth-welcome-banner" src="/welcome-achilt-banner.svg" alt="Ачилт үйлчилгээ — хамгийн ойр, хямд, хурдан" />
 
       {step === 'phone' ? <>
         <h2 className="auth-section-title">Утасны дугаараар нэвтрэх</h2>
