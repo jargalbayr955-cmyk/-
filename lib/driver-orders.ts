@@ -11,6 +11,7 @@ export type DriverOrder = {
   service_type: string | null
   car_type: string | null
   car_mark: string | null
+  service_details?: Record<string, string> | null
   has_offered?: boolean
 }
 export function vehicleLabel(type: string | null) {
