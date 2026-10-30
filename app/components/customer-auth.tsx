@@ -119,9 +119,21 @@ function AuthForm() {
       </div>
       <h1 id="auth-title">Тавтай морил</h1>
       <img
-        src="/api/welcome-banner?v=3"
+        src="/api/welcome-banner?v=4"
         alt="Ачилт үйлчилгээ — хамгийн ойр, хямд, хурдан"
         className={styles.banner}
+        width={960}
+        height={540}
+        loading="eager"
+        fetchPriority="high"
+        decoding="sync"
+        draggable={false}
+        onError={event => {
+          const image = event.currentTarget
+          if (image.dataset.fallback) return
+          image.dataset.fallback = '1'
+          image.src = '/welcome-achilt-banner.svg?v=4'
+        }}
       />
 
       {step === 'phone' ? <>
