@@ -105,12 +105,14 @@ revoke all on function public.reset_driver_pin_verified(text,text) from anon;
 revoke all on function public.reset_driver_pin_verified(text,text) from authenticated;
 grant execute on function public.reset_driver_pin_verified(text,text) to service_role;
 
--- The old direct-registration flow assigned 000000 to every self-registered driver.
--- Invalidate that universal credential without killing already-issued remembered sessions.
+-- The old direct self-registration flow assigned 000000 to every completed driver.
+-- Keep the separate admin-created "Шинэ жолооч" onboarding flow intact: those accounts
+-- are deliberately forced through the existing first-login PIN change gate.
 update public.drivers
 set pin=null,
     pin_hash=extensions.crypt(pg_catalog.gen_random_uuid()::text,extensions.gen_salt('bf',10))
 where deleted_at is null
   and active=true
+  and coalesce(pg_catalog.btrim(name),'') <> 'Шинэ жолооч'
   and pin_hash is not null
   and pin_hash = extensions.crypt('000000', pin_hash);
