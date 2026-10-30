@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { setDeviceSession } from '@/lib/server/device-session'
+import { setDeviceSession, setTrustedDriverDevice } from '@/lib/server/device-session'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { allowRequest, getClientIp, isSessionConfigured, normalizeMnPhone } from '@/lib/server/security'
 import { isServiceType, isTowType } from '@/lib/service-types'
@@ -89,5 +89,6 @@ export async function POST(req: NextRequest) {
     redirect: '/driver',
   }, { headers: { 'Cache-Control': 'private, no-store' } })
   setDeviceSession(response, driver.id, 'driver', session_version)
+  setTrustedDriverDevice(response, driver.id, session_version)
   return response
 }
