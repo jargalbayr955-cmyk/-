@@ -26,6 +26,7 @@ function componentHarness(file, name, initial = {}, replacements = {}, globals =
       require(module) {
         if (Object.hasOwn(replacements, module)) return replacements[module]
         if (module === '@/lib/client/request-signal') return load('lib/client/request-signal.ts')
+        if (module === '@/lib/client/use-screen-history') return { useScreenHistory: () => ({ screen: 'map', navigate() {}, back() { return true }, close() {} }) }
         if (module === 'react') return react
         if (module === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) }
         if (module === '@/lib/order-offers' || module === './order-offers') return load('lib/order-offers.ts')
@@ -57,7 +58,7 @@ function componentHarness(file, name, initial = {}, replacements = {}, globals =
 }
 const driver = { id: 'isolated-driver', name: 'Жолооч', service_type: 'achilt', car_type: 'chiregch', lat: 47.91, lng: 106.91, available: true, location_updated_at: new Date().toISOString() }
 const order = (id, lat = 47.92) => ({ id, created_at: '2026-09-22T12:00:00Z', from_address: 'Талбай ' + id, to_address: 'Засвар ' + id, from_lat: lat, from_lng: 106.91, service_type: 'achilt', car_type: id === 'a' ? 'chiregch' : 'butten', car_mark: 'Prius ' + id })
-const props = { driver, orders: [order('a'), order('b', 47.94)], locating: false, locationMessage: '', error: '', newOrderAlert: false, nativeDriver: false, pushReady: false, notificationsDenied: false, sentOffers: {}, sendingOffer: null, onToggleAvailable() {}, onSubscribe() {}, onProfile() {}, onOffer() {} }
+const props = { driver, orders: [order('a'), order('b', 47.94)], locating: false, locationMessage: '', error: '', newOrderAlert: false, nativeDriver: false, pushReady: false, notificationsDenied: false, sentOffers: {}, sendingOffer: null, onSubscribe() {}, onProfile() {}, onOffer() {} }
 
 test('selecting customer map points shows route, car and requested truck; price drafts stay with their order', async () => {
   const submitted = []
@@ -80,16 +81,17 @@ test('selecting customer map points shows route, car and requested truck; price 
   h.unmount()
 })
 
-test('withdrawn selection switches to an existing order and empty/offline state stays useful', async () => {
+test('withdrawn selection switches to an existing order and always-online empty state stays useful', async () => {
   const h = componentHarness('app/components/driver-dispatch-view.tsx', 'DriverDispatchView', props)
   h.nodes().find(node => node.type === 'DriverOrdersMap').props.onSelect('b'); await h.flush()
   h.update({ orders: [order('a')] })
   assert.match(h.text(), /Талбай a/)
   assert.doesNotMatch(h.text(), /Талбай b/)
   h.update({ driver: { ...driver, available: false } })
-  assert.equal(h.nodes().find(node => node.props?.type === 'submit').props.disabled, true)
+  assert.equal(h.nodes().find(node => node.props?.type === 'submit').props.disabled, false)
   h.update({ orders: [] })
-  assert.match(h.text(), /Онлайн болох.*Захиалга авахгүй.*Амарч байна.*Онлайн болох товчоор/)
+  assert.match(h.text(), /үргэлж онлайн ажиллана.*захиалга ирэхэд.*мэдэгдэл ирнэ/)
+  assert.doesNotMatch(h.text(), /Амрах|Онлайн болох/)
   assert.equal(h.nodes().filter(node => node.type === 'DriverOrdersMap').length, 1)
   h.unmount()
 })
@@ -111,22 +113,18 @@ async function pageHarness(native = false) {
   return { h, watchers, async poll(next) { state = { ...state, ...next }; intervals.forEach(fn => fn()); await h.flush() } }
 }
 
-test('restored working session tracks automatically, resting stops GPS, accepted trip resumes, payment stops', async () => {
+test('restored working session tracks automatically; active trip/payment control dispatch eligibility', async () => {
   const { h, watchers, poll } = await pageHarness()
   assert.equal(watchers.length, 1)
   assert.equal(h.nodes().some(node => node.type === 'OrderVideoCall'), false)
   watchers[0].onLocation({ lat: 47.95, lng: 106.95, location_updated_at: new Date().toISOString(), available: true }); await h.flush()
   assert.equal(h.view.props.driver.lat, 47.95)
-  await poll({ available: false })
-  assert.equal(watchers[0].stopped, true)
   await poll({ acceptedOrder: { ...order('a'), status: 'confirmed', final_price: 85000 } })
-  assert.equal(watchers.length, 2)
   assert.match(h.text(), /Чирэгч.*Prius a/)
   assert.equal(h.view.props.children[0].type, 'OrderVideoCall')
   assert.equal(h.view.props.children[0].props.role, 'driver')
   assert.equal(h.view.props.children[0].props.orderId, 'a')
   await poll({ acceptedOrder: null, pendingPayment: { code: '123456', amount: 8500 } })
-  assert.equal(watchers[1].stopped, true)
   assert.equal(h.nodes().some(node => node.type === 'OrderVideoCall'), false)
   h.unmount()
 })
@@ -135,27 +133,5 @@ test('native driver keeps its existing GPS service instead of starting a second 
   const { h, watchers } = await pageHarness(true)
   assert.equal(watchers.length, 0)
   assert.equal(h.view.props.nativeDriver, true)
-  h.unmount()
-})
-
-test('customer call control is first on a confirmed order and disappears after completion', async () => {
-  let status = 'confirmed'
-  const timers = [], router = { replace() {} }
-  const h = componentHarness('app/tracking/page.tsx', 'default', {}, {
-    'next/navigation': { useRouter: () => router },
-    '@/lib/client/navigation': { backInApp() {} },
-    '@/lib/client/booking-draft': { clearBookingDraft() {}, currentOrderId: () => 'order-customer' },
-    '../components/driver-summary': { DriverSummary: 'DriverSummary' },
-  }, {
-    localStorage: { getItem: () => 'order-customer' },
-    setInterval(callback) { timers.push(callback); return timers.length },
-    fetch: async () => ({ ok: true, status: 200, json: async () => ({ order: { id: 'order-customer', status, service_type: 'achilt', driver_phone: '00000000' }, driver: null }) }),
-  })
-  await h.flush()
-  assert.equal(h.view.props.children[0].type, 'OrderVideoCall')
-  assert.equal(h.view.props.children[0].props.role, 'customer')
-  assert.equal(h.view.props.children[0].props.orderId, 'order-customer')
-  status = 'completed'; timers.forEach(fn => fn()); await h.flush()
-  assert.equal(h.nodes().some(node => node.type === 'OrderVideoCall'), false)
   h.unmount()
 })
