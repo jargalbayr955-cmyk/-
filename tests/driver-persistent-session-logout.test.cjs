@@ -20,11 +20,11 @@ test('driver registration and remembered session go straight back to the driver 
   assert.match(clientSession, /if \(driver\?\.ok\) return \{ destination: '\/driver', user: null \}/)
 })
 
-test('session restore preserves an explicit resting state instead of forcing the driver online', () => {
+test('session restore re-enables a configured driver instead of keeping a manual rest state', () => {
   const sessionRoute = read('app/api/driver/session/route.ts')
-  assert.match(sessionRoute, /driver\.available && driverServiceProfileIsComplete/)
-  assert.doesNotMatch(sessionRoute, /update\(\{ available: true/)
-  assert.match(sessionRoute, /NextResponse\.json\(\{ driver, needsOnboarding, autoStart \}\)/)
+  assert.match(sessionRoute, /const autoStart = !needsOnboarding && driverServiceProfileIsComplete\(driver\)/)
+  assert.match(sessionRoute, /update\(\{ available: true, is_online: false \}\)/)
+  assert.match(sessionRoute, /NextResponse\.json\(\{ driver: profile, needsOnboarding, autoStart \}\)/)
 })
 
 test('driver profile has an explicit bottom logout and vehicle number stays optional', () => {
