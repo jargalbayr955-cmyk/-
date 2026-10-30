@@ -12,8 +12,7 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = getSupabaseAdmin()
-  // A driver can come online after a customer's first search returned no candidates.
-  // Run before reading invitations so the same poll includes the recovered order.
+  // A signed-in eligible driver is always work-enabled. Fresh GPS remains the hard dispatch gate.
   if (driver.available) {
     const { data, error } = await supabase.rpc('refresh_waiting_orders_for_driver', { p_driver_id: driver.id })
     if (error) {
@@ -28,7 +27,7 @@ export async function GET(req: NextRequest) {
   const now = new Date().toISOString()
   const [{ data: invites, error: inviteError }, { data: acceptedOrder, error: acceptedError }, { data: pendingPayment, error: paymentError }] = await Promise.all([
     supabase.from('driver_invites').select('order_id,status,expires_at,rank').eq('driver_id', driver.id).in('status', ['active', 'offered']).gt('expires_at', now).order('rank', { ascending: false }).limit(30),
-    supabase.from('orders').select('id,created_at,from_address,to_address,from_lat,from_lng,status,service_type,car_type,car_mark,driver_id,driver_name,driver_phone,user_phone,final_price').eq('driver_id', driver.id).eq('status', 'confirmed').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('orders').select('id,created_at,from_address,to_address,from_lat,from_lng,status,service_type,car_type,car_mark,service_details,driver_id,driver_name,driver_phone,user_phone,final_price').eq('driver_id', driver.id).eq('status', 'confirmed').order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('payment_codes').select('code,amount,order_id,fare_amount').eq('driver_id', driver.id).eq('used', false).order('id', { ascending: false }).limit(1).maybeSingle(),
   ])
 
@@ -42,7 +41,7 @@ export async function GET(req: NextRequest) {
   const inviteStatusByOrder = new Map(liveInvites.map(i => [i.order_id, i.status]))
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
-    .select('id,created_at,from_address,to_address,from_lat,from_lng,status,service_type,car_type,car_mark')
+    .select('id,created_at,from_address,to_address,from_lat,from_lng,status,service_type,car_type,car_mark,service_details')
     .in('id', orderIds)
     .eq('status', 'pending')
     .order('created_at', { ascending: false })
