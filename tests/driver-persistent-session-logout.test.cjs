@@ -20,10 +20,12 @@ test('driver registration and remembered session go straight back to the driver 
   assert.match(clientSession, /if \(driver\?\.ok\) return \{ destination: '\/driver', user: null \}/)
 })
 
-test('session restore re-enables a configured driver instead of keeping a manual rest state', () => {
+test('session restore re-enables a configured eligible driver and keeps blocking work unavailable', () => {
   const sessionRoute = read('app/api/driver/session/route.ts')
-  assert.match(sessionRoute, /const autoStart = !needsOnboarding && driverServiceProfileIsComplete\(driver\)/)
-  assert.match(sessionRoute, /update\(\{ available: true, is_online: false \}\)/)
+  assert.match(sessionRoute, /const configured = !needsOnboarding && driverServiceProfileIsComplete\(driver\)/)
+  assert.match(sessionRoute, /driverHasBlockingWork\(driver\.id\)/)
+  assert.match(sessionRoute, /const autoStart = configured && !blocked/)
+  assert.match(sessionRoute, /available: shouldBeAvailable, is_online: false/)
   assert.match(sessionRoute, /NextResponse\.json\(\{ driver: profile, needsOnboarding, autoStart \}\)/)
 })
 
