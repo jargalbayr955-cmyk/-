@@ -8,9 +8,9 @@ const registration = fs.readFileSync(path.join(root, 'app/components/driver-regi
 const entry = fs.readFileSync(path.join(root, 'app/components/driver-registration-entry.tsx'), 'utf8')
 const auth = fs.readFileSync(path.join(root, 'app/components/customer-auth.tsx'), 'utf8')
 
-test('successful driver registration skips payment and goes straight to driver map', () => {
-  assert.match(registration, /Бүртгүүлээд шууд жолоочийн газрын зураг руу орно/)
-  assert.match(registration, /Төлбөр болон админы зөвшөөрөл хүлээхгүй/)
+test('successful driver registration verifies phone and goes straight to driver map without payment', () => {
+  assert.match(registration, /Утасны дугаараа OTP-оор баталгаажуулаад шууд газрын зураг руу орно/)
+  assert.match(registration, /Кодоо баталгаажуулмагц бүртгэл үүсэж шууд жолоочийн газрын зураг нээгдэнэ/)
   assert.match(registration, /window\.location\.replace/)
   assert.match(registration, /body\.redirect/)
   assert.match(registration, /'\/driver'/)
@@ -18,7 +18,8 @@ test('successful driver registration skips payment and goes straight to driver m
   assert.doesNotMatch(registration, /REGISTRATION_FEE/)
   assert.doesNotMatch(registration, /IBAN/)
   assert.doesNotMatch(registration, /ГҮЙЛГЭЭНИЙ УТГА/)
-  assert.doesNotMatch(registration, /6 оронтой PIN/)
+  assert.match(registration, /6 оронтой PIN/)
+  assert.match(registration, /OTP код авах/)
 })
 
 test('phone back closes driver registration before leaving the driver login page', () => {
