@@ -31,9 +31,9 @@ export async function POST(req: NextRequest) {
     lng: longitude,
     location_updated_at: now,
     last_heartbeat_at: now,
-    // There is no manual rest mode anymore. A driver is dispatch-available whenever
-    // there is no active trip or unpaid commission; GPS continues to update either way.
-    ...(blocked ? {} : { available: true }),
+    // No manual rest state exists. Active work/unpaid commission alone makes the
+    // driver unavailable for a new dispatch; GPS still keeps updating.
+    available: !blocked,
     is_online: !blocked,
   }
 
@@ -45,5 +45,5 @@ export async function POST(req: NextRequest) {
     .is('deleted_at', null)
 
   if (error) return NextResponse.json({ error: 'Location update failed' }, { status: 500 })
-  return NextResponse.json({ success: true, available: blocked ? false : true, location_updated_at: now })
+  return NextResponse.json({ success: true, available: !blocked, location_updated_at: now })
 }
