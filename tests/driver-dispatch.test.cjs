@@ -27,6 +27,7 @@ function componentHarness(file, name, initial = {}, replacements = {}, globals =
         if (Object.hasOwn(replacements, module)) return replacements[module]
         if (module === '@/lib/client/request-signal') return load('lib/client/request-signal.ts')
         if (module === '@/lib/client/use-screen-history') return { useScreenHistory: () => ({ screen: 'map', navigate() {}, back() { return true }, close() {} }) }
+        if (module === '@/lib/client/road-distance') return { roadDistanceBetween: async () => 1000, roadDistanceText: meters => `${Number(meters) / 1000} км` }
         if (module === 'react') return react
         if (module === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) }
         if (module === '@/lib/order-offers' || module === './order-offers') return load('lib/order-offers.ts')
@@ -34,6 +35,7 @@ function componentHarness(file, name, initial = {}, replacements = {}, globals =
         if (module === '@/lib/service-types' || module === './service-types') return load('lib/service-types.ts')
         if (module === './driver-orders-map') return { DriverOrdersMap: 'DriverOrdersMap' }
         if (module === './driver-chat-panel') return { DriverChatPanel: 'DriverChatPanel' }
+        if (module === './driver-group-chat-panel') return { DriverGroupChatPanel: 'DriverGroupChatPanel' }
         if (module === 'next/link') return { default: 'a' }
         if (module === 'next/navigation') return { useRouter: () => ({ push() {} }) }
         if (module === '../components/order-video-call') return { OrderVideoCall: 'OrderVideoCall' }
