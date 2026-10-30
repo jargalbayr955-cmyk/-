@@ -19,6 +19,7 @@ type Props = {
   sentOffers: Record<string, boolean>; sendingOffer: string | null
   onSubscribe: () => void; onProfile: () => void
   onOffer: (order: DriverOrder, price: string) => void
+  [legacyProp: string]: unknown
 }
 
 export function DriverDispatchView(props: Props) {
