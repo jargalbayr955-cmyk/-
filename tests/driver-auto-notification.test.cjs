@@ -5,14 +5,16 @@ const path = require('node:path')
 
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
 
-test('eligible driver login and session restore auto-start without a manual work button', () => {
+test('explicit login can auto-start, while session restore preserves an intentional rest state', () => {
   const login = read('app/api/driver/login/route.ts')
   const session = read('app/api/driver/session/route.ts')
   const view = read('app/components/driver-dispatch-view.tsx')
   assert.match(login, /autoStart = !\(await driverHasBlockingWork\(data\.id\)\)/)
   assert.match(login, /update\(\{ available: true, is_online: false \}\)/)
+  assert.match(session, /driver\.available && driverServiceProfileIsComplete\(driver\)/)
   assert.match(session, /autoStart = !\(await driverHasBlockingWork\(driver\.id\)\)/)
-  assert.match(session, /update\(\{ available: true, is_online: false \}\)/)
+  assert.doesNotMatch(session, /update\(\{ available: true, is_online: false \}\)/)
+  assert.match(session, /Session restore must not turn a resting driver back online/)
   assert.match(view, /driver\.available \? 'Амрах' : 'Онлайн болох'/)
   assert.doesNotMatch(view, /driver\.available \? 'Амрах' : 'Ажиллаж эхлэх'/)
 })
