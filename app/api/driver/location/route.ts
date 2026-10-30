@@ -31,9 +31,10 @@ export async function POST(req: NextRequest) {
     lng: longitude,
     location_updated_at: now,
     last_heartbeat_at: now,
-    // No manual rest state exists. Active work/unpaid commission alone makes the
-    // driver unavailable for a new dispatch; GPS still keeps updating.
-    available: !blocked,
+    // No manual rest state exists. An eligible driver is restored to available on
+    // every fresh GPS update; active work/unpaid commission preserves its existing
+    // unavailable state while GPS continues to update.
+    ...(blocked ? {} : { available: true }),
     is_online: !blocked,
   }
 
