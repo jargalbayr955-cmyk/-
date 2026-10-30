@@ -20,6 +20,13 @@ test('driver registration and remembered session go straight back to the driver 
   assert.match(clientSession, /if \(driver\?\.ok\) return \{ destination: '\/driver', user: null \}/)
 })
 
+test('session restore preserves an explicit resting state instead of forcing the driver online', () => {
+  const sessionRoute = read('app/api/driver/session/route.ts')
+  assert.match(sessionRoute, /driver\.available && driverServiceProfileIsComplete/)
+  assert.doesNotMatch(sessionRoute, /update\(\{ available: true/)
+  assert.match(sessionRoute, /NextResponse\.json\(\{ driver, needsOnboarding, autoStart \}\)/)
+})
+
 test('driver profile has an explicit bottom logout and vehicle number stays optional', () => {
   const profile = read('app/driver/profile/page.tsx')
   const route = read('app/api/driver/profile/route.ts')
@@ -41,7 +48,7 @@ test('explicit logout turns the driver offline, removes this device push endpoin
   assert.match(logout, /requireDriver\(req, \{ allowIncomplete: true \}\)/)
   assert.match(logout, /available: false/)
   assert.match(logout, /is_online: false/)
-  assert.match(logout, /notification_health: 'logged_out'/)
+  assert.match(logout, /notification_health: 'unknown'/)
   assert.match(logout, /createHash\('md5'\)/)
   assert.match(logout, /push_subscriptions/)
   assert.match(logout, /endpoint_hash/)
