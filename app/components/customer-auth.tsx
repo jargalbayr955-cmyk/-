@@ -117,7 +117,20 @@ function AuthForm() {
         <BrandAccess className="auth-brand-mark" />
       </div>
       <h1 id="auth-title">Тавтай морил</h1>
-      <img className="auth-welcome-banner" src="/welcome-achilt-banner.svg" alt="Ачилт үйлчилгээ — хамгийн ойр, хямд, хурдан" />
+      <img
+        src="/welcome-achilt-banner.svg"
+        alt="Ачилт үйлчилгээ — хамгийн ойр, хямд, хурдан"
+        style={{
+          width: '100%',
+          height: 'auto',
+          aspectRatio: '16 / 9',
+          objectFit: 'cover',
+          display: 'block',
+          margin: '16px 0 22px',
+          borderRadius: 18,
+          boxShadow: '0 18px 42px rgba(0,0,0,.46), 0 0 0 1px rgba(255,138,60,.16)'
+        }}
+      />
 
       {step === 'phone' ? <>
         <h2 className="auth-section-title">Утасны дугаараар нэвтрэх</h2>
