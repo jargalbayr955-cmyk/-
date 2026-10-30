@@ -32,10 +32,14 @@ export async function GET(req: NextRequest) {
 
     if (!user) return unauthorized(false)
     const res = NextResponse.json({ user, restored_from_device: restored }, { headers: { 'Cache-Control': 'private, no-store' } })
-    if (restored) setDeviceSession(res, user.id, 'customer')
-    else renewDeviceSession(req, res, user.id, 'customer')
-    // Refresh the trusted-device proof whenever a verified customer is seen.
-    setTrustedCustomerDevice(res, user.id)
+    if (restored) {
+      setDeviceSession(res, user.id, 'customer')
+      // A successful trust-based restore proves this device is still in use, so extend its remembered-device window.
+      setTrustedCustomerDevice(res, user.id)
+    } else {
+      // Preserve the previous cookie behavior for ordinary active-session checks.
+      renewDeviceSession(req, res, user.id, 'customer')
+    }
     return res
   } catch {
     return NextResponse.json({ error: 'Нэвтрэлт шалгах боломжгүй байна. Дахин оролдоно уу.' }, { status: 503, headers: { 'Cache-Control': 'private, no-store' } })

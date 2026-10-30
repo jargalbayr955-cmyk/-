@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
 
     const active = verifySession(req.cookies.get('achilt_driver_session')?.value, 'driver')
     const version = restoredVersion || active?.version || null
-    const res = NextResponse.json({ driver: profile, needsOnboarding, autoStart, restored_from_device: Boolean(restoredVersion) }, { headers: { 'Cache-Control':'private, no-store' } })
+    const res = NextResponse.json({ driver: profile, needsOnboarding, autoStart })
     if (restoredVersion) setDeviceSession(res, driver.id, 'driver', restoredVersion)
     else renewDeviceSession(req, res, driver.id, 'driver')
     setTrustedDriverDevice(res, driver.id, version)
