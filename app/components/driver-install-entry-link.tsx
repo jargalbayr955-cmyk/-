@@ -22,6 +22,7 @@ export function DriverInstallEntryLink() {
   const hostRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
+    setInstalled(browserStandaloneMode())
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {})
 
     const onBeforeInstall = (event: Event) => {
@@ -32,7 +33,7 @@ export function DriverInstallEntryLink() {
     const onInstalled = () => {
       setInstalled(true)
       setInstallPrompt(null)
-      setHelp('Ачилт апп суулгагдлаа. Утасны нүүрэн дээрх “Ачилт” icon-оос бүртгүүлэх/нэвтрэх нүүр шууд нээгдэнэ.')
+      setHelp('Ачилт апп суулгагдлаа. Утасны нүүрэн дээрх “Ачилт” icon-оос жолоочийн бүртгүүлэх/нэвтрэх нүүр шууд нээгдэнэ.')
     }
 
     window.addEventListener('beforeinstallprompt', onBeforeInstall)
@@ -86,7 +87,7 @@ export function DriverInstallEntryLink() {
       const choice = await installPrompt.userChoice
       setInstallPrompt(null)
       if (choice.outcome === 'accepted') {
-        setHelp('Суулгаж байна. Суулгасны дараа “Ачилт” icon-оос бүртгүүлэх/нэвтрэх нүүр шууд нээгдэнэ.')
+        setHelp('Суулгаж байна. Суулгасны дараа “Ачилт” icon-оос жолоочийн бүртгүүлэх/нэвтрэх нүүр шууд нээгдэнэ.')
       }
       return
     }
@@ -96,13 +97,13 @@ export function DriverInstallEntryLink() {
     const safari = /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua)
 
     if (browserStandaloneMode()) {
-      setHelp('Та одоо суулгасан апп дотор байна. Browser-оор энэ нүүрийг нээгээд аппыг дахин суулгана уу.')
+      setInstalled(true)
       return
     }
 
     if (ios) {
       setHelp(safari
-        ? 'Safari-ийн Share (□↑) → “Add to Home Screen” → Add дарна уу. Суулгасан icon бүртгүүлэх/нэвтрэх нүүрийг нээнэ.'
+        ? 'Safari-ийн Share (□↑) → “Add to Home Screen” → Add дарна уу. Суулгасан icon жолоочийн бүртгүүлэх/нэвтрэх нүүрийг нээнэ.'
         : 'iPhone дээр Safari-аар энэ нүүрийг нээгээд Share (□↑) → “Add to Home Screen” → Add дарна уу.')
       return
     }
@@ -110,32 +111,31 @@ export function DriverInstallEntryLink() {
     setHelp('Chrome-ийн ⋮ цэс → “Install app” эсвэл “Add to Home screen” дарна уу.')
   }
 
-  if (!target) return null
+  if (!target || installed) return null
 
   return createPortal(
     <div style={{ marginTop: 12, textAlign: 'center' }}>
       <button
         type="button"
         onClick={() => void install()}
-        disabled={installed}
         style={{
           display: 'block',
           width: '100%',
           boxSizing: 'border-box',
           borderRadius: 14,
           padding: '14px 16px',
-          background: installed ? 'rgba(34,197,94,0.14)' : 'rgba(255,255,255,0.06)',
-          border: installed ? '1px solid rgba(34,197,94,0.35)' : '1px solid rgba(255,255,255,0.16)',
+          background: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.16)',
           color: '#fff',
           fontSize: 15,
           fontWeight: 800,
-          cursor: installed ? 'default' : 'pointer',
+          cursor: 'pointer',
         }}
       >
-        {installed ? '✓ Жолооч апп суулгагдсан' : '📲 Жолооч апп утас дээр суулгах'}
+        📲 Жолооч апп утас дээр суулгах
       </button>
       <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: 12, lineHeight: 1.45, margin: '8px 4px 0' }}>
-        Эндээс шууд суулгана. Суулгасны дараа Ачилт icon бүртгүүлэх/нэвтрэх нүүрийг шууд нээнэ.
+        Эндээс шууд суулгана. Суулгасны дараа Ачилт icon жолоочийн бүртгүүлэх/нэвтрэх нүүрийг шууд нээнэ.
       </p>
       {help && <p role="status" style={{ color: '#ffd166', fontSize: 12, lineHeight: 1.5, margin: '8px 4px 0' }}>{help}</p>}
     </div>,
