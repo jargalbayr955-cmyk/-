@@ -11,36 +11,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many location updates' }, { status: 429 })
   }
 
-  const { lat, lng, available } = (await req.json().catch(() => null)) ?? {}
+  const { lat, lng } = (await req.json().catch(() => null)) ?? {}
   const latitude = Number(lat)
   const longitude = Number(lng)
   if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
     return NextResponse.json({ error: 'Invalid coordinates' }, { status: 400 })
   }
+  if (!serviceProfileIsComplete(driver.service_type, driver.car_type)) {
+    return NextResponse.json({ error: 'Профайл хэсэгт үйлчилгээний төрлөө бүрэн сонгоно уу' }, { status: 409 })
+  }
+
+  let blocked = false
+  try { blocked = await driverHasBlockingWork(driver.id) }
+  catch { return NextResponse.json({ error: 'Driver work state unavailable' }, { status: 503 }) }
 
   const now = new Date().toISOString()
-  const update: Record<string, unknown> = {
+  const update = {
     lat: latitude,
     lng: longitude,
     location_updated_at: now,
     last_heartbeat_at: now,
-    is_online: true,
-  }
-
-  if (available === false) {
-    update.available = false
-    update.is_online = false
-  } else if (!driver.available || available === true) {
-    // Login/session restore auto-starts the client watcher, but this is the only point
-    // where an idle driver becomes dispatchable: a fresh valid GPS fix must arrive first.
-    if (!serviceProfileIsComplete(driver.service_type, driver.car_type)) {
-      return NextResponse.json({ error: 'Профайл хэсэгт үйлчилгээний төрлөө бүрэн сонгоно уу' }, { status: 409 })
-    }
-    try {
-      if (!(await driverHasBlockingWork(driver.id))) update.available = true
-    } catch {
-      return NextResponse.json({ error: 'Driver state check failed' }, { status: 500 })
-    }
+    // No manual rest state exists. An eligible driver is restored to available on
+    // every fresh GPS update; active work/unpaid commission preserves its existing
+    // unavailable state while GPS continues to update.
+    ...(blocked ? {} : { available: true }),
+    is_online: !blocked,
   }
 
   const { error } = await getSupabaseAdmin()
@@ -51,5 +46,5 @@ export async function POST(req: NextRequest) {
     .is('deleted_at', null)
 
   if (error) return NextResponse.json({ error: 'Location update failed' }, { status: 500 })
-  return NextResponse.json({ success: true, available: update.available ?? driver.available, location_updated_at: now })
+  return NextResponse.json({ success: true, available: !blocked, location_updated_at: now })
 }

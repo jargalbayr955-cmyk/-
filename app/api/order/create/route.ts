@@ -4,7 +4,7 @@ import { requireCustomer } from '@/lib/server/customer'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 import { allowRequest, getClientIp } from '@/lib/server/security'
 import { notifyOrderInvites } from '@/lib/server/push'
-import { isServiceType, isTowType } from '@/lib/service-types'
+import { isServiceType, isTowType, normalizeServiceDetails } from '@/lib/service-types'
 
 export async function POST(req: NextRequest) {
   const user = await requireCustomer(req)
@@ -26,6 +26,10 @@ export async function POST(req: NextRequest) {
   if (!isTow && b.car_type != null && b.car_type !== '') {
     return NextResponse.json({ error: 'Үйлчилгээний төрөл зөрсөн байна' }, { status: 400 })
   }
+  const serviceDetails = normalizeServiceDetails(serviceType, b.service_details ?? {})
+  if (!serviceDetails || (!isTow && Object.keys(serviceDetails).length === 0)) {
+    return NextResponse.json({ error: 'Үйлчилгээний ажлын мэдээллээ бүрэн оруулна уу' }, { status: 400 })
+  }
 
   if (b.request_id !== undefined && (typeof b.request_id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(b.request_id))) return NextResponse.json({ error: 'Захиалгын хүсэлт буруу байна' }, { status: 400 })
   const { data, error } = await getSupabaseAdmin().rpc('create_customer_order_atomic', {
@@ -40,6 +44,7 @@ export async function POST(req: NextRequest) {
       from_lng: lng,
       car_type: isTow ? b.car_type : null,
       car_mark: isTow ? b.car_mark.trim().slice(0, 120) : '',
+      service_details: serviceDetails,
     },
   })
   if (error || !data?.order) return NextResponse.json({ error: error?.code === '22023' ? 'Захиалгын мэдээлэл өөрчлөгдсөн байна. Дахин шалгана уу.' : 'Захиалга үүсгэхэд алдаа гарлаа. Дахин оролдоно уу.' }, { status: error?.code === '22023' ? 409 : 503 })

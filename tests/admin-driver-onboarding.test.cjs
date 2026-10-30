@@ -22,7 +22,7 @@ test('admin creates a phone-only driver with fixed initial PIN 000000', () => {
   assert.match(migration, /session_version = pg_catalog\.gen_random_uuid\(\)/)
 })
 
-test('incomplete drivers can restore session only for onboarding and are blocked from normal driver APIs', () => {
+test('incomplete drivers restore only for onboarding; configured drivers are always eligible when not blocked', () => {
   const driver = read('lib/server/driver.ts')
   const session = read('app/api/driver/session/route.ts')
   assert.match(driver, /driverNeedsOnboarding/)
@@ -30,7 +30,10 @@ test('incomplete drivers can restore session only for onboarding and are blocked
   assert.match(driver, /!options\.allowIncomplete && driverNeedsOnboarding\(driver\)/)
   assert.match(session, /requireDriver\(req, \{ allowIncomplete: true \}\)/)
   assert.match(session, /const needsOnboarding = driverNeedsOnboarding\(driver\)/)
-  assert.match(session, /if \(!needsOnboarding && driver\.available && driverServiceProfileIsComplete\(driver\)\)/)
+  assert.match(session, /const configured = !needsOnboarding && driverServiceProfileIsComplete\(driver\)/)
+  assert.match(session, /driverHasBlockingWork\(driver\.id\)/)
+  assert.match(session, /const autoStart = configured && !blocked/)
+  assert.match(session, /available: shouldBeAvailable, is_online: false/)
   assert.match(session, /needsOnboarding, autoStart/)
 })
 
@@ -49,7 +52,7 @@ test('first driver login is forced through name, plate and a new non-default six
   assert.match(profile, /setDeviceSession\(response, profile\.id, ['"]driver['"], sessionVersion\)/)
 })
 
-test('database onboarding changes the initial PIN atomically and keeps the driver unavailable until setup finishes', () => {
+test('database onboarding changes the initial PIN atomically before always-online restore begins', () => {
   const migration = read('supabase/migrations/20261028160900_admin_driver_onboarding.sql')
   assert.match(migration, /complete_admin_driver_onboarding/)
   assert.match(migration, /p_pin = '000000'/)

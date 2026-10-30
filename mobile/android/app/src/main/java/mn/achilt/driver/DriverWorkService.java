@@ -11,10 +11,10 @@ import org.json.*;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** Visible foreground location/order service. It may auto-start after an authenticated login. */
+/** Visible foreground location/order service. It auto-starts after an authenticated login. */
 public final class DriverWorkService extends Service implements LocationListener {
     static volatile DriverWorkService instance;
-    static volatile String status = "Амарч байна · Байршил илгээхгүй";
+    static volatile String status = "Онлайн · GPS эхлэхэд бэлэн";
     static volatile long lastUpload;
     private static final String WORK = "achilt_work", ORDERS = "achilt_orders";
     private final ScheduledExecutorService worker = Executors.newSingleThreadScheduledExecutor();
@@ -25,7 +25,6 @@ public final class DriverWorkService extends Service implements LocationListener
     private PowerManager.WakeLock wake;
     private volatile Location latest;
     private volatile boolean stopping;
-    private boolean starting = true;
     private String cookie, driverId;
     private long startedAt, sessionCheckedAt, heartbeatAt;
 
@@ -34,7 +33,7 @@ public final class DriverWorkService extends Service implements LocationListener
     static void stop(Runnable after) {
         DriverWorkService current = instance;
         if (current == null) { if (after != null) after.run(); return; }
-        current.finish("Амарч байна · Байршил илгээхгүй", true, after);
+        current.finish("Жолоочийн үйлчилгээ зогслоо", after);
     }
 
     @Override public void onCreate() {
@@ -42,7 +41,7 @@ public final class DriverWorkService extends Service implements LocationListener
         locations = getSystemService(LocationManager.class);
         notifications = getSystemService(NotificationManager.class);
         NotificationChannel work = new NotificationChannel(WORK, "Ажлын байршил", NotificationManager.IMPORTANCE_LOW);
-        work.setDescription("Ажиллаж байх үед байршил илгээж байгааг харуулна.");
+        work.setDescription("Нэвтэрсэн жолоочийн байршил шинэчлэгдэж байгааг харуулна.");
         notifications.createNotificationChannel(work);
         NotificationChannel orders = new NotificationChannel(ORDERS, "Шинэ захиалга", NotificationManager.IMPORTANCE_HIGH);
         orders.setDescription("Шинэ захиалга болон хэрэглэгч таны саналыг сонгосон үед яаралтай мэдэгдэнэ.");
@@ -54,14 +53,12 @@ public final class DriverWorkService extends Service implements LocationListener
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent == null) { stopSelf(); return START_NOT_STICKY; }
-        if ("STOP".equals(intent.getAction())) { stop(null); return START_NOT_STICKY; }
-        if (instance != null) return START_NOT_STICKY;
+        if (instance != null && instance != this) return START_STICKY;
         instance = this;
         cookie = DriverApi.cookie();
-        driverId = intent.getStringExtra("driverId");
+        if (intent != null && intent.getStringExtra("driverId") != null) driverId = intent.getStringExtra("driverId");
         startedAt = SystemClock.elapsedRealtime();
-        status = "GPS байршил тогтоож байна…";
+        status = "ОНЛАЙН · GPS байршил тогтоож байна…";
         try {
             if (Build.VERSION.SDK_INT >= 29) startForeground(1, workNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
             else startForeground(1, workNotification());
@@ -72,8 +69,8 @@ public final class DriverWorkService extends Service implements LocationListener
             if (locations.isProviderEnabled(LocationManager.NETWORK_PROVIDER))
                 locations.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 10_000, 0, this, Looper.getMainLooper());
             worker.scheduleWithFixedDelay(this::tick, 0, 10, TimeUnit.SECONDS);
-        } catch (Exception error) { finish("GPS зөвшөөрлөө шалгаад дахин эхлүүлнэ үү.", true, null); }
-        return START_NOT_STICKY;
+        } catch (Exception error) { finish("GPS зөвшөөрлөө шалгаад аппаа нээнэ үү.", null); }
+        return START_STICKY;
     }
 
     @Override public void onLocationChanged(Location location) {
@@ -81,9 +78,14 @@ public final class DriverWorkService extends Service implements LocationListener
         if (old == null || location.getElapsedRealtimeNanos() >= old.getElapsedRealtimeNanos()) latest = new Location(location);
     }
     @Override public void onProviderDisabled(String provider) {
-        if (LocationManager.GPS_PROVIDER.equals(provider)) finish("GPS унтарсан тул ажил зогслоо.", true, null);
+        if (LocationManager.GPS_PROVIDER.equals(provider)) {
+            status = "ОНЛАЙН · GPS унтарсан · Байршлаа асаана уу";
+            notifications.notify(1, workNotification());
+        }
     }
-    @Override public void onProviderEnabled(String provider) {}
+    @Override public void onProviderEnabled(String provider) {
+        if (LocationManager.GPS_PROVIDER.equals(provider)) status = "ОНЛАЙН · GPS байршил тогтоож байна…";
+    }
     @Override public void onStatusChanged(String provider, int status, Bundle extras) {}
 
     private void sendHeartbeat(long now) {
@@ -98,23 +100,24 @@ public final class DriverWorkService extends Service implements LocationListener
 
     private void tick() {
         if (stopping) return;
-        // A bounded lock keeps each work interval alive; cleanup always releases it.
         wake.acquire(90_000);
         try {
             NotificationChannel orderChannel = notifications.getNotificationChannel(ORDERS);
             if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
                 || !notifications.areNotificationsEnabled()
                 || orderChannel == null || orderChannel.getImportance() == NotificationManager.IMPORTANCE_NONE) {
-                finish("Байршил, мэдэгдлийн зөвшөөрлөө шалгана уу.", true, null); return;
+                finish("Байршил, мэдэгдлийн зөвшөөрлөө шалгана уу.", null); return;
             }
             if (!Objects.equals(cookie, DriverApi.cookie())) {
-                finish("Нэвтрэлт өөрчлөгдсөн. Аппаа нээгээд дахин эхлүүлнэ үү.", false, null); return;
+                finish("Нэвтрэлт өөрчлөгдсөн. Аппаа нээгээд дахин нэвтэрнэ үү.", null); return;
             }
             long now = SystemClock.elapsedRealtime();
             if (sessionCheckedAt == 0 || now - sessionCheckedAt >= 60 * 60_000) {
                 JSONObject session = DriverApi.call("/api/driver/session", null, cookie);
-                if (!Objects.equals(driverId, session.getJSONObject("driver").getString("id"))) {
-                    finish("Нэвтрэлт өөрчлөгдсөн байна.", false, null); return;
+                String currentId = session.getJSONObject("driver").getString("id");
+                if (driverId == null || driverId.isEmpty()) driverId = currentId;
+                else if (!Objects.equals(driverId, currentId)) {
+                    finish("Нэвтрэлт өөрчлөгдсөн байна.", null); return;
                 }
                 sessionCheckedAt = now;
             }
@@ -123,34 +126,27 @@ public final class DriverWorkService extends Service implements LocationListener
             JSONObject orders = DriverApi.call("/api/driver/orders", null, cookie);
             boolean accepted = orders.optJSONObject("acceptedOrder") != null;
             boolean unpaid = orders.optJSONObject("pendingPayment") != null;
-            if (unpaid || (!starting && !WorkPolicy.keepWorking(orders.optBoolean("available"), accepted, false))) {
-                finish(unpaid ? "Төлбөр хүлээгдэж байна · Байршил зогссон" : "Амарч байна · Байршил зогссон", false, null); return;
-            }
-            if (stopping) return;
+
             Location position = latest;
             long age = position == null ? Long.MAX_VALUE : (SystemClock.elapsedRealtimeNanos() - position.getElapsedRealtimeNanos()) / 1_000_000;
             if (position == null || !WorkPolicy.freshLocation(age, position.getAccuracy(), position.getLatitude(), position.getLongitude())) {
-                status = "GPS хүлээж байна · Шинэ байршил илгээгээгүй";
+                status = "ОНЛАЙН · GPS шинэ байршил хүлээж байна";
                 if (now - startedAt > 120_000 && (lastUpload == 0 || System.currentTimeMillis() - lastUpload > 120_000)) {
-                    finish("GPS олдсонгүй. Ил задгай газар дахин эхлүүлнэ үү.", true, null); return;
+                    status = "ОНЛАЙН · GPS олдсонгүй · Байршлаа шалгана уу";
                 }
             } else {
                 JSONObject body = new JSONObject().put("lat", position.getLatitude()).put("lng", position.getLongitude());
-                if (starting && !accepted) body.put("available", true);
-                JSONObject result = DriverApi.call("/api/driver/location", body, cookie);
-                if (starting && !accepted && !result.optBoolean("available")) {
-                    finish("Идэвхтэй ажил эсвэл төлбөрөө шалгана уу.", false, null); return;
-                }
-                starting = false;
+                DriverApi.call("/api/driver/location", body, cookie);
                 lastUpload = System.currentTimeMillis();
-                status = accepted ? "Захиалга гүйцэтгэж байна · GPS ажиллаж байна" : "Ажиллаж байна · GPS ажиллаж байна";
+                status = unpaid ? "ОНЛАЙН · Төлбөр хүлээгдэж байна · GPS ажиллаж байна"
+                    : accepted ? "ОНЛАЙН · Захиалга гүйцэтгэж байна · GPS ажиллаж байна"
+                    : "ОНЛАЙН · Захиалга хүлээж байна · GPS ажиллаж байна";
             }
             if (!stopping) alertOrders(orders);
         } catch (DriverApi.Failure error) {
-            if (error.status == 401 || error.status == 403) finish("Нэвтрэх эрх дууссан. Дахин нэвтэрнэ үү.", false, null);
-            else status = error.status == 409 ? error.getMessage() : "Холболт саатсан · Дахин холбогдож байна";
-            if (error.status == 409) finish(error.getMessage(), true, null);
-        } catch (Exception error) { status = "Сүлжээ тасарсан · Автоматаар дахин холбогдож байна"; }
+            if (error.status == 401 || error.status == 403) finish("Нэвтрэх эрх дууссан. Дахин нэвтэрнэ үү.", null);
+            else status = error.status == 409 ? error.getMessage() : "ОНЛАЙН · Холболт саатсан · Автоматаар дахин холбогдож байна";
+        } catch (Exception error) { status = "ОНЛАЙН · Сүлжээ тасарсан · Автоматаар дахин холбогдож байна"; }
         finally { if (!stopping) notifications.notify(1, workNotification()); }
     }
 
@@ -177,11 +173,9 @@ public final class DriverWorkService extends Service implements LocationListener
         return PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
     private Notification workNotification() {
-        PendingIntent stop = PendingIntent.getService(this, 1, new Intent(this, DriverWorkService.class).setAction("STOP"), PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         return new Notification.Builder(this, WORK).setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Ачилт Жолооч").setContentText(status).setContentIntent(openApp())
-            .setOngoing(true).setOnlyAlertOnce(true).setCategory(Notification.CATEGORY_SERVICE)
-            .addAction(new Notification.Action.Builder(null, "Амрах", stop).build()).build();
+            .setOngoing(true).setOnlyAlertOnce(true).setCategory(Notification.CATEGORY_SERVICE).build();
     }
     private void notifyOrder(String id, String title, String text) {
         notifications.notify(id, 2, new Notification.Builder(this, ORDERS).setSmallIcon(R.drawable.ic_notification)
@@ -191,21 +185,17 @@ public final class DriverWorkService extends Service implements LocationListener
             .setTimeoutAfter(600_000).build());
     }
 
-    private synchronized void finish(String message, boolean offline, Runnable after) {
+    private synchronized void finish(String message, Runnable after) {
         if (stopping) { if (after != null) worker.execute(() -> main.post(after)); return; }
         stopping = true;
         status = message;
         main.post(() -> locations.removeUpdates(this));
-        worker.execute(() -> {
-            if (offline) try { DriverApi.call("/api/driver/availability", new JSONObject().put("available", false), cookie); }
-            catch (Exception error) { status = message + " · Серверт төлөв батлагдаагүй; байршил хуучирмагц шинэ захиалга ирэхгүй."; }
-            main.post(() -> {
-                stopForeground(STOP_FOREGROUND_REMOVE);
-                for (String id : seen) notifications.cancel(id, 2);
-                stopSelf();
-                if (after != null) after.run();
-            });
-        });
+        worker.execute(() -> main.post(() -> {
+            stopForeground(STOP_FOREGROUND_REMOVE);
+            for (String id : seen) notifications.cancel(id, 2);
+            stopSelf();
+            if (after != null) after.run();
+        }));
     }
     @Override public void onDestroy() {
         stopping = true;
