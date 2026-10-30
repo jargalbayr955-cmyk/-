@@ -69,7 +69,7 @@ export function DriverRegistrationEntry() {
   }
 
   const registrationButton = target ? createPortal(
-    <div style={{ marginTop: 12, textAlign: 'center' }}>
+    <div style={{ marginTop: 12, textAlign: 'center', display:'grid', gap:8 }}>
       <button
         type="button"
         onClick={openRegistration}
@@ -79,8 +79,17 @@ export function DriverRegistrationEntry() {
           cursor: 'pointer'
         }}
       >🚚 Жолоочоор бүртгүүлэх</button>
-      <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: 12, lineHeight: 1.45, margin: '8px 4px 0' }}>
-        Шинээр жолооч болох бол эндээс бүртгэлээ эхлүүлнэ үү.
+      <button
+        type="button"
+        onClick={() => { window.location.href = '/driver/recover' }}
+        style={{
+          width:'100%', borderRadius:12, padding:'11px 14px', background:'transparent',
+          border:'1px solid rgba(255,255,255,0.12)', color:'rgba(255,255,255,.72)', fontSize:13, fontWeight:800,
+          cursor:'pointer'
+        }}
+      >🔐 PIN мартсан / сэргээх</button>
+      <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: 12, lineHeight: 1.45, margin: '0 4px' }}>
+        Шинээр жолооч болох бол бүртгүүлнэ. PIN мартсан бол SMS OTP-оор сэргээнэ.
       </p>
     </div>,
     target,
