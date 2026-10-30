@@ -22,12 +22,13 @@ test('new driver registration requires phone OTP and a user-chosen PIN', () => {
   assert.doesNotMatch(migration, /values\s*\([\s\S]*extensions\.crypt\('000000',extensions\.gen_salt\('bf',10\)\)/i)
 })
 
-test('legacy universal PIN is invalidated and recoverable only after OTP verification', () => {
+test('legacy universal PIN is invalidated only after OTP recovery is deployed', () => {
   const entry = read('app/components/driver-registration-entry.tsx')
   const recoverPage = read('app/driver/recover/page.tsx')
   const recoverRequest = read('app/api/driver/recover/request/route.ts')
   const recoverVerify = read('app/api/driver/recover/verify/route.ts')
-  const migration = read('supabase/migrations/20261030100000_driver_pin_security.sql')
+  const securityMigration = read('supabase/migrations/20261030100000_driver_pin_security.sql')
+  const cleanupMigration = read('supabase/migrations/20261030101500_invalidate_legacy_self_registration_pin.sql')
 
   assert.match(entry, /PIN мартсан \/ сэргээх/)
   assert.match(recoverPage, /\/api\/driver\/recover\/request/)
@@ -35,6 +36,8 @@ test('legacy universal PIN is invalidated and recoverable only after OTP verific
   assert.match(recoverRequest, /startPhoneVerification/)
   assert.match(recoverVerify, /checkPhoneVerification/)
   assert.match(recoverVerify, /reset_driver_pin_verified/)
-  assert.match(migration, /pin_hash = extensions\.crypt\('000000', pin_hash\)/)
-  assert.match(migration, /pin_hash=extensions\.crypt\(pg_catalog\.gen_random_uuid\(\)::text/)
+  assert.doesNotMatch(securityMigration, /pin_hash = extensions\.crypt\('000000', pin_hash\)/)
+  assert.match(cleanupMigration, /pin_hash = extensions\.crypt\('000000', pin_hash\)/)
+  assert.match(cleanupMigration, /pin_hash=extensions\.crypt\(pg_catalog\.gen_random_uuid\(\)::text/)
+  assert.match(cleanupMigration, /<> 'Шинэ жолооч'/)
 })
